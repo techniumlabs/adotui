@@ -1,0 +1,22 @@
+{
+  "name": "adotui",
+  "module": "src/main.tsx",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/main.tsx",
+    "start": "bun run src/main.tsx",
+    "typecheck": "bun x tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19.2.17"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "ink": "^7.1.0",
+    "react": "^19.2.7"
+  }
+}
