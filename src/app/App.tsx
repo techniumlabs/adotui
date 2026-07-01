@@ -293,6 +293,18 @@ export const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [state.autoRefresh]);
 
+  useEffect(() => {
+    // Auto-show files view when a PR is selected
+    if (selectedPr) {
+      setState((current) => ({
+        ...current,
+        focus: "files",
+        selectedFileIndex: 0,
+        banner: "Files view. Press 'd' for details, 'h' for PR list.",
+      }));
+    }
+  }, [selectedPr?.id]);
+
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
       exit();
@@ -751,8 +763,16 @@ export const App: React.FC = () => {
       if (input === "h" || key.leftArrow) {
         setState((current) => ({
           ...current,
+          focus: "list",
+          banner: "Focus: list",
+        }));
+      }
+
+      if (input === "d") {
+        setState((current) => ({
+          ...current,
           focus: "detail",
-          banner: "Focus: detail",
+          banner: "Focus: detail. Press 'h' for files, 'd' for PR list.",
         }));
       }
       return;
@@ -811,7 +831,6 @@ export const App: React.FC = () => {
             <PrDetails
               selectedPr={selectedPr}
               focus={state.focus}
-              diffViewMode={state.diffViewMode}
             />
           )}
         </Box>
@@ -821,8 +840,7 @@ export const App: React.FC = () => {
 
       <Box marginTop={1}>
         <Text color="gray">
-          keys: tab focus | tree: j/k repos, h/l orgs | list/detail/files: h/l
-          panes | files: j/k files | / command | r refresh | a approve | x
+          keys: tab focus | tree: j/k repos, h/l orgs | list: j/k prs | files: j/k, d details | detail: h files | / command | r refresh | a approve | x
           reject | c complete | o open | u unified | s split | q quit
         </Text>
       </Box>
