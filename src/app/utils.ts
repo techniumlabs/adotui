@@ -205,3 +205,67 @@ export const openInBrowser = (url: string): void => {
 
   Bun.spawn({ cmd, stdout: "ignore", stderr: "ignore" });
 };
+
+const ensureDiffPrefix = (line: string): string => {
+  if (line.startsWith("+") || line.startsWith("-") || line.startsWith(" ")) {
+    return line;
+  }
+
+  return ` ${line}`;
+};
+
+export const inferFileLangFromPath = (path: string): string => {
+  const extension = path.split(".").pop()?.toLowerCase() ?? "";
+
+  switch (extension) {
+    case "ts":
+    case "tsx":
+      return "typescript";
+    case "js":
+    case "jsx":
+      return "javascript";
+    case "json":
+      return "json";
+    case "md":
+      return "markdown";
+    case "yml":
+    case "yaml":
+      return "yaml";
+    default:
+      return "text";
+  }
+};
+
+export const buildTerminalDiffData = (fileChange: PullRequestFileChange) => {
+  const normalizedLines =
+    fileChange.diff.length > 0
+      ? fileChange.diff.map(ensureDiffPrefix)
+      : [" context unavailable"];
+
+  const addedLines = normalizedLines.filter((line) => line.startsWith("+")).length;
+  const deletedLines = normalizedLines.filter((line) => line.startsWith("-")).length;
+  const oldLength = Math.max(1, normalizedLines.length - addedLines);
+  const newLength = Math.max(1, normalizedLines.length - deletedLines);
+  const fileLang = inferFileLangFromPath(fileChange.path);
+
+  const hunk = [
+    `--- a/${fileChange.path}`,
+    `+++ b/${fileChange.path}`,
+    `@@ -1,${oldLength} +1,${newLength} @@`,
+    ...normalizedLines,
+  ].join("\n");
+
+  return {
+    oldFile: {
+      fileName: fileChange.path,
+      fileLang,
+      content: "",
+    },
+    newFile: {
+      fileName: fileChange.path,
+      fileLang,
+      content: "",
+    },
+    hunks: [hunk],
+  };
+};

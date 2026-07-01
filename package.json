@@ -16,6 +16,9 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@git-diff-view/cli": "^0.1.8",
+    "@git-diff-view/react": "^0.1.6",
+    "git-diff-view": "^0.0.13",
     "ink": "^7.1.0",
     "react": "^19.2.7"
   }

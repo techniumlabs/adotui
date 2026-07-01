@@ -609,6 +609,24 @@ export const App: React.FC = () => {
       return;
     }
 
+    if (input === "u") {
+      setState((current) => ({
+        ...current,
+        diffViewMode: "unified",
+        banner: "Diff mode: unified.",
+      }));
+      return;
+    }
+
+    if (input === "s") {
+      setState((current) => ({
+        ...current,
+        diffViewMode: "split",
+        banner: "Diff mode: split.",
+      }));
+      return;
+    }
+
     if (key.tab) {
       setState((current) => {
         const nextIndex =
@@ -733,7 +751,11 @@ export const App: React.FC = () => {
             selectedPrIndex={state.selectedPrIndex}
             focus={state.focus}
           />
-          <PrDetails selectedPr={selectedPr} focus={state.focus} />
+          <PrDetails
+            selectedPr={selectedPr}
+            focus={state.focus}
+            diffViewMode={state.diffViewMode}
+          />
         </Box>
       </Box>
 
@@ -742,8 +764,8 @@ export const App: React.FC = () => {
       <Box marginTop={1}>
         <Text color="gray">
           keys: tab focus | tree: j/k repos, h/l orgs | list/detail: h/l panes |
-          / command | r refresh | a approve | x reject | c complete | o open | q
-          quit
+          / command | r refresh | a approve | x reject | c complete | o open | u
+          unified | s split | q quit
         </Text>
       </Box>
 

@@ -24,6 +24,7 @@ export const INITIAL_STATE: AppState = {
   banner: "UI-first shell ready. Data is currently mocked.",
   autoRefresh: true,
   lastRefreshISO: new Date().toISOString(),
+  diffViewMode: "unified",
 };
 
 export const REFRESH_INTERVAL_MS = 60_000;

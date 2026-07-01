@@ -1,15 +1,26 @@
 import React from "react";
 import { Box, Text } from "ink";
+import { DiffModeEnum, DiffView } from "@git-diff-view/cli";
 import type { PullRequest } from "../../domain/types";
-import type { FocusArea } from "../types";
-import { fileChangeColor, formatRelativeAge, reviewColor } from "../utils";
+import type { DiffViewMode, FocusArea } from "../types";
+import {
+  buildTerminalDiffData,
+  fileChangeColor,
+  formatRelativeAge,
+  reviewColor,
+} from "../utils";
 
 type PrDetailsProps = {
   selectedPr?: PullRequest;
   focus: FocusArea;
+  diffViewMode: DiffViewMode;
 };
 
-export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => (
+export const PrDetails: React.FC<PrDetailsProps> = ({
+  selectedPr,
+  focus,
+  diffViewMode,
+}) => (
   <Box
     marginTop={1}
     borderStyle="round"
@@ -25,7 +36,8 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => (
           #{selectedPr.id} {selectedPr.title}
         </Text>
         <Text color="gray">
-          author {selectedPr.author} | updated {formatRelativeAge(selectedPr.updatedAt)}
+          author {selectedPr.author} | updated{" "}
+          {formatRelativeAge(selectedPr.updatedAt)}
         </Text>
         <Text color="gray">{`${selectedPr.sourceBranch} -> ${selectedPr.targetBranch}`}</Text>
         <Box>
@@ -40,27 +52,28 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => (
         </Box>
         <Text color="gray">url {selectedPr.url}</Text>
         <Box marginTop={1} flexDirection="column">
-          <Text color="gray">files changed {selectedPr.changedFiles.length}</Text>
+          <Text color="gray">
+            files changed {selectedPr.changedFiles.length} | mode {diffViewMode}
+          </Text>
           {selectedPr.changedFiles.length > 0 ? (
             selectedPr.changedFiles.map((fileChange) => (
               <Box key={fileChange.path} marginTop={1} flexDirection="column">
                 <Text color={fileChangeColor(fileChange.status)}>
-                  {fileChange.status} {fileChange.path} (+{fileChange.additions} -
-                  {fileChange.deletions})
+                  {fileChange.status} {fileChange.path} (+{fileChange.additions}{" "}
+                  -{fileChange.deletions})
                 </Text>
-                {fileChange.diff.map((line, lineIndex) => {
-                  const lineColor = line.startsWith("+")
-                    ? "green"
-                    : line.startsWith("-")
-                      ? "red"
-                      : "gray";
-
-                  return (
-                    <Text key={`${fileChange.path}-${lineIndex}`} color={lineColor}>
-                      {line}
-                    </Text>
-                  );
-                })}
+                <DiffView
+                  data={buildTerminalDiffData(fileChange)}
+                  diffViewMode={
+                    diffViewMode === "split"
+                      ? DiffModeEnum.Split
+                      : DiffModeEnum.Unified
+                  }
+                  diffViewTheme="dark"
+                  diffViewHighlight
+                  diffViewNoBG
+                  width={Math.max(60, (process.stdout.columns ?? 120) - 48)}
+                />
               </Box>
             ))
           ) : (
