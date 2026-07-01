@@ -7,7 +7,10 @@ type CommandBarProps = {
   commandText: string;
 };
 
-export const CommandBar: React.FC<CommandBarProps> = ({ focus, commandText }) => (
+export const CommandBar: React.FC<CommandBarProps> = ({
+  focus,
+  commandText,
+}) => (
   <Box
     marginTop={1}
     borderStyle="single"

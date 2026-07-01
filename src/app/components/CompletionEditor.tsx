@@ -8,7 +8,9 @@ type CompletionEditorProps = {
   state: AppState;
 };
 
-export const CompletionEditor: React.FC<CompletionEditorProps> = ({ state }) => {
+export const CompletionEditor: React.FC<CompletionEditorProps> = ({
+  state,
+}) => {
   if (state.focus !== "completion") {
     return null;
   }

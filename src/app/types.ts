@@ -1,6 +1,6 @@
 import type { AppData } from "../domain/types";
 
-export type FocusArea = "tree" | "list" | "detail" | "command" | "completion";
+export type FocusArea = "tree" | "list" | "detail" | "command" | "completion" | "files";
 
 export type MergeStrategy = "noFastForward" | "squash" | "rebase" | "rebaseMerge";
 
@@ -22,6 +22,7 @@ export type AppState = {
   selectedOrgIndex: number;
   selectedRepoIndex: number;
   selectedPrIndex: number;
+  selectedFileIndex: number;
   focus: FocusArea;
   commandText: string;
   completionOptions: CompletionOptions;

@@ -31,7 +31,8 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
       pullRequests.map((pr, prIndex) => (
         <Box key={pr.id}>
           <Text color={prIndex === selectedPrIndex ? "whiteBright" : "white"}>
-            {prIndex === selectedPrIndex ? ">" : " "} #{pr.id} {pr.draft ? "[draft] " : ""}
+            {prIndex === selectedPrIndex ? ">" : " "} #{pr.id}{" "}
+            {pr.draft ? "[draft] " : ""}
             {pr.title}
           </Text>
           <Text color={reviewColor(pr.reviewState)}> {pr.reviewState}</Text>

@@ -269,3 +269,43 @@ export const buildTerminalDiffData = (fileChange: PullRequestFileChange) => {
     hunks: [hunk],
   };
 };
+
+type FileTreeNode = {
+  name: string;
+  path: string;
+  isDir: boolean;
+  children: FileTreeNode[];
+};
+
+export const buildFileTree = (
+  files: PullRequestFileChange[],
+): FileTreeNode => {
+  const root: FileTreeNode = { name: "root", path: "", isDir: true, children: [] };
+
+  for (const file of files) {
+    const parts = file.path.split("/");
+    let current: FileTreeNode = root;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]!;
+      const isLast = i === parts.length - 1;
+      const fullPath = parts.slice(0, i + 1).join("/");
+
+      let node = current.children.find((n) => n.name === part);
+
+      if (!node) {
+        node = {
+          name: part,
+          path: fullPath,
+          isDir: !isLast,
+          children: [],
+        };
+        current.children.push(node);
+      }
+
+      current = node;
+    }
+  }
+
+  return root;
+};

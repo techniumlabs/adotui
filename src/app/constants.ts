@@ -17,6 +17,7 @@ export const INITIAL_STATE: AppState = {
   selectedOrgIndex: 0,
   selectedRepoIndex: 0,
   selectedPrIndex: 0,
+  selectedFileIndex: 0,
   focus: "tree",
   commandText: "",
   completionOptions: DEFAULT_COMPLETION_OPTIONS,
@@ -29,7 +30,7 @@ export const INITIAL_STATE: AppState = {
 
 export const REFRESH_INTERVAL_MS = 60_000;
 
-export const FOCUS_ORDER: FocusArea[] = ["tree", "list", "detail", "command"];
+export const FOCUS_ORDER: FocusArea[] = ["tree", "list", "detail", "files", "command"];
 
 export const COMPLETION_FIELD_LABELS = [
   "merge strategy",

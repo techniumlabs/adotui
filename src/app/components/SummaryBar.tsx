@@ -20,7 +20,9 @@ export const SummaryBar: React.FC<SummaryBarProps> = ({
     <Text color="green">active {activePrs}</Text>
     <Text color="white">total {totalPrs}</Text>
     <Text color="white">orgs {orgCount}</Text>
-    <Text color={autoRefresh ? "green" : "red"}>auto {autoRefresh ? "on" : "off"}</Text>
+    <Text color={autoRefresh ? "green" : "red"}>
+      auto {autoRefresh ? "on" : "off"}
+    </Text>
     <Text color="gray">last sync {relativeLastRefresh}</Text>
   </Box>
 );

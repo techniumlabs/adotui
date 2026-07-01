@@ -10,6 +10,7 @@ import {
 } from "./constants";
 import { CommandBar } from "./components/CommandBar";
 import { CompletionEditor } from "./components/CompletionEditor";
+import { FilesView } from "./components/FilesView";
 import { OrganizationTree } from "./components/OrganizationTree";
 import { PrDetails } from "./components/PrDetails";
 import { PullRequestList } from "./components/PullRequestList";
@@ -707,6 +708,54 @@ export const App: React.FC = () => {
           banner: "Focus: list",
         }));
       }
+
+      if (input === "l" || key.rightArrow) {
+        setState((current) => ({
+          ...current,
+          focus: "files",
+          selectedFileIndex: 0,
+          banner: "Focus: files",
+        }));
+      }
+      return;
+    }
+
+    if (state.focus === "files") {
+      const maxFileIndex = Math.max(
+        0,
+        (selectedPr?.changedFiles.length ?? 1) - 1,
+      );
+
+      if (input === "j" || key.downArrow) {
+        setState((current) => ({
+          ...current,
+          selectedFileIndex: clamp(
+            current.selectedFileIndex + 1,
+            0,
+            maxFileIndex,
+          ),
+        }));
+      }
+
+      if (input === "k" || key.upArrow) {
+        setState((current) => ({
+          ...current,
+          selectedFileIndex: clamp(
+            current.selectedFileIndex - 1,
+            0,
+            maxFileIndex,
+          ),
+        }));
+      }
+
+      if (input === "h" || key.leftArrow) {
+        setState((current) => ({
+          ...current,
+          focus: "detail",
+          banner: "Focus: detail",
+        }));
+      }
+      return;
     }
   });
 
@@ -751,11 +800,20 @@ export const App: React.FC = () => {
             selectedPrIndex={state.selectedPrIndex}
             focus={state.focus}
           />
-          <PrDetails
-            selectedPr={selectedPr}
-            focus={state.focus}
-            diffViewMode={state.diffViewMode}
-          />
+          {state.focus === "files" ? (
+            <FilesView
+              selectedPr={selectedPr}
+              selectedFileIndex={state.selectedFileIndex}
+              focus={state.focus}
+              diffViewMode={state.diffViewMode}
+            />
+          ) : (
+            <PrDetails
+              selectedPr={selectedPr}
+              focus={state.focus}
+              diffViewMode={state.diffViewMode}
+            />
+          )}
         </Box>
       </Box>
 
@@ -763,9 +821,9 @@ export const App: React.FC = () => {
 
       <Box marginTop={1}>
         <Text color="gray">
-          keys: tab focus | tree: j/k repos, h/l orgs | list/detail: h/l panes |
-          / command | r refresh | a approve | x reject | c complete | o open | u
-          unified | s split | q quit
+          keys: tab focus | tree: j/k repos, h/l orgs | list/detail/files: h/l
+          panes | files: j/k files | / command | r refresh | a approve | x
+          reject | c complete | o open | u unified | s split | q quit
         </Text>
       </Box>
 
