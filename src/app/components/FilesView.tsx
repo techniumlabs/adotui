@@ -3,11 +3,7 @@ import { Box, Text } from "ink";
 import { DiffModeEnum, DiffView } from "@git-diff-view/cli";
 import type { PullRequest } from "../../domain/types";
 import type { DiffViewMode, FocusArea } from "../types";
-import {
-  buildTerminalDiffData,
-  buildFileTree,
-  fileChangeColor,
-} from "../utils";
+import { buildTerminalDiffData, fileChangeColor } from "../utils";
 
 type FilesViewProps = {
   selectedPr?: PullRequest;
@@ -22,9 +18,24 @@ export const FilesView: React.FC<FilesViewProps> = ({
   focus,
   diffViewMode,
 }) => {
+  const terminalWidth = process.stdout.columns ?? 120;
+  const treePaneWidth = 34;
+  const paneGap = 1;
+  const rootPadding = 2;
+  const rightPaneWidth = Math.max(
+    52,
+    terminalWidth - treePaneWidth - paneGap - rootPadding,
+  );
+  const filesInnerWidth = Math.max(44, rightPaneWidth - 4);
+  const diffWidth =
+    diffViewMode === "split"
+      ? Math.max(36, filesInnerWidth - 6)
+      : Math.max(44, filesInnerWidth - 2);
+
   if (!selectedPr || selectedPr.changedFiles.length === 0) {
     return (
       <Box
+        width={rightPaneWidth}
         marginTop={1}
         borderStyle="round"
         borderColor={focus === "files" ? "cyan" : "gray"}
@@ -38,12 +49,12 @@ export const FilesView: React.FC<FilesViewProps> = ({
     );
   }
 
-  const fileTree = buildFileTree(selectedPr.changedFiles);
   const flatFiles = selectedPr.changedFiles;
   const selectedFile = flatFiles[selectedFileIndex];
 
   return (
     <Box
+      width={rightPaneWidth}
       marginTop={1}
       borderStyle="round"
       borderColor={focus === "files" ? "cyan" : "gray"}
@@ -56,7 +67,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
       </Text>
 
       {/* File list */}
-      <Box marginTop={1} flexDirection="column">
+      <Box marginTop={1} flexDirection="column" width={filesInnerWidth}>
         {flatFiles.map((file, idx) => {
           const isSelected = idx === selectedFileIndex;
           const parts = file.path.split("/");
@@ -64,8 +75,11 @@ export const FilesView: React.FC<FilesViewProps> = ({
           const fileName = parts[parts.length - 1];
 
           return (
-            <Box key={file.path}>
-              <Text color={isSelected ? "whiteBright" : "gray"}>
+            <Box key={file.path} width={filesInnerWidth}>
+              <Text
+                color={isSelected ? "whiteBright" : "gray"}
+                wrap="truncate-end"
+              >
                 {isSelected ? ">" : " "}
                 {" ".repeat(indent)}
                 {fileName}
@@ -82,8 +96,8 @@ export const FilesView: React.FC<FilesViewProps> = ({
 
       {/* Diff view for selected file */}
       {selectedFile && (
-        <Box marginTop={1} flexDirection="column">
-          <Text color="cyan">
+        <Box marginTop={1} flexDirection="column" width={filesInnerWidth}>
+          <Text color="cyan" wrap="truncate-end">
             {selectedFile.path} ({selectedFile.status})
           </Text>
           <DiffView
@@ -96,7 +110,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
             diffViewTheme="dark"
             diffViewHighlight
             diffViewNoBG
-            width={Math.max(60, (process.stdout.columns ?? 120) - 12)}
+            width={diffWidth}
           />
         </Box>
       )}
