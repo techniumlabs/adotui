@@ -93,6 +93,21 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
                     {status.symbol} {status.label}
                   </Text>
                 </Row>
+                <Row label="merge">
+                  {selectedPr.mergeStatus === "conflicts" ? (
+                    <Text color={palette.danger}>✗ conflicts</Text>
+                  ) : selectedPr.mergeStatus === "succeeded" ? (
+                    <Text color={palette.ok}>✓ no conflicts</Text>
+                  ) : selectedPr.mergeStatus === "rejectedByPolicy" ? (
+                    <Text color={palette.warn}>⚑ rejected by policy</Text>
+                  ) : selectedPr.mergeStatus === "queued" ? (
+                    <Text color={palette.warn}>◔ queued</Text>
+                  ) : selectedPr.mergeStatus === "failure" ? (
+                    <Text color={palette.danger}>✗ merge failure</Text>
+                  ) : (
+                    <Text color={palette.muted}>— unknown</Text>
+                  )}
+                </Row>
                 <Row label="checks">
                   <Text color={checks.color}>
                     {checks.symbol} {checks.label}

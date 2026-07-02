@@ -17,6 +17,7 @@ const PrRow: React.FC<{ pr: PullRequest; selected: boolean }> = ({
 }) => {
   const review = reviewBadge(pr.reviewState);
   const status = statusBadge(pr.status);
+  const hasConflict = pr.mergeStatus === "conflicts";
 
   return (
     <Box>
@@ -29,6 +30,11 @@ const PrRow: React.FC<{ pr: PullRequest; selected: boolean }> = ({
       {pr.draft ? (
         <Text color={palette.draft} bold>
           {glyph.draft} draft{" "}
+        </Text>
+      ) : null}
+      {hasConflict ? (
+        <Text color={palette.danger} bold>
+          {glyph.cross} conflict{" "}
         </Text>
       ) : null}
       <Box flexGrow={1}>

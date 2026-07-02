@@ -1,9 +1,7 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Box, Text } from "ink";
-import { DiffModeEnum, DiffView } from "@git-diff-view/cli";
-import type { PullRequest } from "../../domain/types";
+import type { PullRequest, PullRequestFileChange } from "../../domain/types";
 import type { DiffViewMode, FocusArea } from "../types";
-import { buildTerminalDiffData } from "../utils";
 import { fileChangeBadge, glyph, palette, truncate } from "../theme";
 
 type FilesViewProps = {
@@ -11,6 +9,185 @@ type FilesViewProps = {
   selectedFileIndex: number;
   focus: FocusArea;
   diffViewMode: DiffViewMode;
+};
+
+// ─── diff renderer ──────────────────────────────────────────────────────────
+
+type ParsedLine =
+  | { kind: "header" | "hunk"; text: string }
+  | { kind: "add" | "del" | "ctx"; text: string; oldNo: number | null; newNo: number | null };
+
+const parseDiff = (raw: string): ParsedLine[] => {
+  const lines = raw.split("\n").filter((l) => l.length > 0);
+  const result: ParsedLine[] = [];
+  let oldLine = 1, newLine = 1;
+
+  for (const l of lines) {
+    if (l.startsWith("---") || l.startsWith("+++")) {
+      result.push({ kind: "header", text: l });
+    } else if (l.startsWith("@@")) {
+      result.push({ kind: "hunk", text: l });
+      const m = l.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      oldLine = m ? parseInt(m[1]!, 10) : 1;
+      newLine = m ? parseInt(m[2]!, 10) : 1;
+    } else if (l.startsWith("+")) {
+      result.push({ kind: "add", text: l.slice(1), oldNo: null, newNo: newLine++ });
+    } else if (l.startsWith("-")) {
+      result.push({ kind: "del", text: l.slice(1), oldNo: oldLine++, newNo: null });
+    } else {
+      result.push({ kind: "ctx", text: l.slice(1), oldNo: oldLine++, newNo: newLine++ });
+    }
+  }
+  return result;
+};
+
+type Token = { text: string; changed: boolean };
+
+/** Word-level LCS diff — identifies exactly which words changed between two lines */
+const wordDiff = (a: string, b: string): { oldT: Token[]; newT: Token[] } => {
+  const split = (s: string) => s.match(/\S+|\s+/g) ?? [];
+  const aw = split(a), bw = split(b);
+  const m = aw.length, n = bw.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i]![j] = aw[i - 1] === bw[j - 1]
+        ? dp[i - 1]![j - 1]! + 1
+        : Math.max(dp[i - 1]![j]!, dp[i]![j - 1]!);
+  const oldT: Token[] = [], newT: Token[] = [];
+  let i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && aw[i - 1] === bw[j - 1]) {
+      oldT.unshift({ text: aw[i - 1]!, changed: false });
+      newT.unshift({ text: bw[j - 1]!, changed: false });
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i]![j - 1]! >= dp[i - 1]![j]!)) {
+      newT.unshift({ text: bw[j - 1]!, changed: true }); j--;
+    } else {
+      oldT.unshift({ text: aw[i - 1]!, changed: true }); i--;
+    }
+  }
+  return { oldT, newT };
+};
+
+const LN_W = 4; // width of each line-number gutter column
+
+const fmtLineNo = (n: number | null): string =>
+  n !== null ? String(n).padStart(LN_W) : " ".repeat(LN_W);
+
+/**
+ * GitHub-style diff row — uses foreground colors only (no backgroundColor)
+ * to avoid Ink rendering artifacts where backgrounds bleed outside borders.
+ *
+ * Line coloring:
+ *   - Added lines: green text (light feel)
+ *   - Deleted lines: red text (light feel)
+ *   - Changed words within: bold + brighter shade (stands out as "darker/heavier")
+ *   - Context lines: normal dim text
+ */
+const DiffRow: React.FC<{
+  oldNo: number | null;
+  newNo: number | null;
+  marker: string;
+  lineColor: string;
+  gutterColor: string;
+  tokens?: Token[];
+  highlightColor?: string;
+  plainText?: string;
+  width: number;
+}> = ({ oldNo, newNo, marker, lineColor, gutterColor, tokens, highlightColor, plainText, width }) => {
+  // gutter: "NNNN NNNN + " = LN_W + 1 + LN_W + 1 + 1 + 1 = LN_W*2 + 4
+  const gutterW = LN_W * 2 + 4;
+  const contentW = Math.max(0, width - gutterW);
+  const gutter = `${fmtLineNo(oldNo)} ${fmtLineNo(newNo)} ${marker} `;
+
+  if (tokens) {
+    return (
+      <Text wrap="truncate-end">
+        <Text color={gutterColor}>{gutter}</Text>
+        {tokens.slice(0, 120).map((t, i) =>
+          t.changed
+            ? <Text key={i} color={highlightColor ?? lineColor} bold underline>{t.text}</Text>
+            : <Text key={i} color={lineColor}>{t.text}</Text>
+        )}
+      </Text>
+    );
+  }
+
+  const content = (plainText ?? "").slice(0, contentW);
+  return (
+    <Text wrap="truncate-end">
+      <Text color={gutterColor}>{gutter}</Text>
+      <Text color={lineColor}>{content}</Text>
+    </Text>
+  );
+};
+
+/** GitHub-style unified diff pane with word-level change highlighting */
+const DiffPane: React.FC<{ file: PullRequestFileChange; width: number }> = ({ file, width }) => {
+  const lines = useMemo(() => {
+    const src = file.rawDiff ?? (file.diff.length > 0 ? file.diff.join("\n") : null);
+    return src ? parseDiff(src) : null;
+  }, [file.path, file.rawDiff, file.diff]);
+
+  if (!lines) {
+    return <Text color={palette.muted}>Diff content not loaded (Azure change list is metadata-only).</Text>;
+  }
+
+  const rows: React.ReactNode[] = [];
+  let idx = 0;
+
+  while (idx < lines.length) {
+    const cur = lines[idx]!;
+    const nxt = lines[idx + 1];
+
+    if (cur.kind === "header") {
+      idx++;
+      continue;
+    }
+
+    if (cur.kind === "hunk") {
+      rows.push(
+        <Text key={idx} color="blueBright" dimColor wrap="truncate-end">
+          {cur.text}
+        </Text>
+      );
+      idx++;
+      continue;
+    }
+
+    // Paired del+add → word-diff highlighting
+    if (cur.kind === "del" && nxt?.kind === "add") {
+      const { oldT, newT } = wordDiff(cur.text, (nxt as { text: string }).text);
+      rows.push(
+        <DiffRow key={`${idx}d`} oldNo={cur.oldNo} newNo={null}
+          marker="-" lineColor="red" gutterColor="red"
+          highlightColor="redBright" tokens={oldT} width={width} />,
+        <DiffRow key={`${idx}a`} oldNo={null} newNo={(nxt as { newNo: number | null }).newNo}
+          marker="+" lineColor="green" gutterColor="green"
+          highlightColor="greenBright" tokens={newT} width={width} />,
+      );
+      idx += 2;
+      continue;
+    }
+
+    if (cur.kind === "add") {
+      rows.push(<DiffRow key={idx} oldNo={null} newNo={cur.newNo}
+        marker="+" lineColor="green" gutterColor="green"
+        plainText={cur.text} width={width} />);
+    } else if (cur.kind === "del") {
+      rows.push(<DiffRow key={idx} oldNo={cur.oldNo} newNo={null}
+        marker="-" lineColor="red" gutterColor="red"
+        plainText={cur.text} width={width} />);
+    } else if (cur.kind === "ctx") {
+      rows.push(<DiffRow key={idx} oldNo={cur.oldNo} newNo={cur.newNo}
+        marker=" " lineColor={palette.text} gutterColor={palette.muted}
+        plainText={cur.text} width={width} />);
+    }
+    idx++;
+  }
+
+  return <Box flexDirection="column">{rows}</Box>;
 };
 
 export const FilesView: React.FC<FilesViewProps> = ({
@@ -24,15 +201,9 @@ export const FilesView: React.FC<FilesViewProps> = ({
   const treePaneWidth = 36;
   const paneGap = 1;
   const rootPadding = 2;
-  const rightPaneWidth = Math.max(
-    52,
-    terminalWidth - treePaneWidth - paneGap - rootPadding,
-  );
-  const filesInnerWidth = Math.max(44, rightPaneWidth - 4);
-  const diffWidth =
-    diffViewMode === "split"
-      ? Math.max(36, filesInnerWidth - 6)
-      : Math.max(44, filesInnerWidth - 2);
+  const rightPaneWidth = Math.max(52, terminalWidth - treePaneWidth - paneGap - rootPadding);
+  // border (2) + paddingX (2) = 4, then subtract 2 more as safety margin
+  const filesInnerWidth = Math.max(44, rightPaneWidth - 6);
 
   if (!selectedPr || selectedPr.changedFiles.length === 0) {
     return (
@@ -75,7 +246,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
       </Box>
 
       {/* File list */}
-      <Box marginTop={1} flexDirection="column" width={filesInnerWidth}>
+      <Box marginTop={1} flexDirection="column">
         {flatFiles.map((file, idx) => {
           const isSelected = idx === selectedFileIndex;
           const badge = fileChangeBadge(file.status);
@@ -84,55 +255,43 @@ export const FilesView: React.FC<FilesViewProps> = ({
           const dir = parts.slice(0, -1).join("/");
 
           return (
-            <Box key={file.path} width={filesInnerWidth}>
+            <Text key={file.path} wrap="truncate-end">
               <Text color={isSelected ? palette.accent : palette.muted}>
                 {isSelected ? glyph.pointer : glyph.pointerIdle}{" "}
               </Text>
               <Text color={badge.color} bold>
                 {badge.symbol}{" "}
               </Text>
-              <Box flexGrow={1}>
-                <Text
-                  color={isSelected ? palette.textBright : palette.text}
-                  wrap="truncate-middle"
-                >
-                  {dir ? (
-                    <Text color={palette.muted}>{dir}/</Text>
-                  ) : null}
-                  {fileName}
-                </Text>
-              </Box>
+              <Text color={isSelected ? palette.textBright : palette.text}>
+                {dir ? (
+                  <Text color={palette.muted}>{dir}/</Text>
+                ) : null}
+                {fileName}
+              </Text>
               {file.additions > 0 || file.deletions > 0 ? (
-                <Text color={palette.muted}>
+                <Text>
                   {" "}
                   <Text color={palette.ok}>+{file.additions}</Text>
                   <Text color={palette.danger}> -{file.deletions}</Text>
                 </Text>
               ) : null}
-            </Box>
+            </Text>
           );
         })}
       </Box>
 
       {/* Diff view for selected file */}
       {selectedFile && (
-        <Box marginTop={1} flexDirection="column" width={filesInnerWidth}>
+        <Box marginTop={1} flexDirection="column">
+          {/* File header */}
           <Text color={palette.accentDim} wrap="truncate-end">
-            {truncate(selectedFile.path, filesInnerWidth - 2)}
+            {"  "}{truncate(selectedFile.path, filesInnerWidth - 16)}
+            {"  "}
+            <Text color={palette.ok}>+{selectedFile.additions}</Text>
+            <Text color={palette.danger}> -{selectedFile.deletions}</Text>
           </Text>
           {hasDiff ? (
-            <DiffView
-              data={buildTerminalDiffData(selectedFile)}
-              diffViewMode={
-                diffViewMode === "split"
-                  ? DiffModeEnum.Split
-                  : DiffModeEnum.Unified
-              }
-              diffViewTheme="dark"
-              diffViewHighlight
-              diffViewNoBG
-              width={diffWidth}
-            />
+            <DiffPane file={selectedFile} width={filesInnerWidth} />
           ) : (
             <Text color={palette.muted}>
               Diff content not loaded (Azure change list is metadata-only).

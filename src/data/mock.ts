@@ -71,6 +71,7 @@ const RAW_MOCK_DATA: { organizations: RawOrg[] } = {
                   ],
                 },
               ],
+              mergeStatus: "succeeded",
             },
             {
               id: 399,
@@ -101,6 +102,7 @@ const RAW_MOCK_DATA: { organizations: RawOrg[] } = {
                   ],
                 },
               ],
+              mergeStatus: "succeeded",
             }
           ]
         },
@@ -134,6 +136,7 @@ const RAW_MOCK_DATA: { organizations: RawOrg[] } = {
                   ],
                 },
               ],
+              mergeStatus: "succeeded",
             }
           ]
         }
@@ -181,6 +184,7 @@ const RAW_MOCK_DATA: { organizations: RawOrg[] } = {
                   ],
                 },
               ],
+              mergeStatus: "conflicts",
             },
             {
               id: 870,
@@ -208,6 +212,7 @@ const RAW_MOCK_DATA: { organizations: RawOrg[] } = {
                   ],
                 },
               ],
+              mergeStatus: "succeeded",
             }
           ]
         },
@@ -239,6 +244,7 @@ const RAW_MOCK_DATA: { organizations: RawOrg[] } = {
                   ],
                 },
               ],
+              mergeStatus: "notSet",
             }
           ]
         }
