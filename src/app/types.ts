@@ -6,6 +6,32 @@ export type MergeStrategy = "noFastForward" | "squash" | "rebase" | "rebaseMerge
 
 export type DiffViewMode = "unified" | "split";
 
+export type LoadState = "loading" | "ready" | "error";
+
+export type ConfirmKind = "approve" | "reject" | "abandon" | "complete";
+
+/** Identifies the exact PR an action targets, captured when the action is armed. */
+export type PrTarget = {
+  organizationUrl: string;
+  project: string;
+  repository: string;
+  prId: number;
+  title: string;
+};
+
+/**
+ * A pending destructive action awaiting y/n confirmation. Carries the target
+ * PR identity captured at arm-time so the action always applies to the PR the
+ * user was shown, regardless of later selection/refresh changes.
+ */
+export type PendingConfirm =
+  | {
+      kind: ConfirmKind;
+      target: PrTarget;
+      completionOptions?: CompletionOptions;
+    }
+  | null;
+
 export type CompletionOptions = {
   autoCompleteIgnoreConfigIds: number[];
   bypassPolicy: boolean;
@@ -31,4 +57,6 @@ export type AppState = {
   autoRefresh: boolean;
   lastRefreshISO: string;
   diffViewMode: DiffViewMode;
+  loadState: LoadState;
+  pendingConfirm: PendingConfirm;
 };

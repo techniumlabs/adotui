@@ -1,6 +1,26 @@
-import type { AppData } from "../domain/types";
+import type {
+  AppData,
+  PullRequest,
+  PullRequestStatus,
+  ReviewState,
+} from "../domain/types";
 
-export const MOCK_DATA: AppData = {
+type RawPr = Omit<
+  PullRequest,
+  "organizationUrl" | "project" | "repository" | "status" | "reviewState"
+> & { status: PullRequestStatus; reviewState: ReviewState };
+
+interface RawRepo {
+  name: string;
+  pullRequests: RawPr[];
+}
+
+interface RawOrg {
+  name: string;
+  repositories: RawRepo[];
+}
+
+const RAW_MOCK_DATA: { organizations: RawOrg[] } = {
   organizations: [
     {
       name: "contoso-platform",
@@ -225,4 +245,29 @@ export const MOCK_DATA: AppData = {
       ]
     }
   ]
+};
+
+/**
+ * Derives the routing fields (organizationUrl / project / repository) onto the
+ * mock tree so it satisfies the domain types. Mock mode never dispatches live
+ * `az` actions, so these values are illustrative only.
+ */
+export const MOCK_DATA: AppData = {
+  organizations: RAW_MOCK_DATA.organizations.map((org) => {
+    const organizationUrl = `https://dev.azure.com/${org.name}`;
+    return {
+      name: org.name,
+      organizationUrl,
+      repositories: org.repositories.map((repo) => ({
+        name: repo.name,
+        project: repo.name,
+        pullRequests: repo.pullRequests.map((pr) => ({
+          ...pr,
+          organizationUrl,
+          project: repo.name,
+          repository: repo.name,
+        })),
+      })),
+    };
+  }),
 };
