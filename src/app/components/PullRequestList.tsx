@@ -9,6 +9,8 @@ type PullRequestListProps = {
   repoName?: string;
   selectedPrIndex: number;
   focus: FocusArea;
+  /** Text filter — PRs whose title or author don't contain this string are hidden. */
+  prFilter: string;
 };
 
 const PrRow: React.FC<{ pr: PullRequest; selected: boolean }> = ({
@@ -39,8 +41,11 @@ const PrRow: React.FC<{ pr: PullRequest; selected: boolean }> = ({
       ) : null}
       <Box flexGrow={1}>
         <Text color={selected ? palette.textBright : palette.text} bold={selected}>
-          {truncate(pr.title, 48)}
+          {truncate(pr.title, 44)}
         </Text>
+      </Box>
+      <Box marginLeft={1}>
+        <Text color={palette.muted}>{truncate(pr.author, 10)}</Text>
       </Box>
       <Box marginLeft={1}>
         <Text color={review.color}>
@@ -61,8 +66,18 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
   repoName,
   selectedPrIndex,
   focus,
+  prFilter,
 }) => {
   const active = focus === "list";
+  const query = prFilter.trim().toLowerCase();
+
+  const visible = query
+    ? pullRequests.filter(
+        (pr) =>
+          pr.title.toLowerCase().includes(query) ||
+          pr.author.toLowerCase().includes(query),
+      )
+    : pullRequests;
 
   return (
     <Box
@@ -71,17 +86,38 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
       paddingX={1}
       flexDirection="column"
     >
+      {/* Header */}
       <Box justifyContent="space-between">
         <Text color={active ? palette.accent : palette.muted} bold>
           {glyph.dot} Pull Requests {glyph.arrow} {repoName ?? "—"}
         </Text>
-        <Text color={palette.muted}>{pullRequests.length} total</Text>
+        <Text color={palette.muted}>
+          {query
+            ? `${visible.length}/${pullRequests.length} match`
+            : `${pullRequests.length} total`}
+        </Text>
       </Box>
 
-      {pullRequests.length > 0 ? (
-        pullRequests.map((pr, prIndex) => (
+      {/* Filter bar — shown whenever there's active text */}
+      {query ? (
+        <Box>
+          <Text color={palette.accent}>🔍 </Text>
+          <Text color={palette.textBright}>{prFilter}</Text>
+          <Text color={palette.muted}>{"  "}(Esc to clear)</Text>
+        </Box>
+      ) : active ? (
+        <Text color={palette.muted}>
+          {"  "}
+          <Text color={palette.accentDim}>/</Text> filter by title or author
+        </Text>
+      ) : null}
+
+      {visible.length > 0 ? (
+        visible.map((pr, prIndex) => (
           <PrRow key={pr.id} pr={pr} selected={prIndex === selectedPrIndex} />
         ))
+      ) : pullRequests.length > 0 ? (
+        <Text color={palette.muted}>No PRs match "{prFilter}".</Text>
       ) : (
         <Text color={palette.muted}>No pull requests in this repository.</Text>
       )}
