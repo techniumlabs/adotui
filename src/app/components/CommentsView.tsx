@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
+import Spinner from "ink-spinner";
 import type { PrCommentThread, PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
 import { glyph, palette, truncate } from "../theme";
@@ -239,9 +240,11 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
           {glyph.dot} Comments
         </Text>
         <Text color={palette.muted}>
-          {loading
-            ? `${glyph.clock} loading…`
-            : `${threads.length} thread${threads.length !== 1 ? "s" : ""}`}
+          {loading ? (
+            <Text color={palette.muted}>
+              <Spinner type="dots" /> loading…
+            </Text>
+          ) : `${threads.length} thread${threads.length !== 1 ? "s" : ""}`}
         </Text>
       </Box>
 

@@ -20,6 +20,7 @@
     "@git-diff-view/react": "^0.1.6",
     "git-diff-view": "^0.0.13",
     "ink": "^7.1.0",
+    "ink-spinner": "^5.0.0",
     "react": "^19.2.7"
   }
 }

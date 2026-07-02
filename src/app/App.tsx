@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text, useApp } from "ink";
+import Spinner from "ink-spinner";
 import { CommandBar } from "./components/CommandBar";
 import { CommentsView } from "./components/CommentsView";
 import { CompletionEditor } from "./components/CompletionEditor";
@@ -57,7 +58,8 @@ export const App: React.FC = () => {
                   : palette.text
           }
         >
-          {state.loadState === "loading" ? `${glyph.clock} ` : ""}
+          {state.loadState === "loading" ? <Spinner type="dots" /> : ""}
+          {state.loadState === "loading" ? " " : ""}
           {state.banner}
         </Text>
       </Box>
