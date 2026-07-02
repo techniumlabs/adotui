@@ -11,6 +11,8 @@ export interface PullRequestFileChange {
   rawDiff?: string;
 }
 
+export type MergeStatus = "succeeded" | "conflicts" | "rejectedByPolicy" | "queued" | "failure" | "notSet";
+
 export interface PullRequest {
   id: number;
   title: string;
@@ -26,6 +28,7 @@ export interface PullRequest {
   checksTotal: number;
   url: string;
   changedFiles: PullRequestFileChange[];
+  mergeStatus: MergeStatus;
   /**
    * Routing info identifying where this PR lives, used to dispatch `az`
    * actions unambiguously (independent of how the tree is grouped/labelled).

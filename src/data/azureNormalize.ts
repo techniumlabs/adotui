@@ -1,4 +1,5 @@
 import type {
+  MergeStatus,
   PullRequest,
   PullRequestFileChange,
   PullRequestStatus,
@@ -117,6 +118,17 @@ export const normalizeFileChanges = (
     }));
 };
 
+const normalizeMergeStatus = (status: string | undefined): MergeStatus => {
+  switch (status) {
+    case "succeeded": return "succeeded";
+    case "conflicts": return "conflicts";
+    case "rejectedByPolicy": return "rejectedByPolicy";
+    case "queued": return "queued";
+    case "failure": return "failure";
+    default: return "notSet";
+  }
+};
+
 /**
  * Maps a raw Azure PR into the domain PullRequest. `changedFiles` and check
  * counts are provided separately (they require extra API calls) and default to
@@ -156,6 +168,7 @@ export const normalizePullRequest = (
       id,
     ),
     changedFiles: context.changedFiles ?? [],
+    mergeStatus: normalizeMergeStatus(pr.mergeStatus),
     organizationUrl: context.organization,
     project: context.project,
     repository: context.repository,
