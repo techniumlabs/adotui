@@ -237,6 +237,17 @@ export const inferFileLangFromPath = (path: string): string => {
 };
 
 export const buildTerminalDiffData = (fileChange: PullRequestFileChange) => {
+  const fileLang = inferFileLangFromPath(fileChange.path);
+
+  // Use the complete unified diff directly when available (fetched from Azure).
+  if (fileChange.rawDiff) {
+    return {
+      oldFile: { fileName: fileChange.path, fileLang, content: "" },
+      newFile: { fileName: fileChange.path, fileLang, content: "" },
+      hunks: [fileChange.rawDiff],
+    };
+  }
+
   const normalizedLines =
     fileChange.diff.length > 0
       ? fileChange.diff.map(ensureDiffPrefix)
@@ -246,7 +257,6 @@ export const buildTerminalDiffData = (fileChange: PullRequestFileChange) => {
   const deletedLines = normalizedLines.filter((line) => line.startsWith("-")).length;
   const oldLength = Math.max(1, normalizedLines.length - addedLines);
   const newLength = Math.max(1, normalizedLines.length - deletedLines);
-  const fileLang = inferFileLangFromPath(fileChange.path);
 
   const hunk = [
     `--- a/${fileChange.path}`,

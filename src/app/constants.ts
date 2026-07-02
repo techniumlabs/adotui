@@ -1,5 +1,7 @@
-import { MOCK_DATA } from "../data/mock";
+import type { AppData } from "../domain/types";
 import type { AppState, CompletionOptions, FocusArea } from "./types";
+
+export const EMPTY_DATA: AppData = { organizations: [] };
 
 export const DEFAULT_COMPLETION_OPTIONS: CompletionOptions = {
   autoCompleteIgnoreConfigIds: [],
@@ -13,7 +15,7 @@ export const DEFAULT_COMPLETION_OPTIONS: CompletionOptions = {
 };
 
 export const INITIAL_STATE: AppState = {
-  data: MOCK_DATA,
+  data: EMPTY_DATA,
   selectedOrgIndex: 0,
   selectedRepoIndex: 0,
   selectedPrIndex: 0,
@@ -22,10 +24,12 @@ export const INITIAL_STATE: AppState = {
   commandText: "",
   completionOptions: DEFAULT_COMPLETION_OPTIONS,
   completionCursor: 0,
-  banner: "UI-first shell ready. Data is currently mocked.",
+  banner: "Loading pull requests from Azure DevOps...",
   autoRefresh: true,
   lastRefreshISO: new Date().toISOString(),
   diffViewMode: "unified",
+  loadState: "loading",
+  pendingConfirm: null,
 };
 
 export const REFRESH_INTERVAL_MS = 60_000;

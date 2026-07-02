@@ -3,7 +3,8 @@ import { Box, Text } from "ink";
 import { DiffModeEnum, DiffView } from "@git-diff-view/cli";
 import type { PullRequest } from "../../domain/types";
 import type { DiffViewMode, FocusArea } from "../types";
-import { buildTerminalDiffData, fileChangeColor } from "../utils";
+import { buildTerminalDiffData } from "../utils";
+import { fileChangeBadge, glyph, palette, truncate } from "../theme";
 
 type FilesViewProps = {
   selectedPr?: PullRequest;
@@ -18,8 +19,9 @@ export const FilesView: React.FC<FilesViewProps> = ({
   focus,
   diffViewMode,
 }) => {
+  const active = focus === "files";
   const terminalWidth = process.stdout.columns ?? 120;
-  const treePaneWidth = 34;
+  const treePaneWidth = 36;
   const paneGap = 1;
   const rootPadding = 2;
   const rightPaneWidth = Math.max(
@@ -38,57 +40,75 @@ export const FilesView: React.FC<FilesViewProps> = ({
         width={rightPaneWidth}
         marginTop={1}
         borderStyle="round"
-        borderColor={focus === "files" ? "cyan" : "gray"}
+        borderColor={active ? palette.accent : palette.muted}
         paddingX={1}
-        paddingY={0}
         flexDirection="column"
       >
-        <Text color={focus === "files" ? "cyan" : "gray"}>Files</Text>
-        <Text color="gray">No files in this PR.</Text>
+        <Text color={active ? palette.accent : palette.muted} bold>
+          {glyph.files} Files
+        </Text>
+        <Text color={palette.muted}>No changed files for this PR.</Text>
       </Box>
     );
   }
 
   const flatFiles = selectedPr.changedFiles;
   const selectedFile = flatFiles[selectedFileIndex];
+  const hasDiff = !!selectedFile && (selectedFile.diff.length > 0 || !!selectedFile.rawDiff);
 
   return (
     <Box
       width={rightPaneWidth}
       marginTop={1}
       borderStyle="round"
-      borderColor={focus === "files" ? "cyan" : "gray"}
+      borderColor={active ? palette.accent : palette.muted}
       paddingX={1}
-      paddingY={0}
       flexDirection="column"
     >
-      <Text color={focus === "files" ? "cyan" : "gray"}>
-        Files ({flatFiles.length}) | mode {diffViewMode}
-      </Text>
+      <Box justifyContent="space-between">
+        <Text color={active ? palette.accent : palette.muted} bold>
+          {glyph.files} Files
+        </Text>
+        <Text color={palette.muted}>
+          {flatFiles.length} {glyph.bullet} {diffViewMode}
+        </Text>
+      </Box>
 
       {/* File list */}
       <Box marginTop={1} flexDirection="column" width={filesInnerWidth}>
         {flatFiles.map((file, idx) => {
           const isSelected = idx === selectedFileIndex;
+          const badge = fileChangeBadge(file.status);
           const parts = file.path.split("/");
-          const indent = Math.max(0, parts.length - 1) * 2;
-          const fileName = parts[parts.length - 1];
+          const fileName = parts[parts.length - 1] ?? file.path;
+          const dir = parts.slice(0, -1).join("/");
 
           return (
             <Box key={file.path} width={filesInnerWidth}>
-              <Text
-                color={isSelected ? "whiteBright" : "gray"}
-                wrap="truncate-end"
-              >
-                {isSelected ? ">" : " "}
-                {" ".repeat(indent)}
-                {fileName}
+              <Text color={isSelected ? palette.accent : palette.muted}>
+                {isSelected ? glyph.pointer : glyph.pointerIdle}{" "}
               </Text>
-              <Text color={fileChangeColor(file.status)}> {file.status}</Text>
-              <Text color="yellow">
-                {" "}
-                +{file.additions}/-{file.deletions}
+              <Text color={badge.color} bold>
+                {badge.symbol}{" "}
               </Text>
+              <Box flexGrow={1}>
+                <Text
+                  color={isSelected ? palette.textBright : palette.text}
+                  wrap="truncate-middle"
+                >
+                  {dir ? (
+                    <Text color={palette.muted}>{dir}/</Text>
+                  ) : null}
+                  {fileName}
+                </Text>
+              </Box>
+              {file.additions > 0 || file.deletions > 0 ? (
+                <Text color={palette.muted}>
+                  {" "}
+                  <Text color={palette.ok}>+{file.additions}</Text>
+                  <Text color={palette.danger}> -{file.deletions}</Text>
+                </Text>
+              ) : null}
             </Box>
           );
         })}
@@ -97,21 +117,27 @@ export const FilesView: React.FC<FilesViewProps> = ({
       {/* Diff view for selected file */}
       {selectedFile && (
         <Box marginTop={1} flexDirection="column" width={filesInnerWidth}>
-          <Text color="cyan" wrap="truncate-end">
-            {selectedFile.path} ({selectedFile.status})
+          <Text color={palette.accentDim} wrap="truncate-end">
+            {truncate(selectedFile.path, filesInnerWidth - 2)}
           </Text>
-          <DiffView
-            data={buildTerminalDiffData(selectedFile)}
-            diffViewMode={
-              diffViewMode === "split"
-                ? DiffModeEnum.Split
-                : DiffModeEnum.Unified
-            }
-            diffViewTheme="dark"
-            diffViewHighlight
-            diffViewNoBG
-            width={diffWidth}
-          />
+          {hasDiff ? (
+            <DiffView
+              data={buildTerminalDiffData(selectedFile)}
+              diffViewMode={
+                diffViewMode === "split"
+                  ? DiffModeEnum.Split
+                  : DiffModeEnum.Unified
+              }
+              diffViewTheme="dark"
+              diffViewHighlight
+              diffViewNoBG
+              width={diffWidth}
+            />
+          ) : (
+            <Text color={palette.muted}>
+              Diff content not loaded (Azure change list is metadata-only).
+            </Text>
+          )}
         </Box>
       )}
     </Box>

@@ -1,0 +1,19 @@
+{
+  "status": "active",
+  "top": 50,
+  "projects": [
+    {
+      "organization": "https://dev.azure.com/contoso",
+      "project": "Platform"
+    },
+    {
+      "organization": "https://dev.azure.com/contoso",
+      "project": "Payments",
+      "repositories": ["payments-api", "payments-web"]
+    },
+    {
+      "organization": "https://dev.azure.com/fabrikam",
+      "project": "Engineering"
+    }
+  ]
+}

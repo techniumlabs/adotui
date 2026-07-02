@@ -15,7 +15,12 @@ import { OrganizationTree } from "./components/OrganizationTree";
 import { PrDetails } from "./components/PrDetails";
 import { PullRequestList } from "./components/PullRequestList";
 import { SummaryBar } from "./components/SummaryBar";
-import type { AppState, CompletionOptions } from "./types";
+import type {
+  AppState,
+  CompletionOptions,
+  ConfirmKind,
+  PrTarget,
+} from "./types";
 import {
   clamp,
   clampPrIndex,
@@ -26,6 +31,13 @@ import {
   parseCompletionCommand,
   serializeCompletionOptions,
 } from "./utils";
+import {
+  loadInitialData,
+  reloadData,
+  resolvePrRefFromParts,
+} from "./dataController";
+import { abandonPr, approvePr, completePr, completionStrategyNote, rejectPr } from "../data/azure";
+import { glyph, palette } from "./theme";
 
 export const App: React.FC = () => {
   const { exit } = useApp();
@@ -38,6 +50,15 @@ export const App: React.FC = () => {
     selectedRepo?.pullRequests[state.selectedPrIndex];
 
   const totalPrs = useMemo(() => countTotalPrs(state.data), [state.data]);
+
+  const repoCount = useMemo(
+    () =>
+      state.data.organizations.reduce(
+        (acc, org) => acc + org.repositories.length,
+        0,
+      ),
+    [state.data],
+  );
 
   const activePrs = useMemo(
     () =>
@@ -67,9 +88,10 @@ export const App: React.FC = () => {
         current.data.organizations.length - 1,
       );
       const nextOrg = current.data.organizations[nextOrgIndex];
-      const nextRepoIndex = clampPrIndex(
-        nextOrg?.repositories[current.selectedRepoIndex],
+      const nextRepoIndex = clamp(
         current.selectedRepoIndex + repoDelta,
+        0,
+        Math.max(0, (nextOrg?.repositories.length ?? 1) - 1),
       );
       const nextRepo = nextOrg?.repositories[nextRepoIndex];
 
@@ -83,55 +105,89 @@ export const App: React.FC = () => {
     });
   };
 
-  const doRefresh = (reason: "manual" | "auto") => {
-    setState((current) => ({
-      ...current,
-      lastRefreshISO: new Date().toISOString(),
-      banner:
-        reason === "manual"
-          ? "Manual refresh complete."
-          : "Auto-refresh synced.",
-    }));
+  const doRefresh = (reason: "manual" | "auto" | "initial") => {
+    if (reason !== "auto") {
+      setState((current) => ({
+        ...current,
+        loadState: "loading",
+        banner:
+          reason === "initial"
+            ? "Loading pull requests from Azure DevOps..."
+            : "Refreshing from Azure DevOps...",
+      }));
+    }
+
+    const load = reason === "initial" ? loadInitialData : reloadData;
+
+    void load().then((result) => {
+      setState((current) => {
+        const orgCount = result.data.organizations.length;
+        const nextOrgIndex = clamp(current.selectedOrgIndex, 0, Math.max(0, orgCount - 1));
+        const nextOrg = result.data.organizations[nextOrgIndex];
+        const repoCount = nextOrg?.repositories.length ?? 0;
+        const nextRepoIndex = clamp(
+          current.selectedRepoIndex,
+          0,
+          Math.max(0, repoCount - 1),
+        );
+        const nextRepo = nextOrg?.repositories[nextRepoIndex];
+
+        return {
+          ...current,
+          data: result.data,
+          selectedOrgIndex: nextOrgIndex,
+          selectedRepoIndex: nextRepoIndex,
+          selectedPrIndex: clampPrIndex(nextRepo, current.selectedPrIndex),
+          lastRefreshISO: new Date().toISOString(),
+          loadState: result.ok ? "ready" : "error",
+          banner:
+            reason === "auto" && result.ok
+              ? `Auto-refresh synced. ${result.banner}`
+              : result.banner,
+        };
+      });
+    });
   };
 
-  const applyPrAction = (
+  /**
+   * Applies a transformer to a specific PR (matched by org URL + repo + id),
+   * not by current selection, so async actions target the intended PR even if
+   * the user moves the cursor before the action completes.
+   */
+  const transformPrById = (
+    target: { organizationUrl: string; repository: string; prId: number },
     transformer: (pr: PullRequest) => PullRequest,
     successBanner: string,
   ) => {
     setState((current) => {
-      const org = current.data.organizations[current.selectedOrgIndex];
-      const repo = org?.repositories[current.selectedRepoIndex];
-      const pr = repo?.pullRequests[current.selectedPrIndex];
+      let matched = false;
+      const organizations = current.data.organizations.map((orgItem) => {
+        if (orgItem.organizationUrl !== target.organizationUrl) {
+          return orgItem;
+        }
+        return {
+          ...orgItem,
+          repositories: orgItem.repositories.map((repoItem) => {
+            if (repoItem.name !== target.repository) {
+              return repoItem;
+            }
+            return {
+              ...repoItem,
+              pullRequests: repoItem.pullRequests.map((prItem) => {
+                if (prItem.id !== target.prId) {
+                  return prItem;
+                }
+                matched = true;
+                return transformer(prItem);
+              }),
+            };
+          }),
+        };
+      });
 
-      if (!org || !repo || !pr) {
-        return { ...current, banner: "No PR selected." };
+      if (!matched) {
+        return current;
       }
-
-      const organizations = current.data.organizations.map(
-        (orgItem, orgIndex) => {
-          if (orgIndex !== current.selectedOrgIndex) {
-            return orgItem;
-          }
-
-          return {
-            ...orgItem,
-            repositories: orgItem.repositories.map((repoItem, repoIndex) => {
-              if (repoIndex !== current.selectedRepoIndex) {
-                return repoItem;
-              }
-
-              return {
-                ...repoItem,
-                pullRequests: repoItem.pullRequests.map((prItem, prIndex) =>
-                  prIndex === current.selectedPrIndex
-                    ? transformer(prItem)
-                    : prItem,
-                ),
-              };
-            }),
-          };
-        },
-      );
 
       return {
         ...current,
@@ -139,6 +195,144 @@ export const App: React.FC = () => {
         banner: successBanner,
       };
     });
+  };
+
+  /**
+   * Executes a destructive PR action against an explicitly captured target
+   * (not live selection), applying an optimistic update, calling `az`, then
+   * refreshing on success. Used by the confirmation gate so the action always
+   * hits the PR the user confirmed.
+   */
+  const runConfirmedAction = (confirm: NonNullable<AppState["pendingConfirm"]>) => {
+    const { kind, target, completionOptions } = confirm;
+
+    const optimistic = (pr: PullRequest): PullRequest => {
+      switch (kind) {
+        case "approve":
+          return { ...pr, reviewState: "approved" };
+        case "reject":
+          return { ...pr, reviewState: "changes-requested" };
+        case "abandon":
+          return { ...pr, status: "abandoned" };
+        case "complete":
+          return { ...pr, status: "completed" };
+      }
+    };
+
+    const pendingBanner =
+      kind === "approve"
+        ? "Approving PR..."
+        : kind === "reject"
+          ? "Rejecting PR..."
+          : kind === "abandon"
+            ? "Abandoning PR..."
+            : "Completing PR...";
+
+    const successBanner =
+      kind === "approve"
+        ? "PR approved."
+        : kind === "reject"
+          ? "PR rejected (changes requested)."
+          : kind === "abandon"
+            ? "PR abandoned."
+            : `PR completed and merged. ${serializeCompletionOptions(
+                completionOptions ?? DEFAULT_COMPLETION_OPTIONS,
+              )}${
+                completionStrategyNote(
+                  completionOptions ?? DEFAULT_COMPLETION_OPTIONS,
+                )
+                  ? ` ${completionStrategyNote(
+                      completionOptions ?? DEFAULT_COMPLETION_OPTIONS,
+                    )}`
+                  : ""
+              }`;
+
+    transformPrById(
+      {
+        organizationUrl: target.organizationUrl,
+        repository: target.repository,
+        prId: target.prId,
+      },
+      optimistic,
+      pendingBanner,
+    );
+
+    const ref = resolvePrRefFromParts({
+      organizationUrl: target.organizationUrl,
+      project: target.project,
+      repository: target.repository,
+      prId: target.prId,
+    });
+
+    if (!ref) {
+      setState((current) => ({
+        ...current,
+        banner:
+          "Applied locally (no live ref: mock mode or PR missing routing info).",
+      }));
+      return;
+    }
+
+    const action: (r: import("../data/azure").PrRef) => Promise<void> =
+      kind === "approve"
+        ? approvePr
+        : kind === "reject"
+          ? rejectPr
+          : kind === "abandon"
+            ? abandonPr
+            : (r) => completePr(r, completionOptions ?? DEFAULT_COMPLETION_OPTIONS);
+
+    action(ref)
+      .then(() => {
+        setState((current) => ({ ...current, banner: successBanner }));
+        doRefresh("auto");
+      })
+      .catch((cause: unknown) => {
+        setState((current) => ({
+          ...current,
+          banner: `Action failed: ${
+            cause instanceof Error ? cause.message : String(cause)
+          }`,
+        }));
+      });
+  };
+
+  /**
+   * Arms a destructive action for confirmation by capturing the currently
+   * selected PR's identity. The action fires only after the user confirms.
+   */
+  const armConfirm = (
+    kind: ConfirmKind,
+    completionOptions?: CompletionOptions,
+  ) => {
+    if (!selectedPr) {
+      setState((current) => ({ ...current, banner: "No PR selected." }));
+      return;
+    }
+    const target: PrTarget = {
+      organizationUrl: selectedPr.organizationUrl,
+      project: selectedPr.project,
+      repository: selectedPr.repository,
+      prId: selectedPr.id,
+      title: selectedPr.title,
+    };
+    const verb =
+      kind === "approve"
+        ? "Approve"
+        : kind === "reject"
+          ? "Reject"
+          : kind === "abandon"
+            ? "Abandon"
+            : "Complete & merge";
+    const suffix = kind === "abandon" || kind === "complete" ? " (irreversible)" : "";
+    setState((current) => ({
+      ...current,
+      pendingConfirm: completionOptions
+        ? { kind, target, completionOptions }
+        : { kind, target },
+      focus: kind === "complete" ? "list" : current.focus,
+      banner: `${verb} PR #${target.prId} "${target.title}"${suffix}? (y/n)`,
+    }));
   };
 
   const openCompletionEditor = (prefill: CompletionOptions) => {
@@ -152,25 +346,16 @@ export const App: React.FC = () => {
   };
 
   const submitCompletion = () => {
-    if (selectedPr?.reviewState !== "approved") {
-      setState((current) => ({
-        ...current,
-        banner: "Approve the PR before completing it.",
-      }));
-      return;
-    }
-
-    applyPrAction(
-      (pr) => ({ ...pr, status: "completed" }),
-      `PR completed and merged. ${serializeCompletionOptions(state.completionOptions)}`,
-    );
-
+    // Arm the irreversible merge for explicit y/n confirmation instead of
+    // firing it directly on a single Enter.
+    const options = state.completionOptions;
     setState((current) => ({
       ...current,
       focus: "list",
       commandText: "",
       completionCursor: 0,
     }));
+    armConfirm("complete", options);
   };
 
   const executeCommand = (rawCommand: string) => {
@@ -192,8 +377,7 @@ export const App: React.FC = () => {
         focus: "list",
         commandText: "",
         banner:
-          "Commands: help, refresh, toggle-auto, approve, reject, complete, abandon, open, quit",
-      }));
+          "Commands: help, refresh, toggle-auto, approve, reject, complete, abandon, open, quit",      }));
       return;
     }
 
@@ -217,20 +401,14 @@ export const App: React.FC = () => {
     }
 
     if (command === "approve") {
-      applyPrAction(
-        (pr) => ({ ...pr, reviewState: "approved" }),
-        "PR marked as approved (mock).",
-      );
       setState((current) => ({ ...current, focus: "list", commandText: "" }));
+      armConfirm("approve");
       return;
     }
 
     if (command === "reject") {
-      applyPrAction(
-        (pr) => ({ ...pr, reviewState: "changes-requested" }),
-        "PR marked as rejected (mock).",
-      );
       setState((current) => ({ ...current, focus: "list", commandText: "" }));
+      armConfirm("reject");
       return;
     }
 
@@ -240,11 +418,8 @@ export const App: React.FC = () => {
     }
 
     if (command === "abandon") {
-      applyPrAction(
-        (pr) => ({ ...pr, status: "abandoned" }),
-        "PR marked as abandoned (mock).",
-      );
       setState((current) => ({ ...current, focus: "list", commandText: "" }));
+      armConfirm("abandon");
       return;
     }
 
@@ -282,6 +457,12 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
+    // Initial data load from Azure DevOps (or mock) on mount.
+    doRefresh("initial");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (!state.autoRefresh) {
       return;
     }
@@ -311,6 +492,24 @@ export const App: React.FC = () => {
       return;
     }
 
+    // Confirmation gate for destructive vote actions (approve/reject).
+    if (state.pendingConfirm) {
+      const confirmed = input === "y" || key.return;
+      const pending = state.pendingConfirm;
+      setState((current) => ({ ...current, pendingConfirm: null }));
+
+      if (!confirmed) {
+        setState((current) => ({
+          ...current,
+          banner: `${pending.kind} cancelled.`,
+        }));
+        return;
+      }
+
+      runConfirmedAction(pending);
+      return;
+    }
+
     if (state.focus === "completion") {
       if (key.escape) {
         setState((current) => ({
@@ -321,7 +520,10 @@ export const App: React.FC = () => {
         return;
       }
 
-      if (key.upArrow || input === "k") {
+      // Cursors 4, 5, 6 are free-text fields — only arrow keys navigate there.
+      const isTextField = state.completionCursor >= 4 && state.completionCursor <= 6;
+
+      if (key.upArrow || (!isTextField && input === "k")) {
         setState((current) => ({
           ...current,
           completionCursor: clamp(
@@ -333,7 +535,7 @@ export const App: React.FC = () => {
         return;
       }
 
-      if (key.downArrow || input === "j") {
+      if (key.downArrow || (!isTextField && input === "j")) {
         setState((current) => ({
           ...current,
           completionCursor: clamp(
@@ -596,18 +798,12 @@ export const App: React.FC = () => {
     }
 
     if (input === "a") {
-      applyPrAction(
-        (pr) => ({ ...pr, reviewState: "approved" }),
-        "PR marked as approved (mock).",
-      );
+      armConfirm("approve");
       return;
     }
 
     if (input === "x") {
-      applyPrAction(
-        (pr) => ({ ...pr, reviewState: "changes-requested" }),
-        "PR marked as rejected (mock).",
-      );
+      armConfirm("reject");
       return;
     }
 
@@ -782,27 +978,42 @@ export const App: React.FC = () => {
   return (
     <Box flexDirection="column" padding={1}>
       <Box justifyContent="space-between">
-        <Text color="cyanBright">adotui</Text>
-        <Text color="gray">
-          {process.platform} | bun {Bun.version}
+        <Box>
+          <Text color={palette.accent} bold>
+            {glyph.dot} adotui
+          </Text>
+          <Text color={palette.muted}> Azure DevOps PR Monitor</Text>
+        </Box>
+        <Text color={palette.muted}>
+          {process.platform} {glyph.bullet} bun {Bun.version}
         </Text>
       </Box>
 
-      <Box>
-        <Text color="whiteBright">Azure DevOps PR Monitor</Text>
-        <Text color="gray"> | grouped by organization and repository</Text>
-      </Box>
-
       <Box marginTop={1}>
-        <Text color="yellow">{state.banner}</Text>
+        <Text
+          color={
+            state.loadState === "error"
+              ? palette.danger
+              : state.pendingConfirm
+                ? palette.warn
+                : state.loadState === "loading"
+                  ? palette.warn
+                  : palette.text
+          }
+        >
+          {state.loadState === "loading" ? `${glyph.clock} ` : ""}
+          {state.banner}
+        </Text>
       </Box>
 
       <SummaryBar
         activePrs={activePrs}
         totalPrs={totalPrs}
         orgCount={state.data.organizations.length}
+        repoCount={repoCount}
         autoRefresh={state.autoRefresh}
         relativeLastRefresh={formatRelativeAge(state.lastRefreshISO)}
+        loadState={state.loadState}
       />
 
       <Box marginTop={1}>
@@ -828,20 +1039,30 @@ export const App: React.FC = () => {
               diffViewMode={state.diffViewMode}
             />
           ) : (
-            <PrDetails
-              selectedPr={selectedPr}
-              focus={state.focus}
-            />
+            <PrDetails selectedPr={selectedPr} focus={state.focus} />
           )}
         </Box>
       </Box>
 
-      <CommandBar focus={state.focus} commandText={state.commandText} />
+      <CommandBar
+        focus={state.focus}
+        commandText={state.commandText}
+        pendingConfirm={state.pendingConfirm}
+      />
 
-      <Box marginTop={1}>
-        <Text color="gray">
-          keys: tab focus | tree: j/k repos, h/l orgs | list: j/k prs | files: j/k, d details | detail: h files | / command | r refresh | a approve | x
-          reject | c complete | o open | u unified | s split | q quit
+      <Box marginTop={1} flexWrap="wrap">
+        <Text color={palette.muted}>
+          <Text color={palette.accentDim}>tab</Text> focus{"   "}
+          <Text color={palette.accentDim}>j/k</Text> move{"   "}
+          <Text color={palette.accentDim}>h/l</Text> panes{"   "}
+          <Text color={palette.accentDim}>/</Text> command{"   "}
+          <Text color={palette.accentDim}>r</Text> refresh{"   "}
+          <Text color={palette.ok}>a</Text> approve{"   "}
+          <Text color={palette.danger}>x</Text> reject{"   "}
+          <Text color={palette.info}>c</Text> complete{"   "}
+          <Text color={palette.accentDim}>o</Text> open{"   "}
+          <Text color={palette.accentDim}>u/s</Text> diff{"   "}
+          <Text color={palette.accentDim}>q</Text> quit
         </Text>
       </Box>
 
