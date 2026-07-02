@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { AppData, RepositoryNode } from "../../domain/types";
-import type { FocusArea } from "../types";
+import type { FocusArea, TreeFilter } from "../types";
 import { glyph, palette, truncate } from "../theme";
 
 type OrganizationTreeProps = {
@@ -9,6 +9,7 @@ type OrganizationTreeProps = {
   selectedOrgIndex: number;
   selectedRepoIndex: number;
   focus: FocusArea;
+  treeFilter: TreeFilter;
 };
 
 const PANEL_WIDTH = 36;
@@ -36,8 +37,10 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
   selectedOrgIndex,
   selectedRepoIndex,
   focus,
+  treeFilter,
 }) => {
   const active = focus === "tree";
+  const filteringByPrs = treeFilter === "with-prs";
 
   return (
     <Box
@@ -47,20 +50,59 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
       paddingX={1}
       flexDirection="column"
     >
-      <Text color={active ? palette.accent : palette.muted} bold>
-        {glyph.files} Organizations
-      </Text>
+      {/* Header row: title + filter badge */}
+      <Box justifyContent="space-between">
+        <Text color={active ? palette.accent : palette.muted} bold>
+          {glyph.files} Organizations
+        </Text>
+        <Text color={filteringByPrs ? palette.warn : palette.muted}>
+          {filteringByPrs ? "PRs only" : "all"}
+        </Text>
+      </Box>
+
+      {/* Filter hint (only visible when tree is focused) */}
+      {active && (
+        <Text color={palette.muted}>
+          {"  "}
+          <Text color={palette.accentDim}>f</Text>
+          {" toggle filter"}
+        </Text>
+      )}
 
       {data.organizations.length === 0 ? (
         <Text color={palette.muted}>No organizations.</Text>
       ) : (
         data.organizations.map((org, orgIndex) => {
           const orgSelected = orgIndex === selectedOrgIndex;
+
+          // Apply filter: only include repos that have at least one PR
+          const visibleRepos = filteringByPrs
+            ? org.repositories.filter((r) => r.pullRequests.length > 0)
+            : org.repositories;
+
           const prCount = org.repositories.reduce(
             (sum, repo) => sum + repo.pullRequests.length,
             0,
           );
-          const projectGroups = groupByProject(org.repositories);
+
+          const visibleCount = visibleRepos.length;
+
+          // Build flat-index-preserving groups from the FILTERED repos.
+          // We must preserve the original flatIndex so selection in App.tsx
+          // (which uses the unfiltered array) still points to the right repo.
+          const filteredWithIndex = filteringByPrs
+            ? org.repositories
+                .map((repo, idx) => ({ repo, flatIndex: idx }))
+                .filter(({ repo }) => repo.pullRequests.length > 0)
+            : org.repositories.map((repo, idx) => ({ repo, flatIndex: idx }));
+
+          const projectGroups = groupByProject(
+            filteredWithIndex.map(({ repo }) => repo),
+          );
+          // Re-attach original flat indices
+          const flatIndexMap = new Map<string, number>(
+            filteredWithIndex.map(({ repo, flatIndex }) => [repo.name, flatIndex]),
+          );
 
           return (
             <Box key={org.organizationUrl || org.name} flexDirection="column" marginTop={orgIndex === 0 ? 1 : 0}>
@@ -74,50 +116,59 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
               </Text>
               <Text color={palette.muted}>
                 {"  "}
-                {org.repositories.length} repos {glyph.bullet} {prCount} prs
+                {filteringByPrs
+                  ? `${visibleCount}/${org.repositories.length} repos ${glyph.bullet} ${prCount} prs`
+                  : `${org.repositories.length} repos ${glyph.bullet} ${prCount} prs`}
               </Text>
 
               {/* Project → Repo rows (only when org is selected) */}
               {orgSelected &&
-                projectGroups.map(({ projectName, entries }, projIdx) => {
-                  const isLastProject = projIdx === projectGroups.length - 1;
-                  const projConnector = isLastProject ? glyph.branchLast : glyph.branch;
+                (visibleCount === 0 ? (
+                  <Text color={palette.muted}>{"  "}No repos with PRs.</Text>
+                ) : (
+                  projectGroups.map(({ projectName, entries }, projIdx) => {
+                    const isLastProject = projIdx === projectGroups.length - 1;
+                    const projConnector = isLastProject ? glyph.branchLast : glyph.branch;
 
-                  return (
-                    <Box key={projectName} flexDirection="column">
-                      {/* Project header */}
-                      <Box>
-                        <Text color={palette.muted}>{"  "}{projConnector} </Text>
-                        <Text color={palette.warn} bold>
-                          {truncate(projectName, PANEL_WIDTH - 8)}
-                        </Text>
+                    return (
+                      <Box key={projectName} flexDirection="column">
+                        {/* Project header */}
+                        <Box>
+                          <Text color={palette.muted}>{"  "}{projConnector} </Text>
+                          <Text color={palette.warn} bold>
+                            {truncate(projectName, PANEL_WIDTH - 8)}
+                          </Text>
+                        </Box>
+
+                        {/* Repo rows under this project */}
+                        {entries.map(({ repo }, entryIdx) => {
+                          const originalFlatIndex = flatIndexMap.get(repo.name) ?? 0;
+                          const repoSelected = originalFlatIndex === selectedRepoIndex;
+                          const isLastRepo = entryIdx === entries.length - 1;
+                          const vertPrefix = isLastProject ? "     " : `  ${glyph.vert}  `;
+                          const repoConnector = isLastRepo ? glyph.branchLast : glyph.branch;
+
+                          return (
+                            <Box key={repo.name}>
+                              <Text color={palette.muted}>
+                                {vertPrefix}{repoConnector}{" "}
+                              </Text>
+                              <Text
+                                color={repoSelected ? palette.accent : palette.text}
+                                bold={repoSelected}
+                              >
+                                {truncate(repo.name, PANEL_WIDTH - 14)}
+                              </Text>
+                              <Text color={repo.pullRequests.length > 0 ? palette.ok : palette.muted}>
+                                {" "}({repo.pullRequests.length})
+                              </Text>
+                            </Box>
+                          );
+                        })}
                       </Box>
-
-                      {/* Repo rows under this project */}
-                      {entries.map(({ repo, flatIndex }, entryIdx) => {
-                        const repoSelected = flatIndex === selectedRepoIndex;
-                        const isLastRepo = entryIdx === entries.length - 1;
-                        const vertPrefix = isLastProject ? "     " : `  ${glyph.vert}  `;
-                        const repoConnector = isLastRepo ? glyph.branchLast : glyph.branch;
-
-                        return (
-                          <Box key={repo.name}>
-                            <Text color={palette.muted}>
-                              {vertPrefix}{repoConnector}{" "}
-                            </Text>
-                            <Text
-                              color={repoSelected ? palette.accent : palette.text}
-                              bold={repoSelected}
-                            >
-                              {truncate(repo.name, PANEL_WIDTH - 14)}
-                            </Text>
-                            <Text color={palette.muted}> ({repo.pullRequests.length})</Text>
-                          </Box>
-                        );
-                      })}
-                    </Box>
-                  );
-                })}
+                    );
+                  })
+                ))}
             </Box>
           );
         })

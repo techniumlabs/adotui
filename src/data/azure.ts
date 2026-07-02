@@ -127,8 +127,8 @@ const buildUnifiedDiff = async (
   const rawDiff = await new Response(proc.stdout).text();
   await proc.exited; // exit 0 (identical) or 1 (differs) are both valid
 
-  await unlink(oldPath).catch(() => {});
-  await unlink(newPath).catch(() => {});
+  await unlink(oldPath).catch(() => { });
+  await unlink(newPath).catch(() => { });
 
   const lines = rawDiff.split("\n");
   const additions = lines.filter(
@@ -412,8 +412,7 @@ export const loadAppData = async (
             .filter((name): name is string => !!name);
         } catch (cause) {
           warnings.push(
-            `Could not list repos for ${project.project}: ${
-              cause instanceof CommandError ? cause.detail : String(cause)
+            `Could not list repos for ${project.project}: ${cause instanceof CommandError ? cause.detail : String(cause)
             }`,
           );
           continue;
@@ -432,8 +431,7 @@ export const loadAppData = async (
             return { name: repository, project: project.project, pullRequests };
           } catch (cause) {
             warnings.push(
-              `Could not list PRs for ${project.project}/${repository}: ${
-                cause instanceof CommandError ? cause.detail : String(cause)
+              `Could not list PRs for ${project.project}/${repository}: ${cause instanceof CommandError ? cause.detail : String(cause)
               }`,
             );
             return { name: repository, project: project.project, pullRequests: [] };

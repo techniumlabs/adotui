@@ -1,0 +1,73 @@
+Viewed FilesView.tsx:67-133
+
+Let me explore both codebases to do a thorough comparison.
+
+Listed directory ghui
+Listed directory adotui
+Listed directory src
+Listed directory src
+Listed directory surfaces
+Listed directory ui
+Listed directory hooks
+Listed directory services
+Listed directory commands
+Listed directory keyboard
+Listed directory item
+Listed directory workspace
+Listed directory components
+Listed directory data
+Listed directory domain
+
+Now let me dive deeper into the key feature files:
+
+Listed directory diff
+Listed directory comments
+Listed directory filter
+Listed directory merge
+Listed directory detail
+Listed directory modals
+Listed directory runs
+Listed directory notice
+Listed directory issues
+Listed directory pullRequests
+Listed directory theme
+Listed directory keymap
+
+Now let me look at key files for feature comparison:
+
+Viewed domain.ts:1-258
+Viewed diff.ts:1-705
+
+Now let me look at the key remaining files to complete the analysis:
+
+Viewed mergeActions.ts:1-152
+Viewed GitHubService.ts:1-528
+Viewed inlineSegments.ts:1-103
+Viewed useDiffLineColors.ts:1-231
+Viewed azure.ts:1-554
+Viewed pullRequestViews.ts:1-55
+
+Now I have a comprehensive understanding of both projects. Let me create the analysis report.
+
+Created ghui_vs_adotui_analysis.md
+
+The full analysis report is in the artifact. Here's the **TL;DR of what's missing in adotui**:
+
+### 🔴 Critical Gaps (must-have for a usable code review tool)
+1. **PR Comments** — Can't read, write, or reply to comments at all
+2. **Review Submission** — Only simple vote, no review body text
+3. **CI/CD Runs View** — No Azure Pipelines visibility
+
+### 🟡 Important Gaps
+4. **Issues/Work Items** — No work item viewing
+5. **Split Diff View** — Type exists but not implemented
+6. **Syntax Highlighting** — ghui has per-filetype highlighting in diffs
+7. **Modal System** — ghui has 12 purpose-built modals; adotui uses inline y/n
+8. **Command Palette** — ghui has fuzzy-search command palette vs basic text input
+9. **Filtering** — No runtime search/filter on PRs
+10. **Caching** — ghui has 35KB cache service; adotui re-fetches everything each time
+
+### 🏗️ Architecture Gap
+The biggest structural difference: **ghui is modular** (30 hooks, 15 services, atom-based state, context-specific keymaps) while **adotui is monolithic** — the entire app is a single 1073-line `App.tsx` with all state, handlers, and actions inline.
+
+Let me know which features you want to prioritize implementing!

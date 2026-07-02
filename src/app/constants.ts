@@ -1,5 +1,5 @@
 import type { AppData } from "../domain/types";
-import type { AppState, CompletionOptions, FocusArea } from "./types";
+import type { AppState, CompletionOptions, FocusArea, TreeFilter } from "./types";
 
 export const EMPTY_DATA: AppData = { organizations: [] };
 
@@ -28,13 +28,18 @@ export const INITIAL_STATE: AppState = {
   autoRefresh: true,
   lastRefreshISO: new Date().toISOString(),
   diffViewMode: "unified",
+  diffScrollOffset: 0,
+  treeFilter: "all" satisfies TreeFilter,
+  prFilter: "",
+  prFilterMode: false,
+  commentInputActive: false,
   loadState: "loading",
   pendingConfirm: null,
 };
 
 export const REFRESH_INTERVAL_MS = 60_000;
 
-export const FOCUS_ORDER: FocusArea[] = ["tree", "list", "detail", "files", "command"];
+export const FOCUS_ORDER: FocusArea[] = ["tree", "list", "detail", "files", "comments", "runs", "command"];
 
 export const COMPLETION_FIELD_LABELS = [
   "merge strategy",

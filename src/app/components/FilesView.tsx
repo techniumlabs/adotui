@@ -7,6 +7,7 @@ import { fileChangeBadge, glyph, palette, truncate } from "../theme";
 type FilesViewProps = {
   selectedPr?: PullRequest;
   selectedFileIndex: number;
+  diffScrollOffset: number;
   focus: FocusArea;
   diffViewMode: DiffViewMode;
 };
@@ -124,7 +125,7 @@ const DiffRow: React.FC<{
 };
 
 /** GitHub-style unified diff pane with word-level change highlighting */
-const DiffPane: React.FC<{ file: PullRequestFileChange; width: number }> = ({ file, width }) => {
+const DiffPane: React.FC<{ file: PullRequestFileChange; width: number; scrollOffset: number }> = ({ file, width, scrollOffset }) => {
   const lines = useMemo(() => {
     const src = file.rawDiff ?? (file.diff.length > 0 ? file.diff.join("\n") : null);
     return src ? parseDiff(src) : null;
@@ -133,6 +134,10 @@ const DiffPane: React.FC<{ file: PullRequestFileChange; width: number }> = ({ fi
   if (!lines) {
     return <Text color={palette.muted}>Diff content not loaded (Azure change list is metadata-only).</Text>;
   }
+
+  const terminalHeight = process.stdout.rows ?? 40;
+  // Reserve rows for: app header (~5) + file list + file header + box borders
+  const viewportH = Math.max(5, terminalHeight - 20);
 
   const rows: React.ReactNode[] = [];
   let idx = 0;
@@ -187,12 +192,33 @@ const DiffPane: React.FC<{ file: PullRequestFileChange; width: number }> = ({ fi
     idx++;
   }
 
-  return <Box flexDirection="column">{rows}</Box>;
+  const total = rows.length;
+  const clampedOffset = Math.min(scrollOffset, Math.max(0, total - viewportH));
+  const visible = rows.slice(clampedOffset, clampedOffset + viewportH);
+  const canScrollDown = clampedOffset + viewportH < total;
+  const canScrollUp = clampedOffset > 0;
+
+  return (
+    <Box flexDirection="column">
+      <Box flexDirection="column">{visible}</Box>
+      <Text color={palette.muted}>
+        {canScrollUp ? "↑ " : "  "}
+        {`line ${clampedOffset + 1}-${Math.min(clampedOffset + viewportH, total)} of ${total}`}
+        {canScrollDown ? " ↓" : "  "}
+        {" · "}
+        <Text color={palette.accentDim}>PgDn/]</Text>{" scroll down  "}
+        <Text color={palette.accentDim}>PgUp/[</Text>{" scroll up  "}
+        <Text color={palette.accentDim}>G</Text>{" end  "}
+        <Text color={palette.accentDim}>g</Text>{" top"}
+      </Text>
+    </Box>
+  );
 };
 
 export const FilesView: React.FC<FilesViewProps> = ({
   selectedPr,
   selectedFileIndex,
+  diffScrollOffset,
   focus,
   diffViewMode,
 }) => {
@@ -291,7 +317,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
             <Text color={palette.danger}> -{selectedFile.deletions}</Text>
           </Text>
           {hasDiff ? (
-            <DiffPane file={selectedFile} width={filesInnerWidth} />
+            <DiffPane file={selectedFile} width={filesInnerWidth} scrollOffset={diffScrollOffset} />
           ) : (
             <Text color={palette.muted}>
               Diff content not loaded (Azure change list is metadata-only).

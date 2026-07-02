@@ -11,7 +11,55 @@ export interface PullRequestFileChange {
   rawDiff?: string;
 }
 
-export type MergeStatus = "succeeded" | "conflicts" | "rejectedByPolicy" | "queued" | "failure" | "notSet";
+export type MergeStatus =
+  | "succeeded"
+  | "conflicts"
+  | "rejectedByPolicy"
+  | "queued"
+  | "failure"
+  | "notSet";
+
+// ─── PR Comments ─────────────────────────────────────────────────────────────
+
+export type CommentType = "text" | "codeChange" | "system";
+
+export interface PrCommentThread {
+  id: number;
+  status: "active" | "fixed" | "wontFix" | "closed" | "byDesign" | "pending" | "unknown";
+  comments: PrComment[];
+  /** File path this thread is anchored to (null = PR-level comment). */
+  filePath: string | null;
+  lineNumber: number | null;
+}
+
+export interface PrComment {
+  id: number;
+  threadId: number;
+  author: string;
+  content: string;
+  publishedDate: string;
+  lastUpdatedDate: string;
+  commentType: CommentType;
+  isDeleted: boolean;
+}
+
+// ─── Pipeline Runs ───────────────────────────────────────────────────────────
+
+export type RunResult = "canceled" | "failed" | "succeeded" | "none";
+export type RunState = "canceling" | "completed" | "inProgress" | "none";
+
+export interface PipelineRun {
+  id: number;
+  name: string;
+  pipelineName: string;
+  state: RunState;
+  result: RunResult | null;
+  startTime: string | null;
+  finishTime: string | null;
+  url: string;
+}
+
+// ─── Core PR ─────────────────────────────────────────────────────────────────
 
 export interface PullRequest {
   id: number;
@@ -36,6 +84,8 @@ export interface PullRequest {
   organizationUrl: string;
   project: string;
   repository: string;
+  /** The repository's internal Azure DevOps ID (used for API calls). */
+  repositoryId?: string;
 }
 
 export interface RepositoryNode {
