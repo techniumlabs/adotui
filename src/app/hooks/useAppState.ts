@@ -445,17 +445,9 @@ export function useAppState(exitApp: () => void) {
     return () => clearInterval(timer);
   }, [state.autoRefresh]);
 
-  useEffect(() => {
-    if (selectedPr) {
-      setState((current) => ({
-        ...current,
-        focus: "files",
-        selectedFileIndex: 0,
-        diffScrollOffset: 0,
-        banner: "Files view. Press 'd' for details, 'h' for PR list.",
-      }));
-    }
-  }, [selectedPr?.id]);
+  // Removed the useEffect that automatically jumped to 'files' focus when selectedPr changed.
+  // This ensures the focus stays in the current pane (e.g., 'tree' or 'list') and simply displays
+  // the 'detail' view of the selected PR on the right, as expected.
 
   return {
     state,

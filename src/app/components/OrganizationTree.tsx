@@ -60,14 +60,7 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
         </Text>
       </Box>
 
-      {/* Filter hint (only visible when tree is focused) */}
-      {active && (
-        <Text color={palette.muted}>
-          {"  "}
-          <Text color={palette.accentDim}>f</Text>
-          {" toggle filter"}
-        </Text>
-      )}
+
 
       {data.organizations.length === 0 ? (
         <Text color={palette.muted}>No organizations.</Text>
@@ -92,8 +85,8 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
           // (which uses the unfiltered array) still points to the right repo.
           const filteredWithIndex = filteringByPrs
             ? org.repositories
-                .map((repo, idx) => ({ repo, flatIndex: idx }))
-                .filter(({ repo }) => repo.pullRequests.length > 0)
+              .map((repo, idx) => ({ repo, flatIndex: idx }))
+              .filter(({ repo }) => repo.pullRequests.length > 0)
             : org.repositories.map((repo, idx) => ({ repo, flatIndex: idx }));
 
           const projectGroups = groupByProject(
@@ -172,6 +165,16 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
             </Box>
           );
         })
+      )}
+
+      {active && (
+        <Box marginTop={1}>
+          <Text color={palette.muted}>
+            <Text color={palette.accentDim}>ᐃ and ᐁ</Text> navigate{"  "}
+            <Text color={palette.accentDim}>↲</Text> select{"  "}
+            <Text color={palette.accentDim}>f</Text> filter
+          </Text>
+        </Box>
       )}
     </Box>
   );

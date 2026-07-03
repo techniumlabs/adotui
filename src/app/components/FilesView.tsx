@@ -509,17 +509,24 @@ export const FilesView: React.FC<FilesViewProps> = ({
                 {canScrollUp ? "↑ " : "  "}
                 {`row ${diffSelectedRow + 1} of ${total}`}
                 {canScrollDown ? " ↓" : "  "}
-                {" · "}
-                <Text color={palette.accentDim}>PgDn</Text>{" page down  "}
-                <Text color={palette.accentDim}>PgUp</Text>{" page up  "}
-                <Text color={palette.accentDim}>G</Text>{" end  "}
-                <Text color={palette.accentDim}>g</Text>{" top"}
               </Text>
             </Box>
           ) : (
             <Text color={palette.muted}>
               Diff content not loaded (Azure change list is metadata-only).
             </Text>
+          )}
+
+          {active && !commentMode && (
+            <Box marginTop={1}>
+              <Text color={palette.muted}>
+                <Text color={palette.accentDim}>j/k</Text> navigate{"  "}
+                <Text color={palette.accentDim}>n</Text> comment{"  "}
+                <Text color={palette.accentDim}>[/]</Text> switch files{"  "}
+                <Text color={palette.accentDim}>PgDn/PgUp</Text> page{"  "}
+                <Text color={palette.accentDim}>g/G</Text> top/end
+              </Text>
+            </Box>
           )}
         </Box>
       )}
@@ -552,16 +559,6 @@ export const FilesView: React.FC<FilesViewProps> = ({
         </Box>
       )}
 
-      {/* Keyboard hint */}
-      {active && !commentMode && (
-        <Box marginTop={1}>
-          <Text color={palette.muted}>
-            <Text color={palette.accentDim}>j/k</Text> navigate lines{"  "}
-            <Text color={palette.accentDim}>n</Text> add comment{"  "}
-            <Text color={palette.accentDim}>[/]</Text> switch files
-          </Text>
-        </Box>
-      )}
     </Box>
   );
 };

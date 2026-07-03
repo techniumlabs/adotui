@@ -59,6 +59,8 @@ export const reviewBadge = (state: ReviewState): Badge => {
         label: "changes",
         color: palette.danger,
       };
+    case "missing-required":
+      return { symbol: glyph.clock, label: "missing required", color: palette.warn };
     default:
       return { symbol: glyph.pending, label: "pending", color: palette.warn };
   }

@@ -112,9 +112,17 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
                   <Text color={checks.color}>
                     {checks.symbol} {checks.label}
                   </Text>
-                  <Text color={palette.muted}>
-                    {"   "}
-                    {glyph.dot} {selectedPr.comments} comments
+                </Row>
+                <Row label="comments">
+                  <Text color={palette.text}>
+                    {selectedPr.comments}{" "}
+                    {selectedPr.activeComments > 0 ? (
+                      <Text color={palette.warn}>
+                        ({selectedPr.activeComments} active)
+                      </Text>
+                    ) : (
+                      <Text color={palette.muted}>(all resolved)</Text>
+                    )}
                   </Text>
                 </Row>
                 <Row label="files">
@@ -122,6 +130,20 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
                     {selectedPr.changedFiles.length}
                   </Text>
                   <Text color={palette.muted}> (press l / files tab)</Text>
+                </Row>
+                <Row label="work items">
+                  {selectedPr.workItems && selectedPr.workItems.length > 0 ? (
+                    <Box flexDirection="column">
+                      {selectedPr.workItems.map((wi) => (
+                        <Text key={wi.id} color={palette.textBright}>
+                          <Text color={palette.accentDim}>#{wi.id}</Text> {wi.type} - {wi.state} -{" "}
+                          <Text color={palette.muted}>{wi.title}</Text>
+                        </Text>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Text color={palette.muted}>none</Text>
+                  )}
                 </Row>
               </Box>
 
