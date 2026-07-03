@@ -56,7 +56,7 @@ export const reviewBadge = (state: ReviewState): Badge => {
     case "changes-requested":
       return {
         symbol: glyph.cross,
-        label: "changes",
+        label: "rejected",
         color: palette.danger,
       };
     case "missing-required":
