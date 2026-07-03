@@ -128,18 +128,12 @@ export const App: React.FC = () => {
       <Box marginTop={1} flexWrap="wrap">
         <Text color={palette.muted}>
           <Text color={palette.accentDim}>tab</Text> focus{"   "}
-          <Text color={palette.accentDim}>j/k</Text> move{"   "}
-          <Text color={palette.accentDim}>h/l</Text> panes{"   "}
-          <Text color={palette.accentDim}>/</Text> filter PRs{"   "}
-          <Text color={palette.accentDim}>m</Text> comments{"   "}
-          <Text color={palette.accentDim}>p</Text> pipelines{"   "}
+          <Text color={palette.accentDim}>1-4</Text> views{"   "}
           <Text color={palette.accentDim}>r</Text> refresh{"   "}
-          <Text color={palette.accentDim}>f</Text> repo filter{"   "}
           <Text color={palette.ok}>a</Text> approve{"   "}
           <Text color={palette.danger}>x</Text> reject{"   "}
           <Text color={palette.info}>c</Text> complete{"   "}
-          <Text color={palette.accentDim}>o</Text> open{"   "}
-          <Text color={palette.accentDim}>u/s</Text> diff{"   "}
+          <Text color={palette.accentDim}>o</Text> open browser{"   "}
           <Text color={palette.accentDim}>q</Text> quit
         </Text>
       </Box>

@@ -1,5 +1,5 @@
 export type PullRequestStatus = "active" | "completed" | "abandoned";
-export type ReviewState = "pending" | "approved" | "changes-requested";
+export type ReviewState = "pending" | "approved" | "changes-requested" | "missing-required";
 
 export interface PullRequestFileChange {
   path: string;
@@ -60,6 +60,14 @@ export interface PipelineRun {
   url: string;
 }
 
+export interface PullRequestWorkItem {
+  id: number;
+  title: string;
+  state: string;
+  type: string;
+  url: string;
+}
+
 // ─── Core PR ─────────────────────────────────────────────────────────────────
 
 export interface PullRequest {
@@ -73,11 +81,13 @@ export interface PullRequest {
   targetBranch: string;
   updatedAt: string;
   comments: number;
+  activeComments: number;
   checksPassed: number;
   checksTotal: number;
   url: string;
   changedFiles: PullRequestFileChange[];
   mergeStatus: MergeStatus;
+  workItems?: PullRequestWorkItem[];
   /**
    * Routing info identifying where this PR lives, used to dispatch `az`
    * actions unambiguously (independent of how the tree is grouped/labelled).

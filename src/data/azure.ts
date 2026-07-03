@@ -4,6 +4,7 @@ import type {
   OrganizationNode,
   PullRequest,
   PullRequestFileChange,
+  PullRequestWorkItem,
   RepositoryNode,
 } from "../domain/types";
 import type { CompletionOptions } from "../app/types";
@@ -22,6 +23,7 @@ import {
   orgLabel,
   summarizeChecks,
 } from "./azureNormalize";
+import { fetchPrComments } from "./azureRest";
 
 const AZ = "az";
 
@@ -234,6 +236,35 @@ const listPrPolicies = async (
   }
 };
 
+/** Fetches work items linked to a PR. */
+const listPrWorkItems = async (
+  organization: string,
+  prId: number,
+): Promise<PullRequestWorkItem[]> => {
+  try {
+    const rawItems = await runJson<any[]>(AZ, [
+      "repos",
+      "pr",
+      "work-item",
+      "list",
+      "--id",
+      String(prId),
+      ...orgArgs(organization),
+      ...jsonOutput,
+    ]);
+
+    return rawItems.map((raw) => ({
+      id: raw.id,
+      title: raw.fields?.["System.Title"] ?? "Unknown Work Item",
+      state: raw.fields?.["System.State"] ?? "Unknown",
+      type: raw.fields?.["System.WorkItemType"] ?? "Unknown",
+      url: raw.url,
+    }));
+  } catch {
+    return [];
+  }
+};
+
 /**
  * Fetches changed files for a PR via the REST changes endpoint.
  * Uses the latest iteration. When source and target commit SHAs are provided,
@@ -341,9 +372,12 @@ const hydratePullRequest = async (
   let changedFiles: PullRequestFileChange[] = [];
   let checksPassed = 0;
   let checksTotal = 0;
+  let workItems: PullRequestWorkItem[] = [];
+  let commentCount = 0;
+  let activeCommentCount = 0;
 
   if (options.fetchDetails && prId > 0) {
-    const [files, policies] = await Promise.all([
+    const [files, policies, items, threads] = await Promise.all([
       listPrFileChanges(
         project.organization,
         project.project,
@@ -353,21 +387,34 @@ const hydratePullRequest = async (
         targetCommit,
       ),
       listPrPolicies(project.organization, project.project, prId),
+      listPrWorkItems(project.organization, prId),
+      fetchPrComments(project.organization, project.project, repositoryId, prId),
     ]);
     changedFiles = files;
     const checks = summarizeChecks(policies);
     checksPassed = checks.passed;
     checksTotal = checks.total;
+    workItems = items;
+    commentCount = threads.reduce((acc, t) => acc + t.comments.length, 0);
+    activeCommentCount = threads.reduce(
+      (acc, t) => acc + (t.status === "active" || t.status === "pending" ? t.comments.length : 0),
+      0
+    );
   }
 
-  return normalizePullRequest(raw, {
-    organization: project.organization,
-    project: project.project,
-    repository,
-    changedFiles,
-    checksPassed,
-    checksTotal,
-  });
+  return {
+    ...normalizePullRequest(raw, {
+      organization: project.organization,
+      project: project.project,
+      repository,
+      changedFiles,
+      checksPassed,
+      checksTotal,
+      commentCount,
+      activeCommentCount,
+    }),
+    workItems,
+  };
 };
 
 export interface LoadOptions {

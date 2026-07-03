@@ -73,10 +73,10 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
 
   const visible = query
     ? pullRequests.filter(
-        (pr) =>
-          pr.title.toLowerCase().includes(query) ||
-          pr.author.toLowerCase().includes(query),
-      )
+      (pr) =>
+        pr.title.toLowerCase().includes(query) ||
+        pr.author.toLowerCase().includes(query),
+    )
     : pullRequests;
 
   return (
@@ -103,13 +103,8 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
         <Box>
           <Text color={palette.accent}>🔍 </Text>
           <Text color={palette.textBright}>{prFilter}</Text>
-          <Text color={palette.muted}>{"  "}(Esc to clear)</Text>
+          <Text color={palette.muted}>{"  "}(esc to clear)</Text>
         </Box>
-      ) : active ? (
-        <Text color={palette.muted}>
-          {"  "}
-          <Text color={palette.accentDim}>/</Text> filter by title or author
-        </Text>
       ) : null}
 
       {visible.length > 0 ? (
@@ -120,6 +115,16 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
         <Text color={palette.muted}>No PRs match "{prFilter}".</Text>
       ) : (
         <Text color={palette.muted}>No pull requests in this repository.</Text>
+      )}
+
+      {active && (
+        <Box marginTop={1}>
+          <Text color={palette.muted}>
+            <Text color={palette.accentDim}>j/k</Text> navigate{"  "}
+            <Text color={palette.accentDim}>enter</Text> select{"  "}
+            <Text color={palette.accentDim}>f</Text> filter
+          </Text>
+        </Box>
       )}
     </Box>
   );

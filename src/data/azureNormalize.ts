@@ -44,13 +44,25 @@ const normalizeStatus = (status: string | undefined): PullRequestStatus => {
  * (-5) is treated as non-blocking and does not override approvals.
  */
 export const deriveReviewState = (pr: AzurePullRequest): ReviewState => {
-  const votes = (pr.reviewers ?? []).map((reviewer) => reviewer.vote ?? 0);
+  const reviewers = pr.reviewers ?? [];
 
-  if (votes.some((vote) => vote <= -10)) {
+  // If anyone rejected, it's changes-requested regardless
+  if (reviewers.some((r) => (r.vote ?? 0) <= -10)) {
     return "changes-requested";
   }
 
-  if (votes.some((vote) => vote >= 5)) {
+  // Check required reviewers
+  const requiredReviewers = reviewers.filter((r) => r.isRequired);
+
+  if (requiredReviewers.length > 0) {
+    const allRequiredApproved = requiredReviewers.every((r) => (r.vote ?? 0) >= 5);
+    if (!allRequiredApproved) {
+      return "missing-required";
+    }
+  }
+
+  // If there are no required reviewers or they all approved, we just need ANY approval to be "approved"
+  if (reviewers.some((r) => (r.vote ?? 0) >= 5)) {
     return "approved";
   }
 
@@ -144,6 +156,7 @@ export const normalizePullRequest = (
     checksPassed?: number;
     checksTotal?: number;
     commentCount?: number;
+    activeCommentCount?: number;
   },
 ): PullRequest => {
   const id = pr.pullRequestId ?? 0;
@@ -159,6 +172,7 @@ export const normalizePullRequest = (
     targetBranch: shortBranch(pr.targetRefName),
     updatedAt: pr.creationDate ?? new Date().toISOString(),
     comments: context.commentCount ?? 0,
+    activeComments: context.activeCommentCount ?? 0,
     checksPassed: context.checksPassed ?? 0,
     checksTotal: context.checksTotal ?? 0,
     url: buildPrUrl(

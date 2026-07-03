@@ -338,7 +338,7 @@ export function useAppKeyboard(
         setState((current) => ({ ...current, focus: "runs", banner: "Focus: Pipelines" }));
         return;
       }
-      
+
       // Global 'h' to return to PR list from any of the 4 panes
       if ((input === "h") && ["detail", "files", "comments", "runs"].includes(state.focus)) {
         setState((current) => ({ ...current, focus: "list", banner: "Focus: list" }));
@@ -399,24 +399,7 @@ export function useAppKeyboard(
       setState((current) => ({ ...current, banner: "Opened PR in browser." }));
       return;
     }
-
-    if (input === "u") {
-      setState((current) => ({
-        ...current,
-        diffViewMode: "unified",
-        banner: "Diff mode: unified.",
-      }));
-      return;
-    }
-
-    if (input === "s") {
-      setState((current) => ({
-        ...current,
-        diffViewMode: "split",
-        banner: "Diff mode: split.",
-      }));
-      return;
-    }
+    // (Removed u/s diff mode shortcuts per user request)
 
     if (state.focus === "tree") {
       if (input === "j" || key.downArrow) {
@@ -427,8 +410,15 @@ export function useAppKeyboard(
         actions.moveTreeSelection(0, -1);
       }
 
-      if (input === "l" || key.rightArrow) {
+      if (input === "l" || key.rightArrow || key.return) {
         actions.moveTreeSelection(1, 0, "Organization changed.");
+        if (key.return) {
+          setState((current) => ({
+            ...current,
+            focus: "list",
+            banner: "Focus: list",
+          }));
+        }
       }
 
       if (input === "h" || key.leftArrow) {
@@ -482,7 +472,7 @@ export function useAppKeyboard(
       }
 
       // Enter filter mode
-      if (input === "/") {
+      if (input === "f") {
         setState((current) => ({
           ...current,
           prFilterMode: true,
@@ -519,7 +509,7 @@ export function useAppKeyboard(
         }));
       }
 
-      if (input === "l" || key.rightArrow) {
+      if (input === "l" || key.rightArrow || key.return) {
         setState((current) => ({
           ...current,
           focus: "detail",
