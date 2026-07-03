@@ -11,7 +11,7 @@ import type {
   RunResult,
   RunState,
 } from "../domain/types";
-import { runJson } from "./command";
+import { run, runJson } from "./command";
 
 const AZ = "az";
 
@@ -117,11 +117,103 @@ const invokePost = async <T>(
   }
 };
 
+const invokePatch = async <T>(
+  organization: string,
+  area: string,
+  resource: string,
+  routeParameters: string[],
+  body: unknown,
+  queryParameters: string[] = [],
+): Promise<T | null> => {
+  const tmpPath = `/tmp/adotui_invoke_${Date.now()}_${Math.random().toString(36).slice(2)}.json`;
+  try {
+    await Bun.write(tmpPath, JSON.stringify(body));
+
+    const args: string[] = [
+      "devops",
+      "invoke",
+      "--area",
+      area,
+      "--resource",
+      resource,
+      "--route-parameters",
+      ...routeParameters,
+      "--http-method",
+      "PATCH",
+      "--in-file",
+      tmpPath,
+      "--media-type",
+      "application/json",
+      "--api-version",
+      "7.1",
+      "--output",
+      "json",
+      ...orgArgs(organization),
+    ];
+
+    if (queryParameters.length > 0) {
+      args.push("--query-parameters", ...queryParameters);
+    }
+
+    return await runJson<T>(AZ, args, { timeoutMs: 20_000 });
+  } catch {
+    return null;
+  } finally {
+    try {
+      const { unlink } = await import("node:fs/promises");
+      await unlink(tmpPath);
+    } catch {
+      // ignore
+    }
+  }
+};
+
+const invokeDelete = async <T>(
+  organization: string,
+  area: string,
+  resource: string,
+  routeParameters: string[],
+  queryParameters: string[] = [],
+): Promise<T | null> => {
+  const args: string[] = [
+    "devops",
+    "invoke",
+    "--area",
+    area,
+    "--resource",
+    resource,
+    "--route-parameters",
+    ...routeParameters,
+    "--http-method",
+    "DELETE",
+    "--api-version",
+    "7.1",
+    "--output",
+    "json",
+    ...orgArgs(organization),
+  ];
+
+  if (queryParameters.length > 0) {
+    args.push("--query-parameters", ...queryParameters);
+  }
+
+  try {
+    const result = await run(AZ, args, { timeoutMs: 20_000 });
+    if (!result.stdout.trim()) {
+      return {} as T;
+    }
+    return JSON.parse(result.stdout) as T;
+  } catch {
+    return null;
+  }
+};
+
 // ─── PR Comment types ─────────────────────────────────────────────────────────
 
 interface RawThread {
   id: number;
   status?: string;
+  isDeleted?: boolean;
   threadContext?: {
     filePath?: string;
     rightFileStart?: { line?: number };
@@ -131,7 +223,7 @@ interface RawThread {
 
 interface RawComment {
   id: number;
-  author?: { displayName?: string };
+  author?: { displayName?: string; uniqueName?: string };
   content?: string;
   publishedDate?: string;
   lastUpdatedDate?: string;
@@ -163,6 +255,7 @@ export const fetchPrComments = async (
   if (!data?.value) return [];
 
   return data.value
+    .filter((thread) => !thread.isDeleted)
     .map((thread) => ({
       id: thread.id,
       status: (thread.status ?? "unknown") as PrCommentThread["status"],
@@ -175,6 +268,7 @@ export const fetchPrComments = async (
             id: c.id,
             threadId: thread.id,
             author: c.author?.displayName ?? "Unknown",
+            authorEmail: c.author?.uniqueName,
             content: c.content ?? "",
             publishedDate: c.publishedDate ?? "",
             lastUpdatedDate: c.lastUpdatedDate ?? "",
@@ -192,10 +286,14 @@ export const postPrComment = async (
   repositoryId: string,
   prId: number,
   content: string,
+  threadContext?: { filePath?: string; rightFileStart?: { line?: number, offset?: number }; rightFileEnd?: { line?: number, offset?: number }; leftFileStart?: { line?: number, offset?: number }; leftFileEnd?: { line?: number, offset?: number } },
+  pullRequestThreadContext?: { changeTrackingId?: number; iterationContext?: { firstComparingIteration?: number; secondComparingIteration?: number } }
 ): Promise<boolean> => {
   const body = {
     comments: [{ parentCommentId: 0, content, commentType: 1 }],
     status: 1, // active
+    ...(threadContext ? { threadContext } : {}),
+    ...(pullRequestThreadContext ? { pullRequestThreadContext } : {}),
   };
 
   const result = await invokePost<{ id: number }>(
@@ -219,9 +317,10 @@ export const replyToPrThread = async (
   repositoryId: string,
   prId: number,
   threadId: number,
+  parentCommentId: number,
   content: string,
 ): Promise<boolean> => {
-  const body = { parentCommentId: 1, content, commentType: 1 };
+  const body = { parentCommentId, content, commentType: 1 };
 
   const result = await invokePost<{ id: number }>(
     organizationUrl,
@@ -234,6 +333,84 @@ export const replyToPrThread = async (
       `threadId=${threadId}`,
     ],
     body,
+  );
+
+  return result !== null;
+};
+
+export const updatePrThreadStatus = async (
+  organizationUrl: string,
+  project: string,
+  repositoryId: string,
+  prId: number,
+  threadId: number,
+  statusId: number, // 1: Active, 2: Fixed, 3: WontFix, 4: Closed, 5: ByDesign, 6: Pending
+): Promise<boolean> => {
+  const body = { status: statusId };
+
+  const result = await invokePatch<{ id: number }>(
+    organizationUrl,
+    "git",
+    "pullRequestThreads",
+    [
+      `project=${project}`,
+      `repositoryId=${repositoryId}`,
+      `pullRequestId=${prId}`,
+      `threadId=${threadId}`,
+    ],
+    body,
+  );
+
+  return result !== null;
+};
+
+export const editPrComment = async (
+  organizationUrl: string,
+  project: string,
+  repositoryId: string,
+  prId: number,
+  threadId: number,
+  commentId: number,
+  content: string,
+): Promise<boolean> => {
+  const body = { content };
+
+  const result = await invokePatch<{ id: number }>(
+    organizationUrl,
+    "git",
+    "pullRequestThreadComments",
+    [
+      `project=${project}`,
+      `repositoryId=${repositoryId}`,
+      `pullRequestId=${prId}`,
+      `threadId=${threadId}`,
+      `commentId=${commentId}`,
+    ],
+    body,
+  );
+
+  return result !== null;
+};
+
+export const deletePrComment = async (
+  organizationUrl: string,
+  project: string,
+  repositoryId: string,
+  prId: number,
+  threadId: number,
+  commentId: number,
+): Promise<boolean> => {
+  const result = await invokeDelete<unknown>(
+    organizationUrl,
+    "git",
+    "pullRequestThreadComments",
+    [
+      `project=${project}`,
+      `repositoryId=${repositoryId}`,
+      `pullRequestId=${prId}`,
+      `threadId=${threadId}`,
+      `commentId=${commentId}`,
+    ],
   );
 
   return result !== null;

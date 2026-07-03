@@ -97,13 +97,18 @@ export const App: React.FC = () => {
               selectedPr={selectedPr}
               selectedFileIndex={state.selectedFileIndex}
               diffScrollOffset={state.diffScrollOffset}
+              onScrollOffsetChange={(offset) => setState(c => ({ ...c, diffScrollOffset: offset }))}
+              diffSelectedRow={state.diffSelectedRow}
+              onSelectedRowChange={(row) => setState(c => ({ ...c, diffSelectedRow: row }))}
               focus={state.focus}
               diffViewMode={state.diffViewMode}
+              onInputModeChange={(active) => setState(c => c.commentInputActive === active ? c : { ...c, commentInputActive: active })}
             />
           ) : state.focus === "comments" ? (
             <CommentsView 
               selectedPr={selectedPr} 
               focus={state.focus}
+              currentUserEmail={state.data.currentUserEmail}
               onInputModeChange={(active) => setState(c => c.commentInputActive === active ? c : { ...c, commentInputActive: active })}
             />
           ) : state.focus === "runs" ? (

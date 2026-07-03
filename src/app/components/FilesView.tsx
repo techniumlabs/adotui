@@ -1,15 +1,20 @@
-import React, { useMemo } from "react";
-import { Box, Text } from "ink";
+import React, { useMemo, useState, useEffect } from "react";
+import { Box, Text, useInput } from "ink";
 import type { PullRequest, PullRequestFileChange } from "../../domain/types";
 import type { DiffViewMode, FocusArea } from "../types";
 import { fileChangeBadge, glyph, palette, truncate } from "../theme";
+import { postPrComment } from "../../data/azureRest";
 
 type FilesViewProps = {
   selectedPr?: PullRequest;
   selectedFileIndex: number;
   diffScrollOffset: number;
+  onScrollOffsetChange: (offset: number) => void;
+  diffSelectedRow: number;
+  onSelectedRowChange: (row: number) => void;
   focus: FocusArea;
   diffViewMode: DiffViewMode;
+  onInputModeChange: (active: boolean) => void;
 };
 
 // ─── diff renderer ──────────────────────────────────────────────────────────
@@ -19,12 +24,17 @@ type ParsedLine =
   | { kind: "add" | "del" | "ctx"; text: string; oldNo: number | null; newNo: number | null };
 
 const parseDiff = (raw: string): ParsedLine[] => {
-  const lines = raw.split("\n").filter((l) => l.length > 0);
+  const lines = raw.replace(/\t/g, "    ").split(/\r?\n/);
+  if (lines.length > 0 && lines[lines.length - 1] === "") {
+    lines.pop();
+  }
   const result: ParsedLine[] = [];
   let oldLine = 1, newLine = 1;
 
   for (const l of lines) {
-    if (l.startsWith("---") || l.startsWith("+++")) {
+    if (l.length === 0) {
+      result.push({ kind: "ctx", text: "", oldNo: oldLine++, newNo: newLine++ });
+    } else if (l.startsWith("---") || l.startsWith("+++")) {
       result.push({ kind: "header", text: l });
     } else if (l.startsWith("@@")) {
       result.push({ kind: "hunk", text: l });
@@ -35,8 +45,12 @@ const parseDiff = (raw: string): ParsedLine[] => {
       result.push({ kind: "add", text: l.slice(1), oldNo: null, newNo: newLine++ });
     } else if (l.startsWith("-")) {
       result.push({ kind: "del", text: l.slice(1), oldNo: oldLine++, newNo: null });
-    } else {
+    } else if (l.startsWith(" ")) {
       result.push({ kind: "ctx", text: l.slice(1), oldNo: oldLine++, newNo: newLine++ });
+    } else if (l === "\\ No newline at end of file") {
+      // Ignore
+    } else {
+      result.push({ kind: "ctx", text: l, oldNo: oldLine++, newNo: newLine++ });
     }
   }
   return result;
@@ -96,17 +110,33 @@ const DiffRow: React.FC<{
   highlightColor?: string;
   plainText?: string;
   width: number;
-}> = ({ oldNo, newNo, marker, lineColor, gutterColor, tokens, highlightColor, plainText, width }) => {
+  isSelected?: boolean;
+}> = ({ oldNo, newNo, marker, lineColor, gutterColor, tokens, highlightColor, plainText, width, isSelected }) => {
   // gutter: "NNNN NNNN + " = LN_W + 1 + LN_W + 1 + 1 + 1 = LN_W*2 + 4
-  const gutterW = LN_W * 2 + 4;
+  const gutterW = LN_W * 2 + 4 + 2; // +2 for the pointer indicator
   const contentW = Math.max(0, width - gutterW);
-  const gutter = `${fmtLineNo(oldNo)} ${fmtLineNo(newNo)} ${marker} `;
+  const pointer = isSelected ? glyph.pointer : " ";
+  const gutter = `${pointer} ${fmtLineNo(oldNo)} ${fmtLineNo(newNo)} ${marker} `;
 
   if (tokens) {
+    let currentLen = 0;
+    const truncatedTokens: Token[] = [];
+    for (const t of tokens) {
+      const spaceLeft = contentW - currentLen;
+      if (spaceLeft <= 0) break;
+      if (t.text.length > spaceLeft) {
+        truncatedTokens.push({ text: t.text.slice(0, spaceLeft - 1) + "…", changed: t.changed });
+        break;
+      } else {
+        truncatedTokens.push(t);
+        currentLen += t.text.length;
+      }
+    }
+
     return (
       <Text wrap="truncate-end">
         <Text color={gutterColor}>{gutter}</Text>
-        {tokens.slice(0, 120).map((t, i) =>
+        {truncatedTokens.map((t, i) =>
           t.changed
             ? <Text key={i} color={highlightColor ?? lineColor} bold underline>{t.text}</Text>
             : <Text key={i} color={lineColor}>{t.text}</Text>
@@ -124,117 +154,268 @@ const DiffRow: React.FC<{
   );
 };
 
-/** GitHub-style unified diff pane with word-level change highlighting */
-const DiffPane: React.FC<{ file: PullRequestFileChange; width: number; scrollOffset: number }> = ({ file, width, scrollOffset }) => {
-  const lines = useMemo(() => {
-    const src = file.rawDiff ?? (file.diff.length > 0 ? file.diff.join("\n") : null);
-    return src ? parseDiff(src) : null;
-  }, [file.path, file.rawDiff, file.diff]);
-
-  if (!lines) {
-    return <Text color={palette.muted}>Diff content not loaded (Azure change list is metadata-only).</Text>;
-  }
-
-  const terminalHeight = process.stdout.rows ?? 40;
-  // Reserve rows for: app header (~5) + file list + file header + box borders
-  const viewportH = Math.max(5, terminalHeight - 20);
-
-  const rows: React.ReactNode[] = [];
-  let idx = 0;
-
-  while (idx < lines.length) {
-    const cur = lines[idx]!;
-    const nxt = lines[idx + 1];
-
-    if (cur.kind === "header") {
-      idx++;
-      continue;
-    }
-
-    if (cur.kind === "hunk") {
-      rows.push(
-        <Text key={idx} color="blueBright" dimColor wrap="truncate-end">
-          {cur.text}
-        </Text>
-      );
-      idx++;
-      continue;
-    }
-
-    // Paired del+add → word-diff highlighting
-    if (cur.kind === "del" && nxt?.kind === "add") {
-      const { oldT, newT } = wordDiff(cur.text, (nxt as { text: string }).text);
-      rows.push(
-        <DiffRow key={`${idx}d`} oldNo={cur.oldNo} newNo={null}
-          marker="-" lineColor="red" gutterColor="red"
-          highlightColor="redBright" tokens={oldT} width={width} />,
-        <DiffRow key={`${idx}a`} oldNo={null} newNo={(nxt as { newNo: number | null }).newNo}
-          marker="+" lineColor="green" gutterColor="green"
-          highlightColor="greenBright" tokens={newT} width={width} />,
-      );
-      idx += 2;
-      continue;
-    }
-
-    if (cur.kind === "add") {
-      rows.push(<DiffRow key={idx} oldNo={null} newNo={cur.newNo}
-        marker="+" lineColor="green" gutterColor="green"
-        plainText={cur.text} width={width} />);
-    } else if (cur.kind === "del") {
-      rows.push(<DiffRow key={idx} oldNo={cur.oldNo} newNo={null}
-        marker="-" lineColor="red" gutterColor="red"
-        plainText={cur.text} width={width} />);
-    } else if (cur.kind === "ctx") {
-      rows.push(<DiffRow key={idx} oldNo={cur.oldNo} newNo={cur.newNo}
-        marker=" " lineColor={palette.text} gutterColor={palette.muted}
-        plainText={cur.text} width={width} />);
-    }
-    idx++;
-  }
-
-  const total = rows.length;
-  const clampedOffset = Math.min(scrollOffset, Math.max(0, total - viewportH));
-  const visible = rows.slice(clampedOffset, clampedOffset + viewportH);
-  const canScrollDown = clampedOffset + viewportH < total;
-  const canScrollUp = clampedOffset > 0;
-
-  return (
-    <Box flexDirection="column">
-      <Box flexDirection="column">{visible}</Box>
-      <Text color={palette.muted}>
-        {canScrollUp ? "↑ " : "  "}
-        {`line ${clampedOffset + 1}-${Math.min(clampedOffset + viewportH, total)} of ${total}`}
-        {canScrollDown ? " ↓" : "  "}
-        {" · "}
-        <Text color={palette.accentDim}>PgDn/]</Text>{" scroll down  "}
-        <Text color={palette.accentDim}>PgUp/[</Text>{" scroll up  "}
-        <Text color={palette.accentDim}>G</Text>{" end  "}
-        <Text color={palette.accentDim}>g</Text>{" top"}
-      </Text>
-    </Box>
-  );
-};
+const okStatus = (msg: string | null) => msg === "Comment posted.";
 
 export const FilesView: React.FC<FilesViewProps> = ({
   selectedPr,
   selectedFileIndex,
   diffScrollOffset,
+  onScrollOffsetChange,
+  diffSelectedRow,
+  onSelectedRowChange,
   focus,
   diffViewMode,
+  onInputModeChange,
 }) => {
   const active = focus === "files";
+  const [commentMode, setCommentMode] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = React.useRef(false);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    onInputModeChange(commentMode);
+  }, [commentMode, onInputModeChange]);
+
+  const flatFiles = selectedPr?.changedFiles ?? [];
+  const selectedFile = flatFiles[selectedFileIndex];
+
   const terminalWidth = process.stdout.columns ?? 120;
   const treePaneWidth = 36;
   const paneGap = 1;
   const rootPadding = 2;
   const rightPaneWidth = Math.max(52, terminalWidth - treePaneWidth - paneGap - rootPadding);
-  // border (2) + paddingX (2) = 4, then subtract 2 more as safety margin
   const filesInnerWidth = Math.max(44, rightPaneWidth - 6);
+
+  // Compute diff rows
+  const diffRows = useMemo(() => {
+    if (!selectedFile) return [];
+    const src = selectedFile.rawDiff ?? (selectedFile.diff.length > 0 ? selectedFile.diff.join("\n") : null);
+    if (!src) return [];
+
+    const lines = parseDiff(src);
+    const result: { element: React.ReactNode; oldNo: number | null; newNo: number | null }[] = [];
+    let idx = 0;
+
+    while (idx < lines.length) {
+      const cur = lines[idx]!;
+      const nxt = lines[idx + 1];
+      const isSelected = result.length === diffSelectedRow;
+
+      if (cur.kind === "header") {
+        idx++;
+        continue;
+      }
+
+      if (cur.kind === "hunk") {
+        result.push({
+          element: (
+            <Text key={idx} color="blueBright" dimColor wrap="truncate-end">
+              {isSelected ? glyph.pointer + " " : "  "}{cur.text.slice(0, filesInnerWidth)}
+            </Text>
+          ),
+          oldNo: null, newNo: null
+        });
+        idx++;
+        continue;
+      }
+
+      if (cur.kind === "del" && nxt?.kind === "add") {
+        const { oldT, newT } = wordDiff(cur.text, (nxt as { text: string }).text);
+        const isNextSelected = result.length + 1 === diffSelectedRow;
+        result.push({
+          element: (
+            <DiffRow key={`${idx}d`} oldNo={cur.oldNo} newNo={null}
+              marker="-" lineColor="red" gutterColor="red"
+              highlightColor="redBright" tokens={oldT} width={filesInnerWidth} isSelected={isSelected} />
+          ),
+          oldNo: cur.oldNo, newNo: null
+        });
+        result.push({
+          element: (
+            <DiffRow key={`${idx}a`} oldNo={null} newNo={(nxt as { newNo: number | null }).newNo}
+              marker="+" lineColor="green" gutterColor="green"
+              highlightColor="greenBright" tokens={newT} width={filesInnerWidth} isSelected={isNextSelected} />
+          ),
+          oldNo: null, newNo: (nxt as { newNo: number | null }).newNo
+        });
+        idx += 2;
+        continue;
+      }
+
+      if (cur.kind === "add") {
+        result.push({
+          element: (
+            <DiffRow key={idx} oldNo={null} newNo={cur.newNo}
+              marker="+" lineColor="green" gutterColor="green"
+              plainText={cur.text} width={filesInnerWidth} isSelected={isSelected} />
+          ),
+          oldNo: null, newNo: cur.newNo
+        });
+      } else if (cur.kind === "del") {
+        result.push({
+          element: (
+            <DiffRow key={idx} oldNo={cur.oldNo} newNo={null}
+              marker="-" lineColor="red" gutterColor="red"
+              plainText={cur.text} width={filesInnerWidth} isSelected={isSelected} />
+          ),
+          oldNo: cur.oldNo, newNo: null
+        });
+      } else if (cur.kind === "ctx") {
+        result.push({
+          element: (
+            <DiffRow key={idx} oldNo={cur.oldNo} newNo={cur.newNo}
+              marker=" " lineColor={palette.text} gutterColor={palette.muted}
+              plainText={cur.text} width={filesInnerWidth} isSelected={isSelected} />
+          ),
+          oldNo: cur.oldNo, newNo: cur.newNo
+        });
+      }
+      idx++;
+    }
+    return result;
+  }, [selectedFile, diffSelectedRow, filesInnerWidth]);
+
+  useInput(
+    (input, key) => {
+      if (!active) return;
+
+      if (commentMode) {
+        if (key.escape) {
+          setCommentMode(false);
+          setCommentText("");
+          return;
+        }
+        if (key.return) {
+          if (!commentText.trim() || !selectedPr || !selectedFile || isSubmittingRef.current) return;
+
+          isSubmittingRef.current = true;
+          setSubmitting(true);
+          const repoId = selectedPr.repositoryId ?? selectedPr.repository;
+
+          let threadContext = { filePath: selectedFile.path } as any;
+          let pullRequestThreadContext: any = undefined;
+
+          if (diffRows.length > 0 && diffSelectedRow >= 0 && diffSelectedRow < diffRows.length) {
+            const rowInfo = diffRows[diffSelectedRow];
+            if (rowInfo && rowInfo.newNo !== null) {
+              threadContext = {
+                filePath: selectedFile.path,
+                rightFileStart: { line: rowInfo.newNo, offset: 1 },
+                rightFileEnd: { line: rowInfo.newNo, offset: 999 }
+              };
+              pullRequestThreadContext = { changeTrackingId: 1, iterationContext: { firstComparingIteration: 1, secondComparingIteration: 2 } };
+            } else if (rowInfo && rowInfo.oldNo !== null) {
+              threadContext = {
+                filePath: selectedFile.path,
+                leftFileStart: { line: rowInfo.oldNo, offset: 1 },
+                leftFileEnd: { line: rowInfo.oldNo, offset: 999 }
+              };
+              pullRequestThreadContext = { changeTrackingId: 1, iterationContext: { firstComparingIteration: 1, secondComparingIteration: 1 } };
+            }
+          }
+
+          postPrComment(
+            selectedPr.organizationUrl,
+            selectedPr.project,
+            repoId,
+            selectedPr.id,
+            commentText.trim(),
+            threadContext,
+            pullRequestThreadContext
+          ).then((ok) => {
+            isSubmittingRef.current = false;
+            setSubmitting(false);
+            if (ok) {
+              setStatusMsg("Comment posted.");
+              setCommentMode(false);
+              setCommentText("");
+            } else {
+              setStatusMsg("Failed to post comment.");
+              // Don't close comment mode on failure so they don't lose their text, 
+              // but we need to ensure the status message is visible!
+            }
+            setTimeout(() => setStatusMsg(null), 3000);
+          });
+          return;
+        }
+        if (key.backspace || key.delete) {
+          setCommentText((t) => t.slice(0, -1));
+          return;
+        }
+        if (!key.ctrl && !key.meta && input) {
+          setCommentText((t) => t + input);
+        }
+        return;
+      }
+
+      // j/k navigation for lines
+      if (!commentMode && diffRows.length > 0) {
+        if (input === "j" || key.downArrow) {
+          const nextRow = Math.min(diffSelectedRow + 1, diffRows.length - 1);
+          onSelectedRowChange(nextRow);
+
+          const terminalHeight = process.stdout.rows ?? 40;
+          const viewportH = Math.max(5, terminalHeight - 20);
+          if (nextRow >= diffScrollOffset + viewportH) {
+            onScrollOffsetChange(nextRow - viewportH + 1);
+          }
+          return;
+        }
+        if (input === "k" || key.upArrow) {
+          const nextRow = Math.max(diffSelectedRow - 1, 0);
+          onSelectedRowChange(nextRow);
+
+          if (nextRow < diffScrollOffset) {
+            onScrollOffsetChange(nextRow);
+          }
+          return;
+        }
+        
+        const terminalHeight = process.stdout.rows ?? 40;
+        const viewportH = Math.max(5, terminalHeight - 20);
+
+        if (input === "g") {
+          onSelectedRowChange(0);
+          onScrollOffsetChange(0);
+          return;
+        }
+        if (input === "G") {
+          const nextRow = diffRows.length - 1;
+          onSelectedRowChange(nextRow);
+          onScrollOffsetChange(Math.max(0, nextRow - viewportH + 1));
+          return;
+        }
+        if (key.pageDown) {
+          const nextRow = Math.min(diffSelectedRow + viewportH, diffRows.length - 1);
+          onSelectedRowChange(nextRow);
+          if (nextRow >= diffScrollOffset + viewportH) {
+            onScrollOffsetChange(Math.min(diffRows.length - viewportH, diffScrollOffset + viewportH));
+          }
+          return;
+        }
+        if (key.pageUp) {
+          const nextRow = Math.max(diffSelectedRow - viewportH, 0);
+          onSelectedRowChange(nextRow);
+          if (nextRow < diffScrollOffset) {
+            onScrollOffsetChange(Math.max(0, diffScrollOffset - viewportH));
+          }
+          return;
+        }
+      }
+
+      if (input === "n" && selectedFile && !submitting) {
+        setCommentMode(true);
+        setStatusMsg(null);
+      }
+    },
+    { isActive: active }
+  );
 
   if (!selectedPr || selectedPr.changedFiles.length === 0) {
     return (
       <Box
-        width={rightPaneWidth}
         marginTop={1}
         borderStyle="round"
         borderColor={active ? palette.accent : palette.muted}
@@ -249,13 +430,18 @@ export const FilesView: React.FC<FilesViewProps> = ({
     );
   }
 
-  const flatFiles = selectedPr.changedFiles;
-  const selectedFile = flatFiles[selectedFileIndex];
   const hasDiff = !!selectedFile && (selectedFile.diff.length > 0 || !!selectedFile.rawDiff);
+
+  const terminalHeight = process.stdout.rows ?? 40;
+  const viewportH = Math.max(5, terminalHeight - 20);
+  const total = diffRows.length;
+  const clampedOffset = Math.min(diffScrollOffset, Math.max(0, total - viewportH));
+  const visibleRows = diffRows.slice(clampedOffset, clampedOffset + viewportH).map(r => r.element);
+  const canScrollDown = clampedOffset + viewportH < total;
+  const canScrollUp = clampedOffset > 0;
 
   return (
     <Box
-      width={rightPaneWidth}
       marginTop={1}
       borderStyle="round"
       borderColor={active ? palette.accent : palette.muted}
@@ -317,12 +503,63 @@ export const FilesView: React.FC<FilesViewProps> = ({
             <Text color={palette.danger}> -{selectedFile.deletions}</Text>
           </Text>
           {hasDiff ? (
-            <DiffPane file={selectedFile} width={filesInnerWidth} scrollOffset={diffScrollOffset} />
+            <Box flexDirection="column">
+              <Box flexDirection="column">{visibleRows}</Box>
+              <Text color={palette.muted}>
+                {canScrollUp ? "↑ " : "  "}
+                {`row ${diffSelectedRow + 1} of ${total}`}
+                {canScrollDown ? " ↓" : "  "}
+                {" · "}
+                <Text color={palette.accentDim}>PgDn</Text>{" page down  "}
+                <Text color={palette.accentDim}>PgUp</Text>{" page up  "}
+                <Text color={palette.accentDim}>G</Text>{" end  "}
+                <Text color={palette.accentDim}>g</Text>{" top"}
+              </Text>
+            </Box>
           ) : (
             <Text color={palette.muted}>
               Diff content not loaded (Azure change list is metadata-only).
             </Text>
           )}
+        </Box>
+      )}
+
+      {/* Comment input box */}
+      {commentMode && (
+        <Box
+          marginTop={1}
+          borderStyle="round"
+          borderColor={palette.accent}
+          paddingX={1}
+          flexDirection="column"
+        >
+          <Text color={palette.accent} bold>
+            {glyph.added} New diff comment on {selectedFile ? truncate(selectedFile.path, 30) : ""}
+            {"  "}
+            <Text color={palette.muted}>(Enter to send · Esc to cancel)</Text>
+          </Text>
+          <Text color={submitting ? palette.muted : palette.textBright}>
+            {commentText || " "}
+            {!submitting && <Text color={palette.accent}>▌</Text>}
+          </Text>
+        </Box>
+      )}
+
+      {/* Status Msg */}
+      {statusMsg && (
+        <Box marginTop={1}>
+          <Text color={okStatus(statusMsg) ? palette.ok : palette.danger}>{statusMsg}</Text>
+        </Box>
+      )}
+
+      {/* Keyboard hint */}
+      {active && !commentMode && (
+        <Box marginTop={1}>
+          <Text color={palette.muted}>
+            <Text color={palette.accentDim}>j/k</Text> navigate lines{"  "}
+            <Text color={palette.accentDim}>n</Text> add comment{"  "}
+            <Text color={palette.accentDim}>[/]</Text> switch files
+          </Text>
         </Box>
       )}
     </Box>

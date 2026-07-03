@@ -60,6 +60,7 @@ export type AppState = {
   lastRefreshISO: string;
   diffViewMode: DiffViewMode;
   diffScrollOffset: number;
+  diffSelectedRow: number;
   treeFilter: TreeFilter;
   /** Runtime text filter applied to the PR list. */
   prFilter: string;

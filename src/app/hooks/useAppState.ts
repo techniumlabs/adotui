@@ -139,6 +139,7 @@ export function useAppState(exitApp: () => void) {
     target: { organizationUrl: string; repository: string; prId: number },
     transformer: (pr: PullRequest) => PullRequest,
     successBanner: string,
+    newLoadState?: import("../types").LoadState,
   ) => {
     setState((current) => {
       let matched = false;
@@ -172,8 +173,9 @@ export function useAppState(exitApp: () => void) {
 
       return {
         ...current,
-        data: { organizations },
+        data: { ...current.data, organizations },
         banner: successBanner,
+        ...(newLoadState ? { loadState: newLoadState } : {}),
       };
     });
   };
@@ -230,6 +232,7 @@ export function useAppState(exitApp: () => void) {
       },
       optimistic,
       pendingBanner,
+      "loading"
     );
 
     const ref = resolvePrRefFromParts({
@@ -259,7 +262,7 @@ export function useAppState(exitApp: () => void) {
 
     action(ref)
       .then(() => {
-        setState((current) => ({ ...current, banner: successBanner }));
+        setState((current) => ({ ...current, banner: successBanner, loadState: "ready" }));
         doRefresh("auto");
       })
       .catch((cause: unknown) => {
@@ -268,6 +271,7 @@ export function useAppState(exitApp: () => void) {
           banner: `Action failed: ${
             cause instanceof Error ? cause.message : String(cause)
           }`,
+          loadState: "error",
         }));
       });
   };
