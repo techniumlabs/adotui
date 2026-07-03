@@ -36,6 +36,7 @@ export interface PrComment {
   id: number;
   threadId: number;
   author: string;
+  authorEmail?: string;
   content: string;
   publishedDate: string;
   lastUpdatedDate: string;
@@ -104,4 +105,5 @@ export interface OrganizationNode {
 
 export interface AppData {
   organizations: OrganizationNode[];
+  currentUserEmail?: string;
 }

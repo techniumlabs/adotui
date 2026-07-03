@@ -340,7 +340,11 @@ export function useAppKeyboard(
       }
       
       // Global 'h' to return to PR list from any of the 4 panes
-      if ((input === "h" || key.leftArrow) && ["detail", "files", "comments", "runs"].includes(state.focus)) {
+      if ((input === "h") && ["detail", "files", "comments", "runs"].includes(state.focus)) {
+        setState((current) => ({ ...current, focus: "list", banner: "Focus: list" }));
+        return;
+      }
+      if ((key.leftArrow) && ["detail", "files", "runs"].includes(state.focus)) {
         setState((current) => ({ ...current, focus: "list", banner: "Focus: list" }));
         return;
       }
@@ -570,27 +574,29 @@ export function useAppKeyboard(
         (selectedPr?.changedFiles.length ?? 1) - 1,
       );
 
-      // j/k or arrows → switch selected file, reset diff scroll
-      if (input === "j" || key.downArrow) {
+      // ] → next file, [ → prev file, reset diff scroll
+      if (input === "]") {
         setState((current) => ({
           ...current,
           selectedFileIndex: clamp(current.selectedFileIndex + 1, 0, maxFileIndex),
           diffScrollOffset: 0,
+          diffSelectedRow: 0,
         }));
         return;
       }
 
-      if (input === "k" || key.upArrow) {
+      if (input === "[") {
         setState((current) => ({
           ...current,
           selectedFileIndex: clamp(current.selectedFileIndex - 1, 0, maxFileIndex),
           diffScrollOffset: 0,
+          diffSelectedRow: 0,
         }));
         return;
       }
 
-      // PageDown / ] → scroll diff down; PageUp / [ → scroll diff up
-      if (key.pageDown || input === "]") {
+      // PageDown → scroll diff down; PageUp → scroll diff up
+      if (key.pageDown) {
         setState((current) => ({
           ...current,
           diffScrollOffset: current.diffScrollOffset + 10,
@@ -598,7 +604,7 @@ export function useAppKeyboard(
         return;
       }
 
-      if (key.pageUp || input === "[") {
+      if (key.pageUp) {
         setState((current) => ({
           ...current,
           diffScrollOffset: Math.max(0, current.diffScrollOffset - 10),

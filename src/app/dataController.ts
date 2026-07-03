@@ -5,6 +5,7 @@ import {
   type PrRef,
 } from "../data/azure";
 import { MOCK_DATA } from "../data/mock";
+import { runJson } from "../data/command";
 import type { AppData, PullRequest } from "../domain/types";
 
 export interface LoadResult {
@@ -49,7 +50,15 @@ export const loadInitialData = async (): Promise<LoadResult> => {
   }
 
   try {
-    const { data, warnings } = await loadAppData(configResult.config);
+    const [{ data, warnings }, currentUserResult] = await Promise.all([
+      loadAppData(configResult.config),
+      runJson<{ user?: { name?: string } }>("az", ["account", "show", "--output", "json"]).catch(() => null)
+    ]);
+
+    if (currentUserResult?.user?.name) {
+      data.currentUserEmail = currentUserResult.user.name;
+    }
+
     const prCount = data.organizations.reduce(
       (orgAcc, org) =>
         orgAcc +

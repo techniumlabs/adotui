@@ -29,6 +29,7 @@ export const INITIAL_STATE: AppState = {
   lastRefreshISO: new Date().toISOString(),
   diffViewMode: "unified",
   diffScrollOffset: 0,
+  diffSelectedRow: 0,
   treeFilter: "all" satisfies TreeFilter,
   prFilter: "",
   prFilterMode: false,
