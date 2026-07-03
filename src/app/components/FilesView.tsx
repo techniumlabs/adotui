@@ -119,24 +119,10 @@ const DiffRow: React.FC<{
   const gutter = `${pointer} ${fmtLineNo(oldNo)} ${fmtLineNo(newNo)} ${marker} `;
 
   if (tokens) {
-    let currentLen = 0;
-    const truncatedTokens: Token[] = [];
-    for (const t of tokens) {
-      const spaceLeft = contentW - currentLen;
-      if (spaceLeft <= 0) break;
-      if (t.text.length > spaceLeft) {
-        truncatedTokens.push({ text: t.text.slice(0, spaceLeft - 1) + "…", changed: t.changed });
-        break;
-      } else {
-        truncatedTokens.push(t);
-        currentLen += t.text.length;
-      }
-    }
-
     return (
-      <Text wrap="truncate-end">
+      <Text wrap="wrap">
         <Text color={gutterColor}>{gutter}</Text>
-        {truncatedTokens.map((t, i) =>
+        {tokens.map((t, i) =>
           t.changed
             ? <Text key={i} color={highlightColor ?? lineColor} bold underline>{t.text}</Text>
             : <Text key={i} color={lineColor}>{t.text}</Text>
@@ -145,9 +131,9 @@ const DiffRow: React.FC<{
     );
   }
 
-  const content = (plainText ?? "").slice(0, contentW);
+  const content = plainText ?? "";
   return (
-    <Text wrap="truncate-end">
+    <Text wrap="wrap">
       <Text color={gutterColor}>{gutter}</Text>
       <Text color={lineColor}>{content}</Text>
     </Text>
@@ -211,8 +197,8 @@ export const FilesView: React.FC<FilesViewProps> = ({
       if (cur.kind === "hunk") {
         result.push({
           element: (
-            <Text key={idx} color="blueBright" dimColor wrap="truncate-end">
-              {isSelected ? glyph.pointer + " " : "  "}{cur.text.slice(0, filesInnerWidth)}
+            <Text key={idx} color="blueBright" dimColor wrap="wrap">
+              {isSelected ? glyph.pointer + " " : "  "}{cur.text}
             </Text>
           ),
           oldNo: null, newNo: null
@@ -504,7 +490,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
           </Text>
           {hasDiff ? (
             <Box flexDirection="column">
-              <Box flexDirection="column">{visibleRows}</Box>
+              <Box flexDirection="column" height={viewportH} overflow="hidden">{visibleRows}</Box>
               <Text color={palette.muted}>
                 {canScrollUp ? "↑ " : "  "}
                 {`row ${diffSelectedRow + 1} of ${total}`}
