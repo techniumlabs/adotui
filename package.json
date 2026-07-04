@@ -2,11 +2,24 @@
   "name": "adotui",
   "module": "src/main.tsx",
   "type": "module",
-  "private": true,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "bin": {
+    "adotui": "bin/adotui.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md"
+  ],
   "scripts": {
+    "build:cli": "bun run dev/build-cli.ts",
     "dev": "bun run --watch src/main.tsx",
     "start": "bun run src/main.tsx",
-    "typecheck": "bun x tsc -p tsconfig.json"
+    "typecheck": "bun x tsc -p tsconfig.json",
+    "prepack": "bun run build:cli"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -81,10 +81,14 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
 
   return (
     <Box
-      borderStyle="round"
-      borderColor={active ? palette.accent : palette.muted}
       paddingX={1}
       flexDirection="column"
+      borderStyle="single"
+      borderBottom={true}
+      borderTop={false}
+      borderLeft={false}
+      borderRight={false}
+      borderColor={palette.border}
     >
       {/* Header */}
       <Box justifyContent="space-between">
@@ -117,15 +121,7 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
         <Text color={palette.muted}>No pull requests in this repository.</Text>
       )}
 
-      {active && (
-        <Box marginTop={1}>
-          <Text color={palette.muted}>
-            <Text color={palette.accentDim}>j/k</Text> navigate{"  "}
-            <Text color={palette.accentDim}>enter</Text> select{"  "}
-            <Text color={palette.accentDim}>f</Text> filter
-          </Text>
-        </Box>
-      )}
+      {/* Hints moved to App.tsx */}
     </Box>
   );
 };

@@ -403,8 +403,8 @@ export const FilesView: React.FC<FilesViewProps> = ({
     return (
       <Box
         marginTop={1}
-        borderStyle="round"
-        borderColor={active ? palette.accent : palette.muted}
+        borderStyle="single"
+        borderColor={palette.border}
         paddingX={1}
         flexDirection="column"
       >
@@ -429,8 +429,8 @@ export const FilesView: React.FC<FilesViewProps> = ({
   return (
     <Box
       marginTop={1}
-      borderStyle="round"
-      borderColor={active ? palette.accent : palette.muted}
+      borderStyle="single"
+      borderColor={palette.border}
       paddingX={1}
       flexDirection="column"
     >

@@ -53,9 +53,8 @@ export const SummaryBar: React.FC<SummaryBarProps> = ({
   return (
     <Box
       marginTop={1}
-      borderStyle="round"
-      borderColor={palette.muted}
       paddingX={1}
+      width="100%"
       justifyContent="space-between"
     >
       <Box>

@@ -15,11 +15,23 @@ import { formatRelativeAge } from "./utils";
 import { glyph, palette } from "./theme";
 import { useAppState } from "./hooks/useAppState";
 import { useAppKeyboard } from "./hooks/useAppKeyboard";
+import { useTerminalSize } from "./hooks/useTerminalSize";
+import { Splash } from "./components/Splash";
 
 export const App: React.FC = () => {
+  const [showSplash, setShowSplash] = React.useState(true);
   const { exit } = useApp();
+  const size = useTerminalSize();
   const app = useAppState(exit);
   useAppKeyboard(app, exit);
+
+  React.useEffect(() => {
+    // If we've finished the initial load, wait a short moment and dismiss splash
+    if (app.state.loadState !== "loading" && showSplash) {
+      const t = setTimeout(() => setShowSplash(false), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [app.state.loadState, showSplash]);
 
   const {
     state,
@@ -32,21 +44,24 @@ export const App: React.FC = () => {
     activePrs,
   } = app;
 
+  if (showSplash) {
+    return <Splash />;
+  }
+
   return (
-    <Box flexDirection="column" padding={1}>
-      <Box justifyContent="space-between">
-        <Box>
-          <Text color={palette.accent} bold>
-            {glyph.dot} adotui
-          </Text>
-          <Text color={palette.muted}> Azure DevOps PR Monitor</Text>
-        </Box>
+    <Box flexDirection="column" minHeight={size.rows} width="100%">
+      {/* Header */}
+      <Box paddingX={1} justifyContent="space-between">
+        <Text color={palette.accent} bold>
+          {glyph.dot} ADOTUI
+        </Text>
         <Text color={palette.muted}>
-          {process.platform} {glyph.bullet} bun {Bun.version}
+          Azure DevOps PR Monitor {glyph.bullet} {process.platform}
         </Text>
       </Box>
 
-      <Box marginTop={1}>
+      {/* Banner / Status line */}
+      <Box paddingX={1} borderBottom={false} borderStyle="single" borderColor={palette.border}>
         <Text
           color={
             state.loadState === "error"
@@ -64,17 +79,19 @@ export const App: React.FC = () => {
         </Text>
       </Box>
 
-      <SummaryBar
-        activePrs={activePrs}
-        totalPrs={totalPrs}
-        orgCount={state.data.organizations.length}
-        repoCount={repoCount}
-        autoRefresh={state.autoRefresh}
-        relativeLastRefresh={formatRelativeAge(state.lastRefreshISO)}
-        loadState={state.loadState}
-      />
+      <Box paddingX={1}>
+        <SummaryBar
+          activePrs={activePrs}
+          totalPrs={totalPrs}
+          orgCount={state.data.organizations.length}
+          repoCount={repoCount}
+          autoRefresh={state.autoRefresh}
+          relativeLastRefresh={formatRelativeAge(state.lastRefreshISO)}
+          loadState={state.loadState}
+        />
+      </Box>
 
-      <Box marginTop={1}>
+      <Box flexGrow={1} flexDirection="row" overflow="hidden">
         <OrganizationTree
           data={state.data}
           selectedOrgIndex={state.selectedOrgIndex}
@@ -83,7 +100,17 @@ export const App: React.FC = () => {
           treeFilter={state.treeFilter}
         />
 
-        <Box flexGrow={1} marginLeft={1} flexDirection="column">
+        <Box
+          flexGrow={1}
+          marginLeft={1}
+          flexDirection="column"
+          borderStyle="single"
+          borderTop={true}
+          borderBottom={false}
+          borderLeft={false}
+          borderRight={false}
+          borderColor={palette.border}
+        >
           <PullRequestList
             pullRequests={selectedRepo?.pullRequests ?? []}
             repoName={selectedRepo?.name}
@@ -105,8 +132,8 @@ export const App: React.FC = () => {
               onInputModeChange={(active) => setState(c => c.commentInputActive === active ? c : { ...c, commentInputActive: active })}
             />
           ) : state.focus === "comments" ? (
-            <CommentsView 
-              selectedPr={selectedPr} 
+            <CommentsView
+              selectedPr={selectedPr}
               focus={state.focus}
               currentUserEmail={state.data.currentUserEmail}
               onInputModeChange={(active) => setState(c => c.commentInputActive === active ? c : { ...c, commentInputActive: active })}
@@ -125,7 +152,17 @@ export const App: React.FC = () => {
         pendingConfirm={state.pendingConfirm}
       />
 
-      <Box marginTop={1} flexWrap="wrap">
+      {/* Unified Footer */}
+      <Box
+        borderStyle="single"
+        borderTop={true}
+        borderLeft={false}
+        borderRight={false}
+        borderBottom={false}
+        borderColor={palette.border}
+        paddingX={2}
+        paddingBottom={1}
+      >
         <Text color={palette.muted}>
           <Text color={palette.accentDim}>tab</Text> focus{"   "}
           <Text color={palette.accentDim}>1-4</Text> views{"   "}

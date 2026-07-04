@@ -45,9 +45,12 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
   return (
     <Box
       width={PANEL_WIDTH}
-      borderStyle="round"
-      borderColor={active ? palette.accent : palette.muted}
-      paddingX={1}
+      borderStyle="single"
+      borderTop={true}
+      borderBottom={false}
+      borderLeft={false}
+      borderColor={palette.border}
+      paddingRight={1}
       flexDirection="column"
     >
       {/* Header row: title + filter badge */}
@@ -167,15 +170,7 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
         })
       )}
 
-      {active && (
-        <Box marginTop={1}>
-          <Text color={palette.muted}>
-            <Text color={palette.accentDim}>ᐃ and ᐁ</Text> navigate{"  "}
-            <Text color={palette.accentDim}>↲</Text> select{"  "}
-            <Text color={palette.accentDim}>v</Text> view all
-          </Text>
-        </Box>
-      )}
+      {/* Hints moved to global footer */}
     </Box>
   );
 };

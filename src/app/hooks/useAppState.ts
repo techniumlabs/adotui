@@ -74,12 +74,37 @@ export function useAppState(exitApp: () => void) {
         current.data.organizations.length - 1,
       );
       const nextOrg = current.data.organizations[nextOrgIndex];
-      const nextRepoIndex = clamp(
-        current.selectedRepoIndex + repoDelta,
-        0,
-        Math.max(0, (nextOrg?.repositories.length ?? 1) - 1),
-      );
-      const nextRepo = nextOrg?.repositories[nextRepoIndex];
+      const repos = nextOrg?.repositories ?? [];
+      const filter = current.treeFilter;
+      const isValid = (idx: number) => filter === "all" || (repos[idx] && repos[idx]!.pullRequests.length > 0);
+
+      let nextRepoIndex = current.selectedRepoIndex;
+
+      if (orgDelta !== 0) {
+        if (!isValid(nextRepoIndex)) {
+          const anyValid = repos.findIndex((_, i) => isValid(i));
+          nextRepoIndex = anyValid !== -1 ? anyValid : 0;
+        }
+      } else if (repoDelta !== 0) {
+        let temp = nextRepoIndex + (repoDelta > 0 ? 1 : -1);
+        let found = -1;
+        while (temp >= 0 && temp < repos.length) {
+          if (isValid(temp)) {
+            found = temp;
+            break;
+          }
+          temp += (repoDelta > 0 ? 1 : -1);
+        }
+        if (found !== -1) {
+          nextRepoIndex = found;
+        } else if (!isValid(nextRepoIndex)) {
+          const anyValid = repos.findIndex((_, i) => isValid(i));
+          nextRepoIndex = anyValid !== -1 ? anyValid : 0;
+        }
+      }
+
+      nextRepoIndex = clamp(nextRepoIndex, 0, Math.max(0, repos.length - 1));
+      const nextRepo = repos[nextRepoIndex];
 
       return {
         ...current,

@@ -18,9 +18,13 @@ export const CommandBar: React.FC<CommandBarProps> = ({
     return (
       <Box
         marginTop={1}
-        borderStyle="round"
+        borderStyle="single"
+        borderTop={true}
+        borderLeft={false}
+        borderRight={false}
+        borderBottom={false}
         borderColor={palette.warn}
-        paddingX={1}
+        paddingX={2}
       >
         <Text color={palette.warn} bold>
           {glyph.clock} Confirm {pendingConfirm.kind} #{pendingConfirm.target.prId}: press{" "}
@@ -42,9 +46,13 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   return (
     <Box
       marginTop={1}
-      borderStyle="round"
-      borderColor={commandMode ? palette.accent : palette.muted}
-      paddingX={1}
+      borderStyle="single"
+      borderTop={true}
+      borderLeft={false}
+      borderRight={false}
+      borderBottom={false}
+      borderColor={commandMode ? palette.accent : palette.border}
+      paddingX={2}
     >
       <Text color={commandMode ? palette.accent : palette.muted} bold>
         {commandMode ? ":" : glyph.dot}{" "}

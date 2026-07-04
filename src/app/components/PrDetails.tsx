@@ -36,8 +36,11 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
   return (
     <Box
       marginTop={1}
-      borderStyle="round"
-      borderColor={active ? palette.accent : palette.muted}
+      borderTop={true}
+      borderBottom={false}
+      borderLeft={false}
+      borderRight={false}
+      borderColor={palette.border}
       paddingX={1}
       flexDirection="column"
     >
