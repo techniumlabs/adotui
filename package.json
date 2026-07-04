@@ -1,7 +1,18 @@
 {
   "name": "adotui",
-  "module": "src/main.tsx",
+  "version": "0.1.0",
+  "description": "Terminal UI for managing Azure DevOps pull requests",
+  "main": "dist/main.js",
   "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "azure",
+    "devops",
+    "pull-request",
+    "tui",
+    "ink",
+    "cli"
+  ],
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -23,9 +34,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/react": "^19.2.17"
-  },
-  "peerDependencies": {
+    "@types/react": "^19.2.17",
     "typescript": "^5"
   },
   "dependencies": {
