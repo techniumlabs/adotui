@@ -4,7 +4,7 @@ import { expect, test, describe, mock } from "bun:test";
 mock.module("../src/data/command", () => {
   return {
     run: mock(async () => ({ stdout: "", stderr: "", exitCode: 0 })),
-    runJson: mock(async (cmd: string, args: string[]) => {
+    runJson: mock(async (_cmd: string, args: string[]) => {
       // Mock `az repos pr list`
       if (args.includes("pr") && args.includes("list")) {
         return [

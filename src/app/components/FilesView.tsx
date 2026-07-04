@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import type { PullRequest, PullRequestFileChange } from "../../domain/types";
+import type { PullRequest } from "../../domain/types";
 import type { DiffViewMode, FocusArea } from "../types";
 import { fileChangeBadge, glyph, palette, truncate } from "../theme";
 import { postPrComment } from "../../data/azureRest";
+import { usePasteHandler } from "../hooks/usePasteHandler";
 
 type FilesViewProps = {
   selectedPr?: PullRequest;
@@ -111,10 +112,8 @@ const DiffRow: React.FC<{
   plainText?: string;
   width: number;
   isSelected?: boolean;
-}> = ({ oldNo, newNo, marker, lineColor, gutterColor, tokens, highlightColor, plainText, width, isSelected }) => {
+}> = ({ oldNo, newNo, marker, lineColor, gutterColor, tokens, highlightColor, plainText, isSelected }) => {
   // gutter: "NNNN NNNN + " = LN_W + 1 + LN_W + 1 + 1 + 1 = LN_W*2 + 4
-  const gutterW = LN_W * 2 + 4 + 2; // +2 for the pointer indicator
-  const contentW = Math.max(0, width - gutterW);
   const pointer = isSelected ? glyph.pointer : " ";
   const gutter = `${pointer} ${fmtLineNo(oldNo)} ${fmtLineNo(newNo)} ${marker} `;
 
@@ -159,6 +158,12 @@ export const FilesView: React.FC<FilesViewProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const isSubmittingRef = React.useRef(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  usePasteHandler((pastedText) => {
+    if (commentMode && !submitting) {
+      setCommentText((t) => t + pastedText);
+    }
+  });
 
   useEffect(() => {
     onInputModeChange(commentMode);

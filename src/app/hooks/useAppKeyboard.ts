@@ -7,7 +7,7 @@ export function useAppKeyboard(
   app: ReturnType<typeof useAppState>,
   exitApp: () => void,
 ) {
-  const { state, setState, selectedRepo, selectedPr, actions } = app;
+  const { state, setState, selectedPr, actions } = app;
 
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
@@ -269,10 +269,10 @@ export function useAppKeyboard(
       if (key.escape) {
         setState((current) => ({
           ...current,
-          focus: "list",
           commandText: "",
-          banner: "Command cancelled.",
+          focus: "tree",
         }));
+        actions.addToast("Command cancelled.", "info");
         return;
       }
 
@@ -396,7 +396,7 @@ export function useAppKeyboard(
 
     if (input === "o" && selectedPr) {
       openInBrowser(selectedPr.url);
-      setState((current) => ({ ...current, banner: "Opened PR in browser." }));
+      actions.addToast("Opened PR in browser.", "success");
       return;
     }
     // (Removed u/s diff mode shortcuts per user request)
@@ -482,23 +482,12 @@ export function useAppKeyboard(
         return;
       }
 
-      const maxPrIndex = Math.max(
-        0,
-        (selectedRepo?.pullRequests.length ?? 1) - 1,
-      );
-
       if (input === "j" || key.downArrow) {
-        setState((current) => ({
-          ...current,
-          selectedPrIndex: clamp(current.selectedPrIndex + 1, 0, maxPrIndex),
-        }));
+        actions.changePrSelection(1);
       }
 
       if (input === "k" || key.upArrow) {
-        setState((current) => ({
-          ...current,
-          selectedPrIndex: clamp(current.selectedPrIndex - 1, 0, maxPrIndex),
-        }));
+        actions.changePrSelection(-1);
       }
 
       if (input === "h" || key.leftArrow) {
@@ -559,29 +548,14 @@ export function useAppKeyboard(
     }
 
     if (state.focus === "files") {
-      const maxFileIndex = Math.max(
-        0,
-        (selectedPr?.changedFiles.length ?? 1) - 1,
-      );
-
-      // ] → next file, [ → prev file, reset diff scroll
+      // ] → next file, [ → prev file, restore scroll states
       if (input === "]") {
-        setState((current) => ({
-          ...current,
-          selectedFileIndex: clamp(current.selectedFileIndex + 1, 0, maxFileIndex),
-          diffScrollOffset: 0,
-          diffSelectedRow: 0,
-        }));
+        actions.changeFileSelection(1);
         return;
       }
 
       if (input === "[") {
-        setState((current) => ({
-          ...current,
-          selectedFileIndex: clamp(current.selectedFileIndex - 1, 0, maxFileIndex),
-          diffScrollOffset: 0,
-          diffSelectedRow: 0,
-        }));
+        actions.changeFileSelection(-1);
         return;
       }
 

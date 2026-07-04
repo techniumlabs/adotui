@@ -36,6 +36,8 @@ export const INITIAL_STATE: AppState = {
   commentInputActive: false,
   loadState: "loading",
   pendingConfirm: null,
+  fileScrollStates: {},
+  toasts: [],
 };
 
 export const REFRESH_INTERVAL_MS = 60_000;

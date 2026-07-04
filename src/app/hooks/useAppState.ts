@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { OrganizationNode, PullRequest } from "../../domain/types";
 import {
   DEFAULT_COMPLETION_OPTIONS,
@@ -124,7 +124,95 @@ export function useAppState(exitApp: () => void) {
     });
   };
 
+
+  const changePrSelection = (delta: number) => {
+    setState((current) => {
+      const org = current.data.organizations[current.selectedOrgIndex];
+      const repo = org?.repositories[current.selectedRepoIndex];
+      if (!repo || repo.pullRequests.length === 0) return current;
+      
+      const maxPrIndex = repo.pullRequests.length - 1;
+      const nextIndex = clamp(current.selectedPrIndex + delta, 0, maxPrIndex);
+      if (nextIndex === current.selectedPrIndex) return current;
+
+      // Save current scroll state
+      const currentPr = repo.pullRequests[current.selectedPrIndex];
+      const currentFile = currentPr?.changedFiles[current.selectedFileIndex];
+      const newScrollStates = { ...current.fileScrollStates };
+      if (currentPr && currentFile) {
+        newScrollStates[`${currentPr.id}:${currentFile.path}`] = { offset: current.diffScrollOffset, row: current.diffSelectedRow };
+      }
+
+      // We reset file index to 0 when switching PRs, but we could also restore if we want.
+      // Usually switching PRs means looking at the first file.
+      return {
+        ...current,
+        selectedPrIndex: nextIndex,
+        selectedFileIndex: 0,
+        diffScrollOffset: 0,
+        diffSelectedRow: 0,
+        fileScrollStates: newScrollStates,
+      };
+    });
+  };
+
+  const changeFileSelection = (delta: number) => {
+    setState((current) => {
+      const org = current.data.organizations[current.selectedOrgIndex];
+      const repo = org?.repositories[current.selectedRepoIndex];
+      const pr = repo?.pullRequests[current.selectedPrIndex];
+      if (!pr || pr.changedFiles.length === 0) return current;
+
+      const maxFileIndex = pr.changedFiles.length - 1;
+      const nextIndex = clamp(current.selectedFileIndex + delta, 0, maxFileIndex);
+      if (nextIndex === current.selectedFileIndex) return current;
+
+      // Save current
+      const currentFile = pr.changedFiles[current.selectedFileIndex];
+      const newScrollStates = { ...current.fileScrollStates };
+      if (currentFile) {
+        newScrollStates[`${pr.id}:${currentFile.path}`] = { offset: current.diffScrollOffset, row: current.diffSelectedRow };
+      }
+
+      // Restore next
+      const nextFile = pr.changedFiles[nextIndex];
+      let nextOffset = 0;
+      let nextRow = 0;
+      if (nextFile) {
+        const saved = newScrollStates[`${pr.id}:${nextFile.path}`];
+        if (saved) {
+          nextOffset = saved.offset;
+          nextRow = saved.row;
+        }
+      }
+
+      return {
+        ...current,
+        selectedFileIndex: nextIndex,
+        diffScrollOffset: nextOffset,
+        diffSelectedRow: nextRow,
+        fileScrollStates: newScrollStates,
+      };
+    });
+  };
+
+  const addToast = (message: string, type: "info" | "success" | "error" = "info") => {
+    const id = Math.random().toString(36).substring(7);
+    setState((current) => ({
+      ...current,
+      toasts: [...current.toasts, { id, message, type }]
+    }));
+    setTimeout(() => {
+      setState((c) => ({ ...c, toasts: c.toasts.filter(t => t.id !== id) }));
+    }, 3000);
+  };
+
+  const isRefreshingRef = useRef(false);
+
   const doRefresh = (reason: "manual" | "auto" | "initial") => {
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
+
     if (reason !== "auto") {
       setState((current) => ({
         ...current,
@@ -138,34 +226,38 @@ export function useAppState(exitApp: () => void) {
 
     const load = reason === "initial" ? loadInitialData : reloadData;
 
-    void load().then((result) => {
-      setState((current) => {
-        const orgCount = result.data.organizations.length;
-        const nextOrgIndex = clamp(current.selectedOrgIndex, 0, Math.max(0, orgCount - 1));
-        const nextOrg = result.data.organizations[nextOrgIndex];
-        const repoCount = nextOrg?.repositories.length ?? 0;
-        const nextRepoIndex = clamp(
-          current.selectedRepoIndex,
-          0,
-          Math.max(0, repoCount - 1),
-        );
-        const nextRepo = nextOrg?.repositories[nextRepoIndex];
+    void load()
+      .then((result) => {
+        setState((current) => {
+          const orgCount = result.data.organizations.length;
+          const nextOrgIndex = clamp(current.selectedOrgIndex, 0, Math.max(0, orgCount - 1));
+          const nextOrg = result.data.organizations[nextOrgIndex];
+          const repoCount = nextOrg?.repositories.length ?? 0;
+          const nextRepoIndex = clamp(
+            current.selectedRepoIndex,
+            0,
+            Math.max(0, repoCount - 1),
+          );
+          const nextRepo = nextOrg?.repositories[nextRepoIndex];
 
-        return {
-          ...current,
-          data: result.data,
-          selectedOrgIndex: nextOrgIndex,
-          selectedRepoIndex: nextRepoIndex,
-          selectedPrIndex: clampPrIndex(nextRepo, current.selectedPrIndex),
-          lastRefreshISO: new Date().toISOString(),
-          loadState: result.ok ? "ready" : "error",
-          banner:
-            reason === "auto" && result.ok
-              ? `Auto-refresh synced. ${result.banner}`
-              : result.banner,
-        };
+          return {
+            ...current,
+            data: result.data,
+            selectedOrgIndex: nextOrgIndex,
+            selectedRepoIndex: nextRepoIndex,
+            selectedPrIndex: clampPrIndex(nextRepo, current.selectedPrIndex),
+            lastRefreshISO: new Date().toISOString(),
+            loadState: result.ok ? "ready" : "error",
+            banner:
+              reason === "auto" && result.ok
+                ? `Auto-refresh synced. ${result.banner}`
+                : result.banner,
+          };
+        });
+      })
+      .finally(() => {
+        isRefreshingRef.current = false;
       });
-    });
   };
 
   const transformPrById = (
@@ -493,6 +585,9 @@ export function useAppState(exitApp: () => void) {
     activePrs,
     actions: {
       moveTreeSelection,
+      changePrSelection,
+      changeFileSelection,
+      addToast,
       doRefresh,
       armConfirm,
       runConfirmedAction,
