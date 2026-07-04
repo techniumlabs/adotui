@@ -26,33 +26,43 @@ const PrRow: React.FC<{ pr: PullRequest; selected: boolean }> = ({
       <Text color={selected ? palette.accent : palette.muted}>
         {selected ? glyph.pointer : glyph.pointerIdle}{" "}
       </Text>
-      <Box width={7}>
+      
+      {/* ID */}
+      <Box width={6}>
         <Text color={palette.muted}>#{pr.id}</Text>
       </Box>
-      {pr.draft ? (
-        <Text color={palette.draft} bold>
-          {glyph.draft} draft{" "}
-        </Text>
-      ) : null}
-      {hasConflict ? (
-        <Text color={palette.danger} bold>
-          {glyph.cross} conflict{" "}
-        </Text>
-      ) : null}
-      <Box flexGrow={1}>
+
+      {/* Title + Tags */}
+      <Box flexGrow={1} marginRight={1}>
+        {pr.draft && (
+          <Text color={palette.draft} bold>
+            {glyph.draft} draft{" "}
+          </Text>
+        )}
+        {hasConflict && (
+          <Text color={palette.danger} bold>
+            {glyph.cross} conflict{" "}
+          </Text>
+        )}
         <Text color={selected ? palette.textBright : palette.text} bold={selected}>
-          {truncate(pr.title, 44)}
+          {truncate(pr.title, 50)}
         </Text>
       </Box>
-      <Box marginLeft={1}>
-        <Text color={palette.muted}>{truncate(pr.author, 10)}</Text>
+
+      {/* Author */}
+      <Box width={14}>
+        <Text color={palette.muted}>{truncate(pr.author, 12)}</Text>
       </Box>
-      <Box marginLeft={1}>
+
+      {/* Review Status */}
+      <Box width={18}>
         <Text color={review.color}>
           {review.symbol} {review.label}
         </Text>
       </Box>
-      <Box marginLeft={1}>
+
+      {/* PR Status */}
+      <Box width={10}>
         <Text color={status.color}>
           {status.symbol} {status.label}
         </Text>

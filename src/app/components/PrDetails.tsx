@@ -72,75 +72,91 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
                 ) : null}
               </Box>
 
-              <Box marginTop={1} flexDirection="column">
-                <Row label="author">
-                  <Text color={palette.text}>{selectedPr.author}</Text>
-                </Row>
-                <Row label="updated">
-                  <Text color={palette.text}>
-                    {formatRelativeAge(selectedPr.updatedAt)}
-                  </Text>
-                </Row>
-                <Row label="branch">
-                  <Text color={palette.info}>{selectedPr.sourceBranch}</Text>
-                  <Text color={palette.muted}> {glyph.arrow} </Text>
-                  <Text color={palette.text}>{selectedPr.targetBranch}</Text>
-                </Row>
-                <Row label="review">
-                  <Text color={review.color}>
-                    {review.symbol} {review.label}
-                  </Text>
-                </Row>
-                <Row label="status">
-                  <Text color={status.color}>
-                    {status.symbol} {status.label}
-                  </Text>
-                </Row>
-                <Row label="merge">
-                  {selectedPr.mergeStatus === "conflicts" ? (
-                    <Text color={palette.danger}>✗ conflicts</Text>
-                  ) : selectedPr.mergeStatus === "succeeded" ? (
-                    <Text color={palette.ok}>✓ no conflicts</Text>
-                  ) : selectedPr.mergeStatus === "rejectedByPolicy" ? (
-                    <Text color={palette.warn}>⚑ rejected by policy</Text>
-                  ) : selectedPr.mergeStatus === "queued" ? (
-                    <Text color={palette.warn}>◔ queued</Text>
-                  ) : selectedPr.mergeStatus === "failure" ? (
-                    <Text color={palette.danger}>✗ merge failure</Text>
-                  ) : (
-                    <Text color={palette.muted}>— unknown</Text>
-                  )}
-                </Row>
-                <Row label="checks">
-                  <Text color={checks.color}>
-                    {checks.symbol} {checks.label}
-                  </Text>
-                </Row>
-                <Row label="comments">
-                  <Text color={palette.text}>
-                    {selectedPr.comments}{" "}
-                    {selectedPr.activeComments > 0 ? (
-                      <Text color={palette.warn}>
-                        ({selectedPr.activeComments} active)
-                      </Text>
+              <Box marginTop={1} flexDirection="row">
+                {/* Left Column */}
+                <Box flexDirection="column" flexBasis="50%">
+                  <Row label="author">
+                    <Text color={palette.text}>{selectedPr.author}</Text>
+                  </Row>
+                  <Row label="updated">
+                    <Text color={palette.text}>
+                      {formatRelativeAge(selectedPr.updatedAt)}
+                    </Text>
+                  </Row>
+                  <Row label="branch">
+                    <Text color={palette.info}>{selectedPr.sourceBranch}</Text>
+                    <Text color={palette.muted}> {glyph.arrow} </Text>
+                    <Text color={palette.text}>{selectedPr.targetBranch}</Text>
+                  </Row>
+                  <Row label="review">
+                    <Text color={review.color}>
+                      {review.symbol} {review.label}
+                    </Text>
+                  </Row>
+                </Box>
+
+                {/* Right Column */}
+                <Box flexDirection="column" flexBasis="50%">
+                  <Row label="status">
+                    <Text color={status.color}>
+                      {status.symbol} {status.label}
+                    </Text>
+                  </Row>
+                  <Row label="merge">
+                    {selectedPr.mergeStatus === "conflicts" ? (
+                      <Text color={palette.danger}>✗ conflicts</Text>
+                    ) : selectedPr.mergeStatus === "succeeded" ? (
+                      <Text color={palette.ok}>✓ no conflicts</Text>
+                    ) : selectedPr.mergeStatus === "rejectedByPolicy" ? (
+                      <Text color={palette.warn}>⚑ rejected by policy</Text>
+                    ) : selectedPr.mergeStatus === "queued" ? (
+                      <Text color={palette.warn}>◔ queued</Text>
+                    ) : selectedPr.mergeStatus === "failure" ? (
+                      <Text color={palette.danger}>✗ merge failure</Text>
                     ) : (
-                      <Text color={palette.muted}>(all resolved)</Text>
+                      <Text color={palette.muted}>— unknown</Text>
                     )}
-                  </Text>
-                </Row>
-                <Row label="files">
-                  <Text color={palette.text}>
-                    {selectedPr.changedFiles.length}
-                  </Text>
-                  <Text color={palette.muted}> (press l / files tab)</Text>
-                </Row>
+                  </Row>
+                  <Row label="checks">
+                    <Text color={checks.color}>
+                      {checks.symbol} {checks.label}
+                    </Text>
+                  </Row>
+                  <Row label="comments">
+                    <Text color={palette.text}>
+                      {selectedPr.comments}{" "}
+                      {selectedPr.activeComments > 0 ? (
+                        <Text color={palette.warn}>
+                          ({selectedPr.activeComments} active)
+                        </Text>
+                      ) : (
+                        <Text color={palette.muted}>(all resolved)</Text>
+                      )}
+                    </Text>
+                  </Row>
+                  <Row label="files">
+                    <Text color={palette.text}>
+                      {selectedPr.changedFiles.length}
+                    </Text>
+                    <Text color={palette.muted}> (press l / files tab)</Text>
+                  </Row>
+                </Box>
+              </Box>
+
+              {/* Work Items full width below columns */}
+              <Box marginTop={1} flexDirection="column">
                 <Row label="work items">
                   {selectedPr.workItems && selectedPr.workItems.length > 0 ? (
                     <Box flexDirection="column">
                       {selectedPr.workItems.map((wi) => (
-                        <Text key={wi.id} color={palette.textBright}>
-                          <Text color={palette.accentDim}>#{wi.id}</Text> {wi.type} - {wi.state} -{" "}
-                          <Text color={palette.muted}>{wi.title}</Text>
+                        <Text key={wi.id}>
+                          <Text color={palette.textBright} bold>
+                            #{wi.id}
+                          </Text>
+                          <Text color={palette.text}> {wi.state} </Text>
+                          <Text color={palette.muted}>
+                            {glyph.bullet} {wi.title}
+                          </Text>
                         </Text>
                       ))}
                     </Box>

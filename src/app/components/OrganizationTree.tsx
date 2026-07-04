@@ -45,11 +45,8 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
   return (
     <Box
       width={PANEL_WIDTH}
-      borderStyle="single"
-      borderTop={true}
-      borderBottom={false}
-      borderLeft={false}
-      borderColor={palette.border}
+      borderStyle="round"
+      borderColor={active ? palette.accent : palette.border}
       paddingRight={1}
       flexDirection="column"
     >
