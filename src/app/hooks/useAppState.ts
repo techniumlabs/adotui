@@ -68,43 +68,51 @@ export function useAppState(exitApp: () => void) {
     banner?: string,
   ) => {
     setState((current) => {
-      const nextOrgIndex = clamp(
-        current.selectedOrgIndex + orgDelta,
-        0,
-        current.data.organizations.length - 1,
-      );
-      const nextOrg = current.data.organizations[nextOrgIndex];
-      const repos = nextOrg?.repositories ?? [];
       const filter = current.treeFilter;
-      const isValid = (idx: number) => filter === "all" || (repos[idx] && repos[idx]!.pullRequests.length > 0);
+      const flatList: { orgIndex: number; repoIndex: number }[] = [];
 
-      let nextRepoIndex = current.selectedRepoIndex;
-
-      if (orgDelta !== 0) {
-        if (!isValid(nextRepoIndex)) {
-          const anyValid = repos.findIndex((_, i) => isValid(i));
-          nextRepoIndex = anyValid !== -1 ? anyValid : 0;
-        }
-      } else if (repoDelta !== 0) {
-        let temp = nextRepoIndex + (repoDelta > 0 ? 1 : -1);
-        let found = -1;
-        while (temp >= 0 && temp < repos.length) {
-          if (isValid(temp)) {
-            found = temp;
-            break;
+      current.data.organizations.forEach((org, orgIdx) => {
+        const repos = org.repositories;
+        let added = false;
+        repos.forEach((repo, repoIdx) => {
+          if (filter === "all" || repo.pullRequests.length > 0) {
+            flatList.push({ orgIndex: orgIdx, repoIndex: repoIdx });
+            added = true;
           }
-          temp += (repoDelta > 0 ? 1 : -1);
+        });
+        if (!added) {
+          flatList.push({ orgIndex: orgIdx, repoIndex: 0 });
         }
-        if (found !== -1) {
-          nextRepoIndex = found;
-        } else if (!isValid(nextRepoIndex)) {
-          const anyValid = repos.findIndex((_, i) => isValid(i));
-          nextRepoIndex = anyValid !== -1 ? anyValid : 0;
+      });
+
+      if (flatList.length === 0) return current;
+
+      let currentIndex = flatList.findIndex(
+        (item) => item.orgIndex === current.selectedOrgIndex && item.repoIndex === current.selectedRepoIndex
+      );
+      
+      if (currentIndex === -1) {
+        currentIndex = flatList.findIndex((item) => item.orgIndex === current.selectedOrgIndex);
+        if (currentIndex === -1) currentIndex = 0;
+      }
+
+      let nextIndex = currentIndex;
+
+      if (repoDelta !== 0) {
+        nextIndex = clamp(currentIndex + repoDelta, 0, flatList.length - 1);
+      } else if (orgDelta !== 0) {
+        const currentOrgIndex = flatList[currentIndex]!.orgIndex;
+        const targetOrgIndex = clamp(currentOrgIndex + orgDelta, 0, current.data.organizations.length - 1);
+        
+        const nextOrgFirstItemIndex = flatList.findIndex(item => item.orgIndex === targetOrgIndex);
+        if (nextOrgFirstItemIndex !== -1) {
+          nextIndex = nextOrgFirstItemIndex;
         }
       }
 
-      nextRepoIndex = clamp(nextRepoIndex, 0, Math.max(0, repos.length - 1));
-      const nextRepo = repos[nextRepoIndex];
+      const { orgIndex: nextOrgIndex, repoIndex: nextRepoIndex } = flatList[nextIndex]!;
+      const nextOrg = current.data.organizations[nextOrgIndex];
+      const nextRepo = nextOrg?.repositories[nextRepoIndex];
 
       return {
         ...current,
