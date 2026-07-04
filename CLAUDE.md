@@ -1,106 +1,44 @@
+# ADOTUI Development Guidelines
 
-Default to using Bun instead of Node.js.
+## Tech Stack
+- **Runtime**: Bun (default to using Bun instead of Node.js)
+- **UI Framework**: React + Ink (Terminal UI)
+- **Language**: TypeScript
+- **Backend API**: Azure CLI (`az`) spawned via Bun's `Bun.spawn`
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
+## Bun Conventions
+- Use `bun <file>` instead of `node <file>`
 - Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
-
-## APIs
-
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
+- Use `bun install` instead of `npm/yarn/pnpm install`
+- Use `bun run <script>` instead of `npm run <script>`
 - Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+- Use `Bun.spawn` or `Bun.$` instead of `child_process` or `execa`.
+
+## Terminal UI (Ink) Guidelines
+- **Layout Model**: Use standard React `<Box>` flexbox properties. ADOTUI relies on a strict split-pane structure with a fixed-width left column and dynamic-width right column. 
+- **Dynamic Resizing**: Use `useTerminalSize` hook instead of hardcoding dimensions. Ensure components flex gracefully when the terminal window is resized.
+- **Borders & Dividers**: 
+  - Use `<Box borderStyle="round">` for primary layout panes.
+  - Track focus dynamically (e.g., `focus === "tree"`) and pass this into the `borderColor` property. Focused panes use the `palette.accent` color, inactive panes use `palette.border`.
+- **Colors & Styling**: Do NOT use raw hex codes or basic terminal colors inline. Always import and use the `palette` and `glyph` objects from `src/app/theme.ts`.
+- **Tables**: Use fixed-width columns inside flex rows for aligning tabular data (like the Pull Request list). Use the `truncate` utility to cap strings and prevent table explosion on small terminals.
+
+## State Management
+- Complex UI state (focus, navigation, layout data) is managed centrally in `useAppState.ts`.
+- Keyboard bindings and command logic are isolated in `useAppKeyboard.ts`.
+- Always pass derived state (like `active`, `selected`) as props to pure presentational components.
 
 ## Testing
-
 Use `bun test` to run tests.
 
-```ts#index.test.ts
+```ts
 import { test, expect } from "bun:test";
 
-test("hello world", () => {
+test("example test", () => {
   expect(1).toBe(1);
 });
 ```
 
-## Frontend
-
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
-
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+## Running the App
+- `bun run dev` (starts the app with watch mode)
+- `ADOTUI_MOCK=1 bun run dev` (starts the app using mock JSON data instead of hitting Azure DevOps)
