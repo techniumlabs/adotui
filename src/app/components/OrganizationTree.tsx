@@ -136,7 +136,7 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
                         {/* Repo rows under this project */}
                         {entries.map(({ repo }, entryIdx) => {
                           const originalFlatIndex = flatIndexMap.get(repo.name) ?? 0;
-                          const repoSelected = originalFlatIndex === selectedRepoIndex;
+                          const repoSelected = orgSelected && originalFlatIndex === selectedRepoIndex;
                           const isLastRepo = entryIdx === entries.length - 1;
                           const vertPrefix = isLastProject ? "     " : `  ${glyph.vert}  `;
                           const repoConnector = isLastRepo ? glyph.branchLast : glyph.branch;
