@@ -104,12 +104,8 @@ export const App: React.FC = () => {
           flexGrow={1}
           marginLeft={1}
           flexDirection="column"
-          borderStyle="single"
-          borderTop={true}
-          borderBottom={false}
-          borderLeft={false}
-          borderRight={false}
-          borderColor={palette.border}
+          borderStyle="round"
+          borderColor={state.focus !== "tree" ? palette.accent : palette.border}
         >
           <PullRequestList
             pullRequests={selectedRepo?.pullRequests ?? []}
@@ -164,14 +160,12 @@ export const App: React.FC = () => {
         paddingBottom={1}
       >
         <Text color={palette.muted}>
-          <Text color={palette.accentDim}>tab</Text> focus{"   "}
-          <Text color={palette.accentDim}>1-4</Text> views{"   "}
-          <Text color={palette.accentDim}>r</Text> refresh{"   "}
-          <Text color={palette.ok}>a</Text> approve{"   "}
-          <Text color={palette.danger}>x</Text> reject{"   "}
-          <Text color={palette.info}>c</Text> complete{"   "}
-          <Text color={palette.accentDim}>o</Text> open browser{"   "}
-          <Text color={palette.accentDim}>q</Text> quit
+          <Text color={palette.accent} bold>/</Text> filter{"   "}
+          <Text color={palette.accent} bold>j/k</Text> move{"   "}
+          <Text color={palette.accent} bold>enter</Text> open pr{"   "}
+          <Text color={palette.accent} bold>tab</Text> switch pane{"   "}
+          <Text color={palette.accent} bold>?</Text> help{"   "}
+          <Text color={palette.accent} bold>q</Text> quit
         </Text>
       </Box>
 

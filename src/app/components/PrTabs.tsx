@@ -30,11 +30,16 @@ export const PrTabs: React.FC<PrTabsProps> = ({ focus }) => {
       {tabs.map((tab, idx) => {
         const isActive = activeTab === tab.id;
         return (
-          <Box key={tab.id}>
-            {idx > 0 && <Text color={palette.muted}>   </Text>}
-            <Text color={isActive ? palette.textBright : palette.muted} bold={isActive} underline={isActive}>
-              {tab.label.toUpperCase()} <Text color={isActive ? palette.accent : palette.muted}>[{tab.shortcut}]</Text>
-            </Text>
+          <Box key={tab.id} marginRight={2}>
+            {isActive ? (
+              <Text backgroundColor={palette.accent} color="black" bold>
+                {" "}{tab.shortcut} {tab.label.toLowerCase()}{" "}
+              </Text>
+            ) : (
+              <Text color={palette.muted}>
+                {tab.shortcut} {tab.label.toLowerCase()}
+              </Text>
+            )}
           </Box>
         );
       })}
