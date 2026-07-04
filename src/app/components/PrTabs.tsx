@@ -31,10 +31,9 @@ export const PrTabs: React.FC<PrTabsProps> = ({ focus }) => {
         const isActive = activeTab === tab.id;
         return (
           <Box key={tab.id}>
-            {idx > 0 && <Text color={palette.muted}> │ </Text>}
-            <Text color={isActive ? palette.accent : palette.muted} bold={isActive}>
-              {isActive ? "● " : "○ "}
-              {tab.label} <Text color={palette.accentDim}>[{tab.shortcut}]</Text>
+            {idx > 0 && <Text color={palette.muted}>   </Text>}
+            <Text color={isActive ? palette.textBright : palette.muted} bold={isActive} underline={isActive}>
+              {tab.label.toUpperCase()} <Text color={isActive ? palette.accent : palette.muted}>[{tab.shortcut}]</Text>
             </Text>
           </Box>
         );

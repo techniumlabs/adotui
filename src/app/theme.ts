@@ -8,17 +8,18 @@ import type { PullRequestFileChange } from "../domain/types";
  */
 
 export const palette = {
-  accent: "cyanBright",
-  accentDim: "cyan",
-  text: "white",
-  textBright: "whiteBright",
-  muted: "gray",
-  ok: "greenBright",
-  okDim: "green",
-  warn: "yellowBright",
-  danger: "redBright",
-  info: "blueBright",
-  draft: "magentaBright",
+  accent: "#00E5FF", // Neon Cyan
+  accentDim: "#0078D4", // Azure Blue
+  text: "#EBEBEB",
+  textBright: "#FFFFFF",
+  muted: "#6B7280",
+  ok: "#10B981", // Emerald
+  okDim: "#059669",
+  warn: "#F59E0B", // Amber
+  danger: "#EF4444", // Red
+  info: "#3B82F6", // Blue
+  draft: "#8B5CF6", // Purple
+  border: "#374151", // Dim grey for structural lines
 } as const;
 
 /** Glyphs (kept to a widely-supported subset for terminal compatibility). */

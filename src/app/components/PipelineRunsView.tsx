@@ -131,8 +131,12 @@ export const PipelineRunsView: React.FC<PipelineRunsViewProps> = ({
   return (
     <Box
       marginTop={1}
-      borderStyle="round"
-      borderColor={active ? palette.accent : palette.muted}
+      borderStyle="single"
+      borderTop={true}
+      borderBottom={false}
+      borderLeft={false}
+      borderRight={false}
+      borderColor={palette.border}
       paddingX={1}
       flexDirection="column"
     >
@@ -230,17 +234,7 @@ export const PipelineRunsView: React.FC<PipelineRunsViewProps> = ({
         );
       })}
 
-      {/* Keyboard hint */}
-      {active && (
-        <Box marginTop={1}>
-          <Text color={palette.muted}>
-            <Text color={palette.accentDim}>j/k</Text> navigate{"  "}
-            <Text color={palette.accentDim}>o</Text> open{"  "}
-            <Text color={palette.accentDim}>R</Text> refresh{"  "}
-            <Text color={palette.accentDim}>h</Text> back
-          </Text>
-        </Box>
-      )}
+      {/* Hints moved to App.tsx */}
     </Box>
   );
 };

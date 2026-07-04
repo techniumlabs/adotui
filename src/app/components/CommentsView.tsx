@@ -339,8 +339,12 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
   return (
     <Box
       marginTop={1}
-      borderStyle="round"
-      borderColor={active ? palette.accent : palette.muted}
+      borderStyle="single"
+      borderTop={true}
+      borderBottom={false}
+      borderLeft={false}
+      borderRight={false}
+      borderColor={palette.border}
       paddingX={1}
       flexDirection="column"
     >
@@ -466,7 +470,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
       {inputMode !== "none" && (
         <Box
           marginTop={1}
-          borderStyle="round"
+          borderStyle="single"
           borderColor={palette.accent}
           paddingX={1}
           flexDirection="column"
