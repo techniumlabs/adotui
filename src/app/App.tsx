@@ -19,7 +19,7 @@ import { useTerminalSize } from "./hooks/useTerminalSize";
 import { Splash } from "./components/Splash";
 
 export const App: React.FC = () => {
-  const [showSplash, setShowSplash] = React.useState(true);
+  const [showSplash, setShowSplash] = React.useState(process.env.NODE_ENV !== "test");
   const { exit } = useApp();
   const size = useTerminalSize();
   const app = useAppState(exit);

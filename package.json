@@ -30,11 +30,13 @@
     "dev": "bun run --watch src/main.tsx",
     "start": "bun run src/main.tsx",
     "typecheck": "bun x tsc -p tsconfig.json",
+    "test": "bun test",
     "prepack": "bun run build:cli"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/react": "^19.2.17",
+    "ink-testing-library": "^4.0.0",
     "typescript": "^5"
   },
   "dependencies": {

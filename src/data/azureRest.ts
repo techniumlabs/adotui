@@ -239,6 +239,11 @@ export const fetchPrComments = async (
   repositoryId: string,
   prId: number,
 ): Promise<PrCommentThread[]> => {
+  if (process.env.ADOTUI_MOCK) {
+    const { getMockComments } = await import("./mock");
+    return getMockComments(prId);
+  }
+
   // az devops invoke --area git --resource pullRequestThreads
   //   --route-parameters project=<p> repositoryId=<r> pullRequestId=<id>
   const data = await invokeGet<{ value?: RawThread[] }>(

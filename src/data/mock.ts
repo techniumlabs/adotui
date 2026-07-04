@@ -277,3 +277,56 @@ export const MOCK_DATA: AppData = {
     };
   }),
 };
+
+import type { PrCommentThread } from "../domain/types";
+
+export const getMockComments = (prId: number): PrCommentThread[] => {
+  return [
+    {
+      id: prId * 10,
+      status: "active",
+      filePath: "src/app/App.tsx",
+      lineNumber: 42,
+      comments: [
+        {
+          id: prId * 10 + 1,
+          threadId: prId * 10,
+          author: "maya",
+          content: "Can we simplify this condition?",
+          publishedDate: "2026-07-02T10:00:00Z",
+          lastUpdatedDate: "2026-07-02T10:00:00Z",
+          commentType: "text",
+          isDeleted: false,
+        },
+        {
+          id: prId * 10 + 2,
+          threadId: prId * 10,
+          author: "ram",
+          content: "Yes, I will refactor it.",
+          publishedDate: "2026-07-02T10:15:00Z",
+          lastUpdatedDate: "2026-07-02T10:15:00Z",
+          commentType: "text",
+          isDeleted: false,
+        }
+      ]
+    },
+    {
+      id: prId * 10 + 3,
+      status: "closed",
+      filePath: null,
+      lineNumber: null,
+      comments: [
+        {
+          id: prId * 10 + 4,
+          threadId: prId * 10 + 3,
+          author: "sanjay",
+          content: "LGTM!",
+          publishedDate: "2026-07-03T09:00:00Z",
+          lastUpdatedDate: "2026-07-03T09:00:00Z",
+          commentType: "text",
+          isDeleted: false,
+        }
+      ]
+    }
+  ];
+};
