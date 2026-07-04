@@ -172,7 +172,7 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
           <Text color={palette.muted}>
             <Text color={palette.accentDim}>ᐃ and ᐁ</Text> navigate{"  "}
             <Text color={palette.accentDim}>↲</Text> select{"  "}
-            <Text color={palette.accentDim}>f</Text> filter
+            <Text color={palette.accentDim}>v</Text> view all
           </Text>
         </Box>
       )}

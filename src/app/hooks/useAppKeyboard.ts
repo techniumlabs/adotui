@@ -425,7 +425,7 @@ export function useAppKeyboard(
         actions.moveTreeSelection(-1, 0, "Organization changed.");
       }
 
-      if (input === "f") {
+      if (input === "v") {
         setState((current) => {
           const next = current.treeFilter === "all" ? "with-prs" : "all";
           return {
