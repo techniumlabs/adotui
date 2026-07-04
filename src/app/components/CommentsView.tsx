@@ -13,6 +13,7 @@ import {
   deletePrComment,
   editPrComment,
 } from "../../data/azureRest";
+import { usePasteHandler } from "../hooks/usePasteHandler";
 import {
   commentCacheKey,
   getCommentCache,
@@ -76,6 +77,12 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const isSubmittingRef = React.useRef(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  usePasteHandler((pastedText) => {
+    if (inputMode !== "none" && !submitting) {
+      setInputText((t) => t + pastedText);
+    }
+  });
 
   useEffect(() => {
     onInputModeChange(inputMode !== "none");

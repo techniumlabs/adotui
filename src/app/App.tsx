@@ -11,6 +11,7 @@ import { PrDetails } from "./components/PrDetails";
 import { PrTabs } from "./components/PrTabs";
 import { PullRequestList } from "./components/PullRequestList";
 import { SummaryBar } from "./components/SummaryBar";
+import { ToastContainer } from "./components/ToastContainer";
 import { formatRelativeAge } from "./utils";
 import { glyph, palette } from "./theme";
 import { useAppState } from "./hooks/useAppState";
@@ -36,7 +37,6 @@ export const App: React.FC = () => {
   const {
     state,
     setState,
-    selectedOrg,
     selectedRepo,
     selectedPr,
     totalPrs,
@@ -50,6 +50,7 @@ export const App: React.FC = () => {
 
   return (
     <Box flexDirection="column" minHeight={size.rows} width="100%">
+      <ToastContainer toasts={state.toasts || []} />
       {/* Header */}
       <Box paddingX={1} justifyContent="space-between">
         <Text color={palette.accent} bold>

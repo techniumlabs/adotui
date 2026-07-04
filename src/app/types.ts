@@ -74,4 +74,6 @@ export type AppState = {
   commentInputActive: boolean;
   loadState: LoadState;
   pendingConfirm: PendingConfirm;
+  fileScrollStates: Record<string, { offset: number; row: number }>;
+  toasts: { id: string; message: string; type: "info" | "success" | "error" }[];
 };

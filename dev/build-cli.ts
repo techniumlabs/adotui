@@ -1,4 +1,3 @@
-import { $ } from "bun";
 
 console.log("Building adotui CLI...");
 

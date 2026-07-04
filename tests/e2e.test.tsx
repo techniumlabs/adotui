@@ -1,4 +1,3 @@
-import React from "react";
 import { expect, test, describe } from "bun:test";
 import { render } from "ink-testing-library";
 import { App } from "../src/app/App";
