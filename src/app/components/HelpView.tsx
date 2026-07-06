@@ -61,7 +61,7 @@ export const HelpView: React.FC = () => {
           </Box>
 
           <Box marginBottom={1}>
-            <Text bold color={palette.text}>Comments View (`3` or `m`)</Text>
+            <Text bold color={palette.text}>Comments View (`3`)</Text>
           </Box>
           <Box flexDirection="column" marginBottom={1}>
             <Text><Text color={palette.accent} bold>j/k  </Text> Navigate comments</Text>
