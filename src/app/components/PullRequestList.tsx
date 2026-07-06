@@ -122,9 +122,19 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
       ) : null}
 
       {visible.length > 0 ? (
-        visible.map((pr, prIndex) => (
-          <PrRow key={pr.id} pr={pr} selected={prIndex === selectedPrIndex} />
-        ))
+        active || focus === "tree" ? (
+          visible.map((pr, prIndex) => (
+            <PrRow key={pr.id} pr={pr} selected={prIndex === selectedPrIndex} />
+          ))
+        ) : (
+          visible[selectedPrIndex] ? (
+            <PrRow
+              key={visible[selectedPrIndex].id}
+              pr={visible[selectedPrIndex]}
+              selected={true}
+            />
+          ) : null
+        )
       ) : pullRequests.length > 0 ? (
         <Text color={palette.muted}>No PRs match "{prFilter}".</Text>
       ) : (

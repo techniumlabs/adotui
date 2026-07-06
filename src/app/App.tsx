@@ -29,7 +29,7 @@ export const App: React.FC = () => {
   React.useEffect(() => {
     // If we've finished the initial load, wait a short moment and dismiss splash
     if (app.state.loadState !== "loading" && showSplash) {
-      const t = setTimeout(() => setShowSplash(false), 1200);
+      const t = setTimeout(() => setShowSplash(false), 2000);
       return () => clearTimeout(t);
     }
   }, [app.state.loadState, showSplash]);

@@ -224,10 +224,23 @@ export function useAppState(exitApp: () => void) {
       }));
     }
 
-    const load = reason === "initial" ? loadInitialData : reloadData;
+    const onProgress = (msg: string) => {
+      setState((current) => ({ ...current, banner: msg }));
+    };
+
+    const load = () => reason === "initial" ? loadInitialData(true, onProgress) : reloadData(onProgress);
 
     void load()
       .then((result) => {
+        if (!result.ok) {
+          addToast(result.banner, "error");
+        }
+        
+        if (result.fromCache) {
+          // Immediately trigger a background refresh to get live data
+          setTimeout(() => doRefresh("auto"), 50);
+        }
+
         setState((current) => {
           const orgCount = result.data.organizations.length;
           const nextOrgIndex = clamp(current.selectedOrgIndex, 0, Math.max(0, orgCount - 1));
@@ -248,10 +261,9 @@ export function useAppState(exitApp: () => void) {
             selectedPrIndex: clampPrIndex(nextRepo, current.selectedPrIndex),
             lastRefreshISO: new Date().toISOString(),
             loadState: result.ok ? "ready" : "error",
-            banner:
-              reason === "auto" && result.ok
-                ? `Auto-refresh synced. ${result.banner}`
-                : result.banner,
+            banner: result.ok
+              ? (reason === "auto" ? `Auto-refresh synced. ${result.banner}` : result.banner)
+              : "Failed to load data. See toast for details.",
           };
         });
       })

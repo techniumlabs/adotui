@@ -348,7 +348,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
           onSelectedRowChange(nextRow);
 
           const terminalHeight = process.stdout.rows ?? 40;
-          const viewportH = Math.max(5, terminalHeight - 20);
+          const viewportH = Math.max(5, terminalHeight - 35);
           if (nextRow >= diffScrollOffset + viewportH) {
             onScrollOffsetChange(nextRow - viewportH + 1);
           }
@@ -363,9 +363,9 @@ export const FilesView: React.FC<FilesViewProps> = ({
           }
           return;
         }
-        
+
         const terminalHeight = process.stdout.rows ?? 40;
-        const viewportH = Math.max(5, terminalHeight - 20);
+        const viewportH = Math.max(5, terminalHeight - 35);
 
         if (input === "g") {
           onSelectedRowChange(0);
@@ -424,7 +424,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
   const hasDiff = !!selectedFile && (selectedFile.diff.length > 0 || !!selectedFile.rawDiff);
 
   const terminalHeight = process.stdout.rows ?? 40;
-  const viewportH = Math.max(5, terminalHeight - 20);
+  const viewportH = Math.max(5, terminalHeight - 32);
   const total = diffRows.length;
   const clampedOffset = Math.min(diffScrollOffset, Math.max(0, total - viewportH));
   const visibleRows = diffRows.slice(clampedOffset, clampedOffset + viewportH).map(r => r.element);
@@ -444,13 +444,25 @@ export const FilesView: React.FC<FilesViewProps> = ({
           {glyph.files} Files
         </Text>
         <Text color={palette.muted}>
-          {flatFiles.length} {glyph.bullet} {diffViewMode}
+          {selectedFileIndex + 1}/{flatFiles.length} {glyph.bullet} {diffViewMode}
         </Text>
       </Box>
 
       {/* File list */}
       <Box marginTop={1} flexDirection="column">
         {flatFiles.map((file, idx) => {
+          let show = false;
+          if (flatFiles.length <= 5) {
+            show = true;
+          } else if (selectedFileIndex < 2) {
+            show = idx < 5;
+          } else if (selectedFileIndex >= flatFiles.length - 2) {
+            show = idx >= flatFiles.length - 5;
+          } else {
+            show = Math.abs(idx - selectedFileIndex) <= 2;
+          }
+          if (!show) return null;
+
           const isSelected = idx === selectedFileIndex;
           const badge = fileChangeBadge(file.status);
           const parts = file.path.split("/");
