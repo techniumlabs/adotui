@@ -420,6 +420,8 @@ const hydratePullRequest = async (
 export interface LoadOptions {
   /** When true, fetch per-PR file changes and policy checks (slower). */
   fetchDetails?: boolean;
+  /** Callback fired to report current loading progress. */
+  onProgress?: (msg: string) => void;
 }
 
 /**
@@ -453,6 +455,7 @@ export const loadAppData = async (
 
       if (repoNames.length === 0) {
         try {
+          options.onProgress?.(`Discovering repos for ${project.project}...`);
           const discovered = await listRepositories(project);
           repoNames = discovered
             .map((repo) => repo.name)
@@ -469,6 +472,7 @@ export const loadAppData = async (
       const repoNodes = await Promise.all(
         repoNames.map(async (repository): Promise<RepositoryNode> => {
           try {
+            options.onProgress?.(`Fetching PRs for ${project.project}/${repository}...`);
             const rawPrs = await listPullRequests(config, project, repository);
             const pullRequests = await Promise.all(
               rawPrs.map((raw) =>

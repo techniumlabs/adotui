@@ -89,10 +89,13 @@ export const run = async (
   }
 
   if (exitCode !== 0) {
-    const detail =
-      stderr.trim() ||
-      stdout.trim() ||
-      `exited with code ${exitCode} (possibly timed out)`;
+    let detail = stderr.trim() || stdout.trim() || `exited with code ${exitCode} (possibly timed out)`;
+    const errorMatch = detail.match(/^[A-Za-z]+Error: (.*)$/m);
+    if (errorMatch) {
+      detail = errorMatch[0];
+    } else {
+      detail = detail.split('\n').map(l => l.trim()).filter(Boolean)[0] || detail;
+    }
     throw new CommandError(command, args, detail);
   }
 

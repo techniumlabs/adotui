@@ -187,11 +187,18 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
 export const loadConfig = async (): Promise<ConfigResult> => {
   const searchedPaths = configSearchPaths();
 
-  for (const path of searchedPaths) {
+  const existsResults = await Promise.all(
+    searchedPaths.map(async (path) => ({
+      path,
+      exists: await Bun.file(path).exists(),
+    }))
+  );
+
+  const existing = existsResults.find((r) => r.exists);
+
+  if (existing) {
+    const { path } = existing;
     const file = Bun.file(path);
-    if (!(await file.exists())) {
-      continue;
-    }
 
     let parsed: unknown;
     try {

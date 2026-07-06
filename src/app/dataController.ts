@@ -12,6 +12,7 @@ export interface LoadResult {
   data: AppData;
   banner: string;
   ok: boolean;
+  fromCache?: boolean;
 }
 
 const isMockMode = (): boolean => {
@@ -19,11 +20,13 @@ const isMockMode = (): boolean => {
   return value === "1" || value === "true";
 };
 
+import { readAppCache, writeAppCache } from "../data/cache";
+
 /**
  * Resolves config and loads live data from Azure DevOps. Falls back to mock
  * data when ADOTUI_MOCK is set. Never throws — errors are returned as banners.
  */
-export const loadInitialData = async (): Promise<LoadResult> => {
+export const loadInitialData = async (allowCache = false, onProgress?: (msg: string) => void): Promise<LoadResult> => {
   if (isMockMode()) {
     return {
       data: MOCK_DATA,
@@ -33,6 +36,7 @@ export const loadInitialData = async (): Promise<LoadResult> => {
   }
 
   const configResult = await loadConfig();
+
   if (!configResult.ok) {
     const hint =
       "Create ~/.config/adotui/config.json or adotui.config.json in your " +
@@ -44,14 +48,27 @@ export const loadInitialData = async (): Promise<LoadResult> => {
     };
   }
 
-  const az = await checkAzAvailable();
-  if (!az.ok) {
-    return { data: { organizations: [] }, banner: az.error, ok: false };
+  if (allowCache) {
+    const cachedData = await readAppCache();
+    if (cachedData) {
+      const prCount = cachedData.organizations.reduce(
+        (orgAcc, org) =>
+          orgAcc +
+          org.repositories.reduce((acc, repo) => acc + repo.pullRequests.length, 0),
+        0,
+      );
+      return {
+        data: cachedData,
+        banner: `Loaded ${prCount} PR(s) from cache. Syncing fresh data...`,
+        ok: true,
+        fromCache: true,
+      };
+    }
   }
 
   try {
     const [{ data, warnings }, currentUserResult] = await Promise.all([
-      loadAppData(configResult.config),
+      loadAppData(configResult.config, { onProgress }),
       runJson<{ user?: { name?: string } }>("az", ["account", "show", "--output", "json"]).catch(() => null)
     ]);
 
@@ -66,6 +83,10 @@ export const loadInitialData = async (): Promise<LoadResult> => {
       0,
     );
     const base = `Loaded ${prCount} PR(s) from ${data.organizations.length} org(s).`;
+    
+    // Save live data to cache so next launch is instant
+    await writeAppCache(data);
+
     return {
       data,
       banner:
@@ -75,6 +96,10 @@ export const loadInitialData = async (): Promise<LoadResult> => {
       ok: true,
     };
   } catch (cause) {
+    const az = await checkAzAvailable();
+    if (!az.ok) {
+      return { data: { organizations: [] }, banner: az.error, ok: false };
+    }
     return {
       data: { organizations: [] },
       banner: `Failed to load data: ${
@@ -86,7 +111,7 @@ export const loadInitialData = async (): Promise<LoadResult> => {
 };
 
 /** Reloads live data (used by manual/auto refresh). */
-export const reloadData = async (): Promise<LoadResult> => loadInitialData();
+export const reloadData = async (onProgress?: (msg: string) => void): Promise<LoadResult> => loadInitialData(false, onProgress);
 
 /**
  * Builds a PrRef from explicit routing parts. Returns null in mock mode (no
