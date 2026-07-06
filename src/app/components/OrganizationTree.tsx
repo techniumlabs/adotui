@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import type { AppData, RepositoryNode } from "../../domain/types";
 import type { FocusArea, TreeFilter } from "../types";
 import { glyph, palette, truncate } from "../theme";
+import { matchesTreeFilter } from "../utils";
 
 type OrganizationTreeProps = {
   data: AppData;
@@ -41,6 +42,7 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
 }) => {
   const active = focus === "tree";
   const filteringByPrs = treeFilter === "with-prs";
+  const isCustomFilter = treeFilter !== "all" && treeFilter !== "with-prs";
 
   return (
     <Box
@@ -55,12 +57,10 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
         <Text color={active ? palette.accent : palette.muted} bold>
           {glyph.files} Organizations
         </Text>
-        <Text color={filteringByPrs ? palette.warn : palette.muted}>
-          {filteringByPrs ? "PRs only" : "all"}
+        <Text color={filteringByPrs || isCustomFilter ? palette.warn : palette.muted}>
+          {filteringByPrs ? "PRs only" : isCustomFilter ? "filtered" : "all"}
         </Text>
       </Box>
-
-
 
       {data.organizations.length === 0 ? (
         <Text color={palette.muted}>No organizations.</Text>
@@ -68,12 +68,14 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
         data.organizations.map((org, orgIndex) => {
           const orgSelected = orgIndex === selectedOrgIndex;
 
-          // Apply filter: only include repos that have at least one PR
-          const visibleRepos = filteringByPrs
-            ? org.repositories.filter((r) => r.pullRequests.length > 0)
-            : org.repositories;
+          const visibleRepos = org.repositories.map(repo => {
+             const matchingPrs = (treeFilter === "all" || treeFilter === "with-prs") 
+                 ? repo.pullRequests 
+                 : repo.pullRequests.filter(pr => matchesTreeFilter(pr, treeFilter));
+             return { ...repo, pullRequests: matchingPrs };
+          }).filter(r => (treeFilter === "all" ? true : r.pullRequests.length > 0));
 
-          const prCount = org.repositories.reduce(
+          const prCount = visibleRepos.reduce(
             (sum, repo) => sum + repo.pullRequests.length,
             0,
           );
@@ -81,13 +83,14 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
           const visibleCount = visibleRepos.length;
 
           // Build flat-index-preserving groups from the FILTERED repos.
-          // We must preserve the original flatIndex so selection in App.tsx
-          // (which uses the unfiltered array) still points to the right repo.
-          const filteredWithIndex = filteringByPrs
-            ? org.repositories
-              .map((repo, idx) => ({ repo, flatIndex: idx }))
-              .filter(({ repo }) => repo.pullRequests.length > 0)
-            : org.repositories.map((repo, idx) => ({ repo, flatIndex: idx }));
+          const filteredWithIndex = org.repositories
+            .map((repo, idx) => {
+               const matchingPrs = (treeFilter === "all" || treeFilter === "with-prs")
+                 ? repo.pullRequests 
+                 : repo.pullRequests.filter(pr => matchesTreeFilter(pr, treeFilter));
+               return { repo: { ...repo, pullRequests: matchingPrs }, flatIndex: idx };
+            })
+            .filter(({ repo }) => (treeFilter === "all" ? true : repo.pullRequests.length > 0));
 
           const projectGroups = groupByProject(
             filteredWithIndex.map(({ repo }) => repo),
@@ -109,7 +112,7 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
               </Text>
               <Text color={palette.muted}>
                 {"  "}
-                {filteringByPrs
+                {filteringByPrs || isCustomFilter
                   ? `${visibleCount}/${org.repositories.length} repos ${glyph.bullet} ${prCount} prs`
                   : `${org.repositories.length} repos ${glyph.bullet} ${prCount} prs`}
               </Text>

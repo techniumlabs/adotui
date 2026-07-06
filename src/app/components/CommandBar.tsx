@@ -59,8 +59,8 @@ export const CommandBar: React.FC<CommandBarProps> = ({
       </Text>
       <Text color={commandMode ? palette.textBright : palette.muted}>
         {commandMode
-          ? commandText || "type a command (help, refresh, approve, complete…)"
-          : "Press / to enter command mode"}
+          ? commandText || "type a command (filter, help, refresh, approve, complete…)"
+          : "Press / to filter or run commands"}
       </Text>
     </Box>
   );

@@ -72,6 +72,58 @@ export const clampPrIndex = (
   index: number,
 ): number => clamp(index, 0, Math.max(0, (repo?.pullRequests.length ?? 1) - 1));
 
+export const matchesTreeFilter = (pr: PullRequest, filterStr: string): boolean => {
+  if (!filterStr || filterStr === "all" || filterStr === "with-prs") return true;
+
+  const parts = filterStr.split(/\s+/);
+  for (const part of parts) {
+    if (part.includes(":")) {
+      const idx = part.indexOf(":");
+      const key = part.slice(0, idx).toLowerCase();
+      const value = part.slice(idx + 1).toLowerCase();
+
+      switch (key) {
+        case "author":
+          if (!pr.author.toLowerCase().includes(value)) return false;
+          break;
+        case "merge":
+          if (!pr.mergeStatus.toLowerCase().includes(value)) return false;
+          break;
+        case "title":
+          if (!pr.title.toLowerCase().includes(value)) return false;
+          break;
+        case "description":
+          // Description is not in PR object currently, but if it is added later, or mapped to title for now
+          if (!pr.title.toLowerCase().includes(value)) return false;
+          break;
+        case "tag":
+          if (!pr.tags?.some(tag => tag.toLowerCase().includes(value))) return false;
+          break;
+        default:
+          break;
+      }
+    } else {
+      const val = part.toLowerCase();
+      if (!pr.title.toLowerCase().includes(val) && !pr.author.toLowerCase().includes(val)) {
+        return false;
+      }
+    }
+  }
+  return true;
+};
+
+export const getVisiblePrs = (
+  repo: { pullRequests: PullRequest[] } | undefined,
+  treeFilter: string,
+): PullRequest[] => {
+  if (!repo) return [];
+  let prs = repo.pullRequests;
+  if (treeFilter !== "all" && treeFilter !== "with-prs") {
+    prs = prs.filter((pr) => matchesTreeFilter(pr, treeFilter));
+  }
+  return prs;
+};
+
 export const cycleMergeStrategy = (
   current: MergeStrategy,
   delta: 1 | -1,

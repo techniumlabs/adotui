@@ -86,15 +86,15 @@ The footer permanently lists available shortcuts based on your context.
 - `tab`: switch pane focus between Tree (left) and Content (right)
 - `j` / `k` or arrows: navigate items in the focused pane
 - `enter`: open selected PR or file
-- `/`: open filter mode (type to filter list, `esc` to clear)
+- `/`: enter command mode (e.g., `:filter <query>`, `:help`, `:refresh`)
 - `1`-`4`: switch tabs in the PR detail view (Overview, Diff, Comments, Pipelines)
 - `r`: manual refresh (re-fetch from Azure DevOps)
 - `a`: approve selected PR
 - `x`: reject selected PR / request changes
 - `c`: complete selected PR (opens completion editor)
 - `o`: open selected PR in browser
-- `?`: toggle help screen (coming soon)
-- `q`: quit
+- `?`: toggle full-screen help view (or type `:help`)
+- `q`: quit the application
 
 All mutating actions (approve, reject, abandon, complete/merge) require an explicit `y/n` confirmation.
 

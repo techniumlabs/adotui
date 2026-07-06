@@ -41,6 +41,7 @@ const RAW_MOCK_DATA: { organizations: RawOrg[] } = {
               comments: 7, activeComments: 0,
               checksPassed: 8,
               checksTotal: 9,
+              tags: ["core", "urgent"],
               url: "https://dev.azure.com/contoso-platform/adotui-core/_git/adotui-core/pullrequest/401",
               changedFiles: [
                 {

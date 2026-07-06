@@ -13,11 +13,12 @@ import type {
 } from "../types";
 import {
   clamp,
-  clampPrIndex,
   countTotalPrs,
   openInBrowser,
   parseCompletionCommand,
   serializeCompletionOptions,
+  matchesTreeFilter,
+  getVisiblePrs,
 } from "../utils";
 import {
   loadInitialData,
@@ -32,8 +33,13 @@ export function useAppState(exitApp: () => void) {
   const selectedOrg: OrganizationNode | undefined =
     state.data.organizations[state.selectedOrgIndex];
   const selectedRepo = selectedOrg?.repositories[state.selectedRepoIndex];
-  const selectedPr: PullRequest | undefined =
-    selectedRepo?.pullRequests[state.selectedPrIndex];
+
+  const visiblePrs = useMemo(
+    () => getVisiblePrs(selectedRepo, state.treeFilter),
+    [selectedRepo, state.treeFilter]
+  );
+
+  const selectedPr: PullRequest | undefined = visiblePrs[state.selectedPrIndex];
 
   const totalPrs = useMemo(() => countTotalPrs(state.data), [state.data]);
 
@@ -75,7 +81,11 @@ export function useAppState(exitApp: () => void) {
         const repos = org.repositories;
         let added = false;
         repos.forEach((repo, repoIdx) => {
-          if (filter === "all" || repo.pullRequests.length > 0) {
+          const matchingPrs =
+            filter === "all" || filter === "with-prs"
+              ? repo.pullRequests
+              : repo.pullRequests.filter((pr) => matchesTreeFilter(pr, filter));
+          if (filter === "all" || matchingPrs.length > 0) {
             flatList.push({ orgIndex: orgIdx, repoIndex: repoIdx });
             added = true;
           }
@@ -90,7 +100,7 @@ export function useAppState(exitApp: () => void) {
       let currentIndex = flatList.findIndex(
         (item) => item.orgIndex === current.selectedOrgIndex && item.repoIndex === current.selectedRepoIndex
       );
-      
+
       if (currentIndex === -1) {
         currentIndex = flatList.findIndex((item) => item.orgIndex === current.selectedOrgIndex);
         if (currentIndex === -1) currentIndex = 0;
@@ -103,7 +113,7 @@ export function useAppState(exitApp: () => void) {
       } else if (orgDelta !== 0) {
         const currentOrgIndex = flatList[currentIndex]!.orgIndex;
         const targetOrgIndex = clamp(currentOrgIndex + orgDelta, 0, current.data.organizations.length - 1);
-        
+
         const nextOrgFirstItemIndex = flatList.findIndex(item => item.orgIndex === targetOrgIndex);
         if (nextOrgFirstItemIndex !== -1) {
           nextIndex = nextOrgFirstItemIndex;
@@ -113,12 +123,13 @@ export function useAppState(exitApp: () => void) {
       const { orgIndex: nextOrgIndex, repoIndex: nextRepoIndex } = flatList[nextIndex]!;
       const nextOrg = current.data.organizations[nextOrgIndex];
       const nextRepo = nextOrg?.repositories[nextRepoIndex];
+      const nextVisible = getVisiblePrs(nextRepo, current.treeFilter);
 
       return {
         ...current,
         selectedOrgIndex: nextOrgIndex,
         selectedRepoIndex: nextRepoIndex,
-        selectedPrIndex: clampPrIndex(nextRepo, current.selectedPrIndex),
+        selectedPrIndex: clamp(current.selectedPrIndex, 0, Math.max(0, nextVisible.length - 1)),
         banner: banner ?? current.banner,
       };
     });
@@ -129,14 +140,15 @@ export function useAppState(exitApp: () => void) {
     setState((current) => {
       const org = current.data.organizations[current.selectedOrgIndex];
       const repo = org?.repositories[current.selectedRepoIndex];
-      if (!repo || repo.pullRequests.length === 0) return current;
-      
-      const maxPrIndex = repo.pullRequests.length - 1;
+      const visible = getVisiblePrs(repo, current.treeFilter);
+      if (visible.length === 0) return current;
+
+      const maxPrIndex = visible.length - 1;
       const nextIndex = clamp(current.selectedPrIndex + delta, 0, maxPrIndex);
       if (nextIndex === current.selectedPrIndex) return current;
 
       // Save current scroll state
-      const currentPr = repo.pullRequests[current.selectedPrIndex];
+      const currentPr = visible[current.selectedPrIndex];
       const currentFile = currentPr?.changedFiles[current.selectedFileIndex];
       const newScrollStates = { ...current.fileScrollStates };
       if (currentPr && currentFile) {
@@ -235,7 +247,7 @@ export function useAppState(exitApp: () => void) {
         if (!result.ok) {
           addToast(result.banner, "error");
         }
-        
+
         if (result.fromCache) {
           // Immediately trigger a background refresh to get live data
           setTimeout(() => doRefresh("auto"), 50);
@@ -252,13 +264,14 @@ export function useAppState(exitApp: () => void) {
             Math.max(0, repoCount - 1),
           );
           const nextRepo = nextOrg?.repositories[nextRepoIndex];
+          const nextVisible = getVisiblePrs(nextRepo, current.treeFilter);
 
           return {
             ...current,
             data: result.data,
             selectedOrgIndex: nextOrgIndex,
             selectedRepoIndex: nextRepoIndex,
-            selectedPrIndex: clampPrIndex(nextRepo, current.selectedPrIndex),
+            selectedPrIndex: clamp(current.selectedPrIndex, 0, Math.max(0, nextVisible.length - 1)),
             lastRefreshISO: new Date().toISOString(),
             loadState: result.ok ? "ready" : "error",
             banner: result.ok
@@ -350,16 +363,15 @@ export function useAppState(exitApp: () => void) {
           : kind === "abandon"
             ? "PR abandoned."
             : `PR completed and merged. ${serializeCompletionOptions(
+              completionOptions ?? DEFAULT_COMPLETION_OPTIONS,
+            )}${completionStrategyNote(
+              completionOptions ?? DEFAULT_COMPLETION_OPTIONS,
+            )
+              ? ` ${completionStrategyNote(
                 completionOptions ?? DEFAULT_COMPLETION_OPTIONS,
-              )}${
-                completionStrategyNote(
-                  completionOptions ?? DEFAULT_COMPLETION_OPTIONS,
-                )
-                  ? ` ${completionStrategyNote(
-                      completionOptions ?? DEFAULT_COMPLETION_OPTIONS,
-                    )}`
-                  : ""
-              }`;
+              )}`
+              : ""
+            }`;
 
     transformPrById(
       {
@@ -405,9 +417,8 @@ export function useAppState(exitApp: () => void) {
       .catch((cause: unknown) => {
         setState((current) => ({
           ...current,
-          banner: `Action failed: ${
-            cause instanceof Error ? cause.message : String(cause)
-          }`,
+          banner: `Action failed: ${cause instanceof Error ? cause.message : String(cause)
+            }`,
           loadState: "error",
         }));
       });
@@ -484,10 +495,10 @@ export function useAppState(exitApp: () => void) {
     if (command === "help") {
       setState((current) => ({
         ...current,
-        focus: "list",
+        previousFocus: current.focus,
+        focus: "help",
         commandText: "",
-        banner:
-          "Commands: help, refresh, toggle-auto, approve, reject, complete, abandon, open, quit",
+        banner: "Help view",
       }));
       return;
     }
@@ -520,6 +531,29 @@ export function useAppState(exitApp: () => void) {
     if (command === "reject") {
       setState((current) => ({ ...current, focus: "list", commandText: "" }));
       armConfirm("reject");
+      return;
+    }
+
+    if (command.startsWith("filter ")) {
+      const query = command.slice(7).trim();
+      setState((current) => ({
+        ...current,
+        focus: "tree",
+        commandText: "",
+        treeFilter: query,
+        banner: `Tree filter applied: ${query}`,
+      }));
+      return;
+    }
+
+    if (command === "filter") {
+      setState((current) => ({
+        ...current,
+        focus: "tree",
+        commandText: "",
+        treeFilter: "all",
+        banner: `Tree filter cleared.`,
+      }));
       return;
     }
 
@@ -556,6 +590,7 @@ export function useAppState(exitApp: () => void) {
 
     if (command === "quit") {
       exitApp();
+      process.exit(0);
       return;
     }
 
@@ -591,6 +626,7 @@ export function useAppState(exitApp: () => void) {
     setState,
     selectedOrg,
     selectedRepo,
+    visiblePrs,
     selectedPr,
     totalPrs,
     repoCount,
