@@ -7,12 +7,14 @@ type CommandBarProps = {
   focus: FocusArea;
   commandText: string;
   pendingConfirm: PendingConfirm;
+  hasSelectedPr?: boolean;
 };
 
 export const CommandBar: React.FC<CommandBarProps> = ({
   focus,
   commandText,
   pendingConfirm,
+  hasSelectedPr,
 }) => {
   if (pendingConfirm) {
     return (

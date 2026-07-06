@@ -155,6 +155,7 @@ export const App: React.FC = () => {
         focus={state.focus}
         commandText={state.commandText}
         pendingConfirm={state.pendingConfirm}
+        hasSelectedPr={!!selectedPr}
       />
 
       {/* Unified Footer */}
@@ -171,9 +172,19 @@ export const App: React.FC = () => {
         <Text color={palette.muted}>
           <Text color={palette.accent} bold>/</Text> filter{"   "}
           <Text color={palette.accent} bold>j/k</Text> move{"   "}
-          <Text color={palette.accent} bold>1-4</Text> View changes, comments, runs, details{"   "}
-          <Text color={palette.accent} bold>enter</Text> open pr{"   "}
-          <Text color={palette.accent} bold>tab</Text> switch pane{"   "}
+          <Text color={palette.accent} bold>1-4</Text> switch view tab{"   "}
+          <Text color={palette.accent} bold>tab</Text> focus{"   "}
+          {selectedPr ? (
+            <>
+              <Text color={palette.accent} bold>a</Text> approve{"   "}
+              <Text color={palette.accent} bold>x</Text> reject{"   "}
+              <Text color={palette.accent} bold>c</Text> complete{"   "}
+            </>
+          ) : (
+            <>
+              <Text color={palette.accent} bold>enter</Text> open pr{"   "}
+            </>
+          )}
           <Text color={palette.accent} bold>?</Text> help{"   "}
           <Text color={palette.accent} bold>q</Text> quit
         </Text>
