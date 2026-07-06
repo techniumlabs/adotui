@@ -1,12 +1,12 @@
 import type { AppData } from "../domain/types";
 
-export type FocusArea = "tree" | "list" | "detail" | "command" | "completion" | "files" | "comments" | "runs";
+export type FocusArea = "tree" | "list" | "detail" | "command" | "completion" | "files" | "comments" | "runs" | "help";
 
 export type MergeStrategy = "noFastForward" | "squash" | "rebase" | "rebaseMerge";
 
 export type DiffViewMode = "unified" | "split";
 
-export type TreeFilter = "all" | "with-prs";
+export type TreeFilter = string;
 
 export type LoadState = "loading" | "ready" | "error";
 
@@ -52,6 +52,7 @@ export type AppState = {
   selectedPrIndex: number;
   selectedFileIndex: number;
   focus: FocusArea;
+  previousFocus?: FocusArea;
   commandText: string;
   completionOptions: CompletionOptions;
   completionCursor: number;
@@ -62,10 +63,6 @@ export type AppState = {
   diffScrollOffset: number;
   diffSelectedRow: number;
   treeFilter: TreeFilter;
-  /** Runtime text filter applied to the PR list. */
-  prFilter: string;
-  /** When true the user is typing into the PR filter input. */
-  prFilterMode: boolean;
   /**
    * True while CommentsView has a text-input box open (new comment / reply).
    * When set, App.tsx must suppress ALL keyboard shortcuts — including h —

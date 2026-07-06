@@ -65,7 +65,7 @@ export const readAppCache = async (): Promise<AppData | null> => {
   try {
     const file = Bun.file(APP_CACHE_FILE);
     if (await file.exists()) {
-      return await file.json<AppData>();
+      return (await file.json()) as AppData;
     }
   } catch (err) {
     // Ignore cache read errors (corrupted JSON, etc)

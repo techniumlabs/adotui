@@ -18,6 +18,7 @@ import { useAppState } from "./hooks/useAppState";
 import { useAppKeyboard } from "./hooks/useAppKeyboard";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { Splash } from "./components/Splash";
+import { HelpView } from "./components/HelpView";
 
 export const App: React.FC = () => {
   const [showSplash, setShowSplash] = React.useState(process.env.NODE_ENV !== "test");
@@ -38,6 +39,7 @@ export const App: React.FC = () => {
     state,
     setState,
     selectedRepo,
+    visiblePrs,
     selectedPr,
     totalPrs,
     repoCount,
@@ -93,54 +95,60 @@ export const App: React.FC = () => {
       </Box>
 
       <Box flexGrow={1} flexDirection="row" overflow="hidden">
-        <OrganizationTree
-          data={state.data}
-          selectedOrgIndex={state.selectedOrgIndex}
-          selectedRepoIndex={state.selectedRepoIndex}
-          focus={state.focus}
-          treeFilter={state.treeFilter}
-        />
+        {state.focus === "help" ? (
+          <HelpView />
+        ) : (
+          <>
+            <OrganizationTree
+              data={state.data}
+              selectedOrgIndex={state.selectedOrgIndex}
+              selectedRepoIndex={state.selectedRepoIndex}
+              focus={state.focus}
+              treeFilter={state.treeFilter}
+            />
 
-        <Box
-          flexGrow={1}
-          marginLeft={1}
-          flexDirection="column"
-          borderStyle="round"
-          borderColor={state.focus !== "tree" ? palette.accent : palette.border}
-        >
-          <PullRequestList
-            pullRequests={selectedRepo?.pullRequests ?? []}
-            repoName={selectedRepo?.name}
-            selectedPrIndex={state.selectedPrIndex}
-            focus={state.focus}
-            prFilter={state.prFilter}
-          />
-          {selectedPr && <PrTabs focus={state.focus} />}
-          {state.focus === "files" ? (
-            <FilesView
-              selectedPr={selectedPr}
-              selectedFileIndex={state.selectedFileIndex}
-              diffScrollOffset={state.diffScrollOffset}
-              onScrollOffsetChange={(offset) => setState(c => ({ ...c, diffScrollOffset: offset }))}
-              diffSelectedRow={state.diffSelectedRow}
-              onSelectedRowChange={(row) => setState(c => ({ ...c, diffSelectedRow: row }))}
-              focus={state.focus}
-              diffViewMode={state.diffViewMode}
-              onInputModeChange={(active) => setState(c => c.commentInputActive === active ? c : { ...c, commentInputActive: active })}
-            />
-          ) : state.focus === "comments" ? (
-            <CommentsView
-              selectedPr={selectedPr}
-              focus={state.focus}
-              currentUserEmail={state.data.currentUserEmail}
-              onInputModeChange={(active) => setState(c => c.commentInputActive === active ? c : { ...c, commentInputActive: active })}
-            />
-          ) : state.focus === "runs" ? (
-            <PipelineRunsView selectedPr={selectedPr} focus={state.focus} />
-          ) : (
-            <PrDetails selectedPr={selectedPr} focus={state.focus} />
-          )}
-        </Box>
+            <Box
+              flexGrow={1}
+              marginLeft={1}
+              flexDirection="column"
+              borderStyle="round"
+              borderColor={state.focus !== "tree" ? palette.accent : palette.border}
+            >
+              <PullRequestList
+                pullRequests={selectedRepo?.pullRequests ?? []}
+                visiblePrs={visiblePrs}
+                repoName={selectedRepo?.name}
+                selectedPrIndex={state.selectedPrIndex}
+                focus={state.focus}
+              />
+              {selectedPr && <PrTabs focus={state.focus} />}
+              {state.focus === "files" ? (
+                <FilesView
+                  selectedPr={selectedPr}
+                  selectedFileIndex={state.selectedFileIndex}
+                  diffScrollOffset={state.diffScrollOffset}
+                  onScrollOffsetChange={(offset) => setState(c => ({ ...c, diffScrollOffset: offset }))}
+                  diffSelectedRow={state.diffSelectedRow}
+                  onSelectedRowChange={(row) => setState(c => ({ ...c, diffSelectedRow: row }))}
+                  focus={state.focus}
+                  diffViewMode={state.diffViewMode}
+                  onInputModeChange={(active) => setState(c => c.commentInputActive === active ? c : { ...c, commentInputActive: active })}
+                />
+              ) : state.focus === "comments" ? (
+                <CommentsView
+                  selectedPr={selectedPr}
+                  focus={state.focus}
+                  currentUserEmail={state.data.currentUserEmail}
+                  onInputModeChange={(active) => setState(c => c.commentInputActive === active ? c : { ...c, commentInputActive: active })}
+                />
+              ) : state.focus === "runs" ? (
+                <PipelineRunsView selectedPr={selectedPr} focus={state.focus} />
+              ) : (
+                <PrDetails selectedPr={selectedPr} focus={state.focus} />
+              )}
+            </Box>
+          </>
+        )}
       </Box>
 
       <CommandBar
@@ -163,6 +171,7 @@ export const App: React.FC = () => {
         <Text color={palette.muted}>
           <Text color={palette.accent} bold>/</Text> filter{"   "}
           <Text color={palette.accent} bold>j/k</Text> move{"   "}
+          <Text color={palette.accent} bold>1-4</Text> View changes, comments, runs, details{"   "}
           <Text color={palette.accent} bold>enter</Text> open pr{"   "}
           <Text color={palette.accent} bold>tab</Text> switch pane{"   "}
           <Text color={palette.accent} bold>?</Text> help{"   "}

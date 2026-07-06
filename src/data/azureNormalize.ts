@@ -160,6 +160,10 @@ export const normalizePullRequest = (
   },
 ): PullRequest => {
   const id = pr.pullRequestId ?? 0;
+  
+  const tags = (pr.labels ?? [])
+    .filter(l => l.active !== false && l.name)
+    .map(l => l.name!);
 
   return {
     id,
@@ -181,6 +185,7 @@ export const normalizePullRequest = (
       context.repository,
       id,
     ),
+    tags,
     changedFiles: context.changedFiles ?? [],
     mergeStatus: normalizeMergeStatus(pr.mergeStatus),
     organizationUrl: context.organization,

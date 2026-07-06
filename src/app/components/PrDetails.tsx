@@ -143,6 +143,23 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
                 </Box>
               </Box>
 
+              {/* Tags full width below columns */}
+              <Box marginTop={1} flexDirection="column">
+                <Row label="tags">
+                  {selectedPr.tags && selectedPr.tags.length > 0 ? (
+                    <Box flexDirection="row" flexWrap="wrap">
+                      {selectedPr.tags.map((tag) => (
+                        <Box key={tag} marginRight={1}>
+                          <Text color={palette.info}>#{tag}</Text>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Text color={palette.muted}>none</Text>
+                  )}
+                </Row>
+              </Box>
+
               {/* Work Items full width below columns */}
               <Box marginTop={1} flexDirection="column">
                 <Row label="work items">

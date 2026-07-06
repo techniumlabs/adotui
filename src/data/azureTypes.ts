@@ -36,6 +36,7 @@ export interface AzurePullRequest {
   reviewers?: AzureIdentityRef[];
   repository?: AzureRepositoryRef;
   mergeStatus?: string;
+  labels?: { id?: string; name?: string; active?: boolean }[];
   lastMergeSourceCommit?: { commitId?: string };
   lastMergeTargetCommit?: { commitId?: string };
   url?: string;

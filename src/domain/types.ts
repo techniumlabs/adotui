@@ -85,6 +85,7 @@ export interface PullRequest {
   checksPassed: number;
   checksTotal: number;
   url: string;
+  tags?: string[];
   changedFiles: PullRequestFileChange[];
   mergeStatus: MergeStatus;
   workItems?: PullRequestWorkItem[];

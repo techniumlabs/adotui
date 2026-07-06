@@ -6,11 +6,10 @@ import { glyph, palette, reviewBadge, statusBadge, truncate } from "../theme";
 
 type PullRequestListProps = {
   pullRequests: PullRequest[];
+  visiblePrs: PullRequest[];
   repoName?: string;
   selectedPrIndex: number;
   focus: FocusArea;
-  /** Text filter — PRs whose title or author don't contain this string are hidden. */
-  prFilter: string;
 };
 
 const PrRow: React.FC<{ pr: PullRequest; selected: boolean }> = ({
@@ -73,21 +72,12 @@ const PrRow: React.FC<{ pr: PullRequest; selected: boolean }> = ({
 
 export const PullRequestList: React.FC<PullRequestListProps> = ({
   pullRequests,
+  visiblePrs,
   repoName,
   selectedPrIndex,
   focus,
-  prFilter,
 }) => {
   const active = focus === "list";
-  const query = prFilter.trim().toLowerCase();
-
-  const visible = query
-    ? pullRequests.filter(
-      (pr) =>
-        pr.title.toLowerCase().includes(query) ||
-        pr.author.toLowerCase().includes(query),
-    )
-    : pullRequests;
 
   return (
     <Box
@@ -106,37 +96,28 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
           {glyph.dot} Pull Requests {glyph.arrow} {repoName ?? "—"}
         </Text>
         <Text color={palette.muted}>
-          {query
-            ? `${visible.length}/${pullRequests.length} match`
+          {visiblePrs.length !== pullRequests.length
+            ? `${visiblePrs.length}/${pullRequests.length} match`
             : `${pullRequests.length} total`}
         </Text>
       </Box>
 
-      {/* Filter bar — shown whenever there's active text */}
-      {query ? (
-        <Box>
-          <Text color={palette.accent}>🔍 </Text>
-          <Text color={palette.textBright}>{prFilter}</Text>
-          <Text color={palette.muted}>{"  "}(esc to clear)</Text>
-        </Box>
-      ) : null}
-
-      {visible.length > 0 ? (
+      {visiblePrs.length > 0 ? (
         active || focus === "tree" ? (
-          visible.map((pr, prIndex) => (
+          visiblePrs.map((pr, prIndex) => (
             <PrRow key={pr.id} pr={pr} selected={prIndex === selectedPrIndex} />
           ))
         ) : (
-          visible[selectedPrIndex] ? (
+          visiblePrs[selectedPrIndex] ? (
             <PrRow
-              key={visible[selectedPrIndex].id}
-              pr={visible[selectedPrIndex]}
+              key={visiblePrs[selectedPrIndex].id}
+              pr={visiblePrs[selectedPrIndex]}
               selected={true}
             />
           ) : null
         )
       ) : pullRequests.length > 0 ? (
-        <Text color={palette.muted}>No PRs match "{prFilter}".</Text>
+        <Text color={palette.muted}>No PRs match filters.</Text>
       ) : (
         <Text color={palette.muted}>No pull requests in this repository.</Text>
       )}

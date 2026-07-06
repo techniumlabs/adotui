@@ -12,6 +12,7 @@ export function useAppKeyboard(
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
       exitApp();
+      process.exit(0);
       return;
     }
 
@@ -30,6 +31,22 @@ export function useAppKeyboard(
       }
 
       actions.runConfirmedAction(pending);
+      return;
+    }
+
+    if (state.focus === "help") {
+      if (input === "q") {
+        exitApp();
+        process.exit(0);
+        return;
+      }
+      if (input === "?" || key.escape || input === "h") {
+        setState((current) => ({
+          ...current,
+          focus: current.previousFocus ?? "list",
+          banner: `Focus: ${current.previousFocus ?? "list"}`,
+        }));
+      }
       return;
     }
 
@@ -300,7 +317,7 @@ export function useAppKeyboard(
     }
 
     // ── Guard: suppress global shortcuts if typing ───────────────────────────
-    if (state.commentInputActive || state.prFilterMode) {
+    if (state.commentInputActive) {
       return; // swallow global shortcuts so they don't intercept text input
     }
 
@@ -350,12 +367,19 @@ export function useAppKeyboard(
       }
     }
 
-    // ── Guard: Prevent global shortcut conflicts ─────────────────────────────
-    // If we are in comments or runs (and not typing), we only want to allow 
-    // the pane switching shortcuts above. We must return early here so that
-    // global shortcuts like 'r' (refresh) don't fire when the user presses 'r'
-    // to reply in the CommentsView.
-    if (state.focus === "comments" || state.focus === "runs") {
+    if (input === "?") {
+      setState((current) => ({
+        ...current,
+        previousFocus: current.focus,
+        focus: "help",
+        banner: "Help view",
+      }));
+      return;
+    }
+
+    if (input === "q") {
+      exitApp();
+      process.exit(0);
       return;
     }
 
@@ -366,16 +390,6 @@ export function useAppKeyboard(
         commandText: "",
         banner: "Command mode.",
       }));
-      return;
-    }
-
-    if (input === "q") {
-      exitApp();
-      return;
-    }
-
-    if (input === "r") {
-      actions.doRefresh("manual");
       return;
     }
 
@@ -391,6 +405,20 @@ export function useAppKeyboard(
 
     if (input === "c") {
       actions.openCompletionEditor(DEFAULT_COMPLETION_OPTIONS);
+      return;
+    }
+
+    // ── Guard: Prevent global shortcut conflicts ─────────────────────────────
+    // If we are in comments or runs (and not typing), we only want to allow 
+    // the pane switching shortcuts above. We must return early here so that
+    // global shortcuts like 'r' (refresh) don't fire when the user presses 'r'
+    // to reply in the CommentsView.
+    if (state.focus === "comments" || state.focus === "runs") {
+      return;
+    }
+
+    if (input === "r") {
+      actions.doRefresh("manual");
       return;
     }
 
@@ -440,47 +468,6 @@ export function useAppKeyboard(
     }
 
     if (state.focus === "list") {
-      // ── PR filter input mode ─────────────────────────────────────────────
-      if (state.prFilterMode) {
-        if (key.escape) {
-          setState((current) => ({
-            ...current,
-            prFilterMode: false,
-            prFilter: "",
-            banner: "Filter cleared.",
-          }));
-          return;
-        }
-        if (key.return) {
-          setState((current) => ({ ...current, prFilterMode: false, banner: `Filtering by: "${current.prFilter}"` }));
-          return;
-        }
-        if (key.backspace || key.delete) {
-          setState((current) => ({ ...current, prFilter: current.prFilter.slice(0, -1) }));
-          return;
-        }
-        if (!key.ctrl && !key.meta && input) {
-          setState((current) => ({ ...current, prFilter: current.prFilter + input }));
-        }
-        return;
-      }
-
-      // Clear filter with Esc when not in filter-input mode
-      if (key.escape && state.prFilter) {
-        setState((current) => ({ ...current, prFilter: "", banner: "Filter cleared." }));
-        return;
-      }
-
-      // Enter filter mode
-      if (input === "f") {
-        setState((current) => ({
-          ...current,
-          prFilterMode: true,
-          prFilter: "",
-          banner: "Filter PRs — type to search, Enter to confirm, Esc to clear",
-        }));
-        return;
-      }
 
       if (input === "j" || key.downArrow) {
         actions.changePrSelection(1);
