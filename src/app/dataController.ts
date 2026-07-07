@@ -7,6 +7,7 @@ import {
 import { MOCK_DATA } from "../data/mock";
 import { runJson } from "../data/command";
 import type { AppData, PullRequest } from "../domain/types";
+import { countTotalPrs } from "./utils";
 
 export interface LoadResult {
   data: AppData;
@@ -51,15 +52,9 @@ export const loadInitialData = async (allowCache = false, onProgress?: (msg: str
   if (allowCache) {
     const cachedData = await readAppCache();
     if (cachedData) {
-      const prCount = cachedData.organizations.reduce(
-        (orgAcc, org) =>
-          orgAcc +
-          org.repositories.reduce((acc, repo) => acc + repo.pullRequests.length, 0),
-        0,
-      );
       return {
         data: cachedData,
-        banner: `Loaded ${prCount} PR(s) from cache. Syncing fresh data...`,
+        banner: `Loaded ${countTotalPrs(cachedData)} PR(s) from cache. Syncing fresh data...`,
         ok: true,
         fromCache: true,
       };
@@ -76,13 +71,7 @@ export const loadInitialData = async (allowCache = false, onProgress?: (msg: str
       data.currentUserEmail = currentUserResult.user.name;
     }
 
-    const prCount = data.organizations.reduce(
-      (orgAcc, org) =>
-        orgAcc +
-        org.repositories.reduce((acc, repo) => acc + repo.pullRequests.length, 0),
-      0,
-    );
-    const base = `Loaded ${prCount} PR(s) from ${data.organizations.length} org(s).`;
+    const base = `Loaded ${countTotalPrs(data)} PR(s) from ${data.organizations.length} org(s).`;
     
     // Save live data to cache so next launch is instant
     await writeAppCache(data);

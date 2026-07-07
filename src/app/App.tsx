@@ -37,13 +37,13 @@ export const App: React.FC = () => {
 
   const {
     state,
-    setState,
     selectedRepo,
     visiblePrs,
     selectedPr,
     totalPrs,
     repoCount,
     activePrs,
+    actions,
   } = app;
 
   if (showSplash) {
@@ -127,19 +127,19 @@ export const App: React.FC = () => {
                   selectedPr={selectedPr}
                   selectedFileIndex={state.selectedFileIndex}
                   diffScrollOffset={state.diffScrollOffset}
-                  onScrollOffsetChange={(offset) => setState(c => ({ ...c, diffScrollOffset: offset }))}
+                  onScrollOffsetChange={actions.setDiffScrollOffset}
                   diffSelectedRow={state.diffSelectedRow}
-                  onSelectedRowChange={(row) => setState(c => ({ ...c, diffSelectedRow: row }))}
+                  onSelectedRowChange={actions.setDiffSelectedRow}
                   focus={state.focus}
                   diffViewMode={state.diffViewMode}
-                  onInputModeChange={(active) => setState(c => c.commentInputActive === active ? c : { ...c, commentInputActive: active })}
+                  onInputModeChange={actions.setCommentInputActive}
                 />
               ) : state.focus === "comments" ? (
                 <CommentsView
                   selectedPr={selectedPr}
                   focus={state.focus}
                   currentUserEmail={state.data.currentUserEmail}
-                  onInputModeChange={(active) => setState(c => c.commentInputActive === active ? c : { ...c, commentInputActive: active })}
+                  onInputModeChange={actions.setCommentInputActive}
                 />
               ) : state.focus === "runs" ? (
                 <PipelineRunsView selectedPr={selectedPr} focus={state.focus} />

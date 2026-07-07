@@ -24,9 +24,15 @@
 - **Tables**: Use fixed-width columns inside flex rows for aligning tabular data (like the Pull Request list). Use the `truncate` utility to cap strings and prevent table explosion on small terminals.
 
 ## State Management
-- Complex UI state (focus, navigation, layout data) is managed centrally in `useAppState.ts`.
-- Keyboard bindings and command logic are isolated in `useAppKeyboard.ts`.
-- Always pass derived state (like `active`, `selected`) as props to pure presentational components.
+- Complex UI state is managed centrally by composing sub-hooks in `useAppState.ts`:
+  - `useToast.ts` (toasts with UUID IDs)
+  - `useRefresh.ts` (automatic & manual fetching)
+  - `useSelection.ts` (flat tree, PR list, & diff select/scroll tracking)
+  - `useConfirmAction.ts` (y/n confirmation pipeline for destructive actions)
+  - `useCompletionEditor.ts` (merging & autocompletion strategy inputs)
+  - `useCommandDispatch.ts` (dispatching console `:` commands)
+- Presentational components invoke actions via named helper methods on the `actions` return from `useAppState`. Direct `setState` invocation is hidden.
+- Keyboard bindings are decentralized into per-focus files under `src/app/hooks/keyboard/` (e.g. `globals.ts`, `filesKeyboard.ts`, `completionKeyboard.ts`), loaded with a unified state handler table in `useAppKeyboard.ts`. All handlers share the exported type `AppHandle`.
 
 ## Testing
 Use `bun test` to run tests.
@@ -40,5 +46,8 @@ test("example test", () => {
 ```
 
 ## Running the App
-- `bun run dev` (starts the app with watch mode)
-- `ADOTUI_MOCK=1 bun run dev` (starts the app using mock JSON data instead of hitting Azure DevOps)
+- `bun run dev` (starts the app with watch mode for development)
+- `bun run start` (runs the app locally)
+- Run in Mock Mode (no Azure credentials needed):
+  - **Linux / macOS**: `ADOTUI_MOCK=1 bun run start`
+  - **Windows (PowerShell)**: `$env:ADOTUI_MOCK="1"; bun run start`

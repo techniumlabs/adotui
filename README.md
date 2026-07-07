@@ -75,9 +75,14 @@ bun run typecheck  # tsc
 
 Skip Azure and show sample data:
 
-```bash
-ADOTUI_MOCK=1 bun run start
-```
+- **Linux / macOS**:
+  ```bash
+  ADOTUI_MOCK=1 bun run start
+  ```
+- **Windows (PowerShell)**:
+  ```powershell
+  $env:ADOTUI_MOCK="1"; bun run start
+  ```
 
 ## Keybindings
 
@@ -102,12 +107,13 @@ All mutating actions (approve, reject, abandon, complete/merge) require an expli
 
 - `src/data/config.ts` — loads and validates the multi-org/project config.
 - `src/data/command.ts` — CLI-agnostic `Bun.spawn` wrapper (run / runJson).
-- `src/data/azure.ts` — the `az repos` command catalog: discovers repos,
-  lists PRs, fetches file changes and policy checks, and performs actions
-  (`set-vote`, `update --status`).
+- `src/data/azureCommon.ts` — shared Azure CLI status, organization, and JSON flags.
+- `src/data/azure.ts` / `azureRest.ts` — Azure DevOps command catalogs. Replaces `/tmp` with `os.tmpdir()` for Windows safety.
 - `src/data/azureNormalize.ts` — maps Azure DevOps JSON to the domain model.
-- `src/app/dataController.ts` — orchestrates loading, refresh, mock fallback,
-  and resolving the selected PR back to an org/project/repo reference.
+- `src/app/dataController.ts` — orchestrates loading, refresh, and mock fallback.
+- `src/app/hooks/useAppState.ts` — main react state container, composed of modular sub-hooks:
+  - `useToast`, `useRefresh`, `useSelection`, `useConfirmAction`, `useCompletionEditor`, and `useCommandDispatch`.
+- `src/app/hooks/useAppKeyboard.ts` — routes keyboard events to dedicated handlers under `src/app/hooks/keyboard/` (`globals.ts`, `filesKeyboard.ts`, etc.) using a central dispatch table.
 
 ## Azure CLI commands used
 

@@ -1,34 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { OrganizationNode, PullRequest } from "../../domain/types";
+import { DEFAULT_COMPLETION_OPTIONS, INITIAL_STATE } from "../constants";
+import type { AppState, CompletionOptions } from "../types";
 import {
-  DEFAULT_COMPLETION_OPTIONS,
-  INITIAL_STATE,
-  REFRESH_INTERVAL_MS,
-} from "../constants";
-import type {
-  AppState,
-  CompletionOptions,
-  ConfirmKind,
-  PrTarget,
-} from "../types";
-import {
-  clamp,
   countTotalPrs,
+  countActivePrs,
   openInBrowser,
   parseCompletionCommand,
-  serializeCompletionOptions,
-  matchesTreeFilter,
   getVisiblePrs,
 } from "../utils";
-import {
-  loadInitialData,
-  reloadData,
-  resolvePrRefFromParts,
-} from "../dataController";
-import { abandonPr, approvePr, completePr, completionStrategyNote, rejectPr } from "../../data/azure";
+import { useToast } from "./useToast";
+import { useRefresh } from "./useRefresh";
+import { useSelection } from "./useSelection";
+import { useConfirmAction } from "./useConfirmAction";
+import { useCompletionEditor } from "./useCompletionEditor";
+import { useCommandDispatch } from "./useCommandDispatch";
+
+
+/** Shared type for the return value of useAppState, used by keyboard handlers. */
+export type AppHandle = ReturnType<typeof useAppState>;
 
 export function useAppState(exitApp: () => void) {
   const [state, setState] = useState<AppState>(INITIAL_STATE);
+
+  const { addToast } = useToast(setState);
+  const { doRefresh } = useRefresh(state.autoRefresh, setState, addToast);
 
   const selectedOrg: OrganizationNode | undefined =
     state.data.organizations[state.selectedOrgIndex];
@@ -36,594 +32,41 @@ export function useAppState(exitApp: () => void) {
 
   const visiblePrs = useMemo(
     () => getVisiblePrs(selectedRepo, state.treeFilter),
-    [selectedRepo, state.treeFilter]
+    [selectedRepo, state.treeFilter],
   );
 
   const selectedPr: PullRequest | undefined = visiblePrs[state.selectedPrIndex];
-
   const totalPrs = useMemo(() => countTotalPrs(state.data), [state.data]);
-
   const repoCount = useMemo(
-    () =>
-      state.data.organizations.reduce(
-        (acc, org) => acc + org.repositories.length,
-        0,
-      ),
+    () => state.data.organizations.reduce((acc, org) => acc + org.repositories.length, 0),
     [state.data],
   );
+  const activePrs = useMemo(() => countActivePrs(state.data), [state.data]);
 
-  const activePrs = useMemo(
-    () =>
-      state.data.organizations.reduce(
-        (orgAcc, org) =>
-          orgAcc +
-          org.repositories.reduce(
-            (repoAcc, repo) =>
-              repoAcc +
-              repo.pullRequests.filter((pr) => pr.status === "active").length,
-            0,
-          ),
-        0,
-      ),
-    [state.data],
-  );
+  const selection = useSelection(setState);
+  const { armConfirm, runConfirmedAction } = useConfirmAction(setState, selectedPr, doRefresh, addToast);
+  const { openCompletionEditor, submitCompletion } = useCompletionEditor(setState, armConfirm);
+  const { executeCommand } = useCommandDispatch(setState, selectedPr, doRefresh, armConfirm, openCompletionEditor, exitApp);
 
-  const moveTreeSelection = (
-    orgDelta: number,
-    repoDelta: number,
-    banner?: string,
-  ) => {
-    setState((current) => {
-      const filter = current.treeFilter;
-      const flatList: { orgIndex: number; repoIndex: number }[] = [];
+  // Named setters used by child components (replaces raw setState exposure)
+  const setDiffScrollOffset = (offset: number) =>
+    setState((c) => ({ ...c, diffScrollOffset: offset }));
+  const setDiffSelectedRow = (row: number) =>
+    setState((c) => ({ ...c, diffSelectedRow: row }));
+  const setCommentInputActive = (active: boolean) =>
+    setState((c) => (c.commentInputActive === active ? c : { ...c, commentInputActive: active }));
 
-      current.data.organizations.forEach((org, orgIdx) => {
-        const repos = org.repositories;
-        let added = false;
-        repos.forEach((repo, repoIdx) => {
-          const matchingPrs =
-            filter === "all" || filter === "with-prs"
-              ? repo.pullRequests
-              : repo.pullRequests.filter((pr) => matchesTreeFilter(pr, filter));
-          if (filter === "all" || matchingPrs.length > 0) {
-            flatList.push({ orgIndex: orgIdx, repoIndex: repoIdx });
-            added = true;
-          }
-        });
-        if (!added) {
-          flatList.push({ orgIndex: orgIdx, repoIndex: 0 });
-        }
-      });
+  // executeCommand is delegated to useCommandDispatch hook
 
-      if (flatList.length === 0) return current;
-
-      let currentIndex = flatList.findIndex(
-        (item) => item.orgIndex === current.selectedOrgIndex && item.repoIndex === current.selectedRepoIndex
-      );
-
-      if (currentIndex === -1) {
-        currentIndex = flatList.findIndex((item) => item.orgIndex === current.selectedOrgIndex);
-        if (currentIndex === -1) currentIndex = 0;
-      }
-
-      let nextIndex = currentIndex;
-
-      if (repoDelta !== 0) {
-        nextIndex = clamp(currentIndex + repoDelta, 0, flatList.length - 1);
-      } else if (orgDelta !== 0) {
-        const currentOrgIndex = flatList[currentIndex]!.orgIndex;
-        const targetOrgIndex = clamp(currentOrgIndex + orgDelta, 0, current.data.organizations.length - 1);
-
-        const nextOrgFirstItemIndex = flatList.findIndex(item => item.orgIndex === targetOrgIndex);
-        if (nextOrgFirstItemIndex !== -1) {
-          nextIndex = nextOrgFirstItemIndex;
-        }
-      }
-
-      const { orgIndex: nextOrgIndex, repoIndex: nextRepoIndex } = flatList[nextIndex]!;
-      const nextOrg = current.data.organizations[nextOrgIndex];
-      const nextRepo = nextOrg?.repositories[nextRepoIndex];
-      const nextVisible = getVisiblePrs(nextRepo, current.treeFilter);
-
-      return {
-        ...current,
-        selectedOrgIndex: nextOrgIndex,
-        selectedRepoIndex: nextRepoIndex,
-        selectedPrIndex: clamp(current.selectedPrIndex, 0, Math.max(0, nextVisible.length - 1)),
-        banner: banner ?? current.banner,
-      };
-    });
-  };
-
-
-  const changePrSelection = (delta: number) => {
-    setState((current) => {
-      const org = current.data.organizations[current.selectedOrgIndex];
-      const repo = org?.repositories[current.selectedRepoIndex];
-      const visible = getVisiblePrs(repo, current.treeFilter);
-      if (visible.length === 0) return current;
-
-      const maxPrIndex = visible.length - 1;
-      const nextIndex = clamp(current.selectedPrIndex + delta, 0, maxPrIndex);
-      if (nextIndex === current.selectedPrIndex) return current;
-
-      // Save current scroll state
-      const currentPr = visible[current.selectedPrIndex];
-      const currentFile = currentPr?.changedFiles[current.selectedFileIndex];
-      const newScrollStates = { ...current.fileScrollStates };
-      if (currentPr && currentFile) {
-        newScrollStates[`${currentPr.id}:${currentFile.path}`] = { offset: current.diffScrollOffset, row: current.diffSelectedRow };
-      }
-
-      // We reset file index to 0 when switching PRs, but we could also restore if we want.
-      // Usually switching PRs means looking at the first file.
-      return {
-        ...current,
-        selectedPrIndex: nextIndex,
-        selectedFileIndex: 0,
-        diffScrollOffset: 0,
-        diffSelectedRow: 0,
-        fileScrollStates: newScrollStates,
-      };
-    });
-  };
-
-  const changeFileSelection = (delta: number) => {
-    setState((current) => {
-      const org = current.data.organizations[current.selectedOrgIndex];
-      const repo = org?.repositories[current.selectedRepoIndex];
-      const pr = repo?.pullRequests[current.selectedPrIndex];
-      if (!pr || pr.changedFiles.length === 0) return current;
-
-      const maxFileIndex = pr.changedFiles.length - 1;
-      const nextIndex = clamp(current.selectedFileIndex + delta, 0, maxFileIndex);
-      if (nextIndex === current.selectedFileIndex) return current;
-
-      // Save current
-      const currentFile = pr.changedFiles[current.selectedFileIndex];
-      const newScrollStates = { ...current.fileScrollStates };
-      if (currentFile) {
-        newScrollStates[`${pr.id}:${currentFile.path}`] = { offset: current.diffScrollOffset, row: current.diffSelectedRow };
-      }
-
-      // Restore next
-      const nextFile = pr.changedFiles[nextIndex];
-      let nextOffset = 0;
-      let nextRow = 0;
-      if (nextFile) {
-        const saved = newScrollStates[`${pr.id}:${nextFile.path}`];
-        if (saved) {
-          nextOffset = saved.offset;
-          nextRow = saved.row;
-        }
-      }
-
-      return {
-        ...current,
-        selectedFileIndex: nextIndex,
-        diffScrollOffset: nextOffset,
-        diffSelectedRow: nextRow,
-        fileScrollStates: newScrollStates,
-      };
-    });
-  };
-
-  const addToast = (message: string, type: "info" | "success" | "error" = "info") => {
-    const id = Math.random().toString(36).substring(7);
-    setState((current) => ({
-      ...current,
-      toasts: [...current.toasts, { id, message, type }]
-    }));
-    setTimeout(() => {
-      setState((c) => ({ ...c, toasts: c.toasts.filter(t => t.id !== id) }));
-    }, 3000);
-  };
-
-  const isRefreshingRef = useRef(false);
-
-  const doRefresh = (reason: "manual" | "auto" | "initial") => {
-    if (isRefreshingRef.current) return;
-    isRefreshingRef.current = true;
-
-    if (reason !== "auto") {
-      setState((current) => ({
-        ...current,
-        loadState: "loading",
-        banner:
-          reason === "initial"
-            ? "Loading pull requests from Azure DevOps..."
-            : "Refreshing from Azure DevOps...",
-      }));
-    }
-
-    const onProgress = (msg: string) => {
-      setState((current) => ({ ...current, banner: msg }));
-    };
-
-    const load = () => reason === "initial" ? loadInitialData(true, onProgress) : reloadData(onProgress);
-
-    void load()
-      .then((result) => {
-        if (!result.ok) {
-          addToast(result.banner, "error");
-        }
-
-        if (result.fromCache) {
-          // Immediately trigger a background refresh to get live data
-          setTimeout(() => doRefresh("auto"), 50);
-        }
-
-        setState((current) => {
-          const orgCount = result.data.organizations.length;
-          const nextOrgIndex = clamp(current.selectedOrgIndex, 0, Math.max(0, orgCount - 1));
-          const nextOrg = result.data.organizations[nextOrgIndex];
-          const repoCount = nextOrg?.repositories.length ?? 0;
-          const nextRepoIndex = clamp(
-            current.selectedRepoIndex,
-            0,
-            Math.max(0, repoCount - 1),
-          );
-          const nextRepo = nextOrg?.repositories[nextRepoIndex];
-          const nextVisible = getVisiblePrs(nextRepo, current.treeFilter);
-
-          return {
-            ...current,
-            data: result.data,
-            selectedOrgIndex: nextOrgIndex,
-            selectedRepoIndex: nextRepoIndex,
-            selectedPrIndex: clamp(current.selectedPrIndex, 0, Math.max(0, nextVisible.length - 1)),
-            lastRefreshISO: new Date().toISOString(),
-            loadState: result.ok ? "ready" : "error",
-            banner: result.ok
-              ? (reason === "auto" ? `Auto-refresh synced. ${result.banner}` : result.banner)
-              : "Failed to load data. See toast for details.",
-          };
-        });
-      })
-      .finally(() => {
-        isRefreshingRef.current = false;
-      });
-  };
-
-  const transformPrById = (
-    target: { organizationUrl: string; repository: string; prId: number },
-    transformer: (pr: PullRequest) => PullRequest,
-    successBanner: string,
-    newLoadState?: import("../types").LoadState,
-  ) => {
-    setState((current) => {
-      let matched = false;
-      const organizations = current.data.organizations.map((orgItem) => {
-        if (orgItem.organizationUrl !== target.organizationUrl) {
-          return orgItem;
-        }
-        return {
-          ...orgItem,
-          repositories: orgItem.repositories.map((repoItem) => {
-            if (repoItem.name !== target.repository) {
-              return repoItem;
-            }
-            return {
-              ...repoItem,
-              pullRequests: repoItem.pullRequests.map((prItem) => {
-                if (prItem.id !== target.prId) {
-                  return prItem;
-                }
-                matched = true;
-                return transformer(prItem);
-              }),
-            };
-          }),
-        };
-      });
-
-      if (!matched) {
-        return current;
-      }
-
-      return {
-        ...current,
-        data: { ...current.data, organizations },
-        banner: successBanner,
-        ...(newLoadState ? { loadState: newLoadState } : {}),
-      };
-    });
-  };
-
-  const runConfirmedAction = (confirm: NonNullable<AppState["pendingConfirm"]>) => {
-    const { kind, target, completionOptions } = confirm;
-
-    const optimistic = (pr: PullRequest): PullRequest => {
-      switch (kind) {
-        case "approve":
-          return { ...pr, reviewState: "approved" };
-        case "reject":
-          return { ...pr, reviewState: "changes-requested" };
-        case "abandon":
-          return { ...pr, status: "abandoned" };
-        case "complete":
-          return { ...pr, status: "completed" };
-      }
-    };
-
-    const pendingBanner =
-      kind === "approve"
-        ? "Approving PR..."
-        : kind === "reject"
-          ? "Rejecting PR..."
-          : kind === "abandon"
-            ? "Abandoning PR..."
-            : "Completing PR...";
-
-    const successBanner =
-      kind === "approve"
-        ? "PR approved."
-        : kind === "reject"
-          ? "PR rejected (changes requested)."
-          : kind === "abandon"
-            ? "PR abandoned."
-            : `PR completed and merged. ${serializeCompletionOptions(
-              completionOptions ?? DEFAULT_COMPLETION_OPTIONS,
-            )}${completionStrategyNote(
-              completionOptions ?? DEFAULT_COMPLETION_OPTIONS,
-            )
-              ? ` ${completionStrategyNote(
-                completionOptions ?? DEFAULT_COMPLETION_OPTIONS,
-              )}`
-              : ""
-            }`;
-
-    transformPrById(
-      {
-        organizationUrl: target.organizationUrl,
-        repository: target.repository,
-        prId: target.prId,
-      },
-      optimistic,
-      pendingBanner,
-      "loading"
-    );
-
-    const ref = resolvePrRefFromParts({
-      organizationUrl: target.organizationUrl,
-      project: target.project,
-      repository: target.repository,
-      prId: target.prId,
-    });
-
-    if (!ref) {
-      setState((current) => ({
-        ...current,
-        banner:
-          "Applied locally (no live ref: mock mode or PR missing routing info).",
-      }));
-      return;
-    }
-
-    const action: (r: import("../../data/azure").PrRef) => Promise<void> =
-      kind === "approve"
-        ? approvePr
-        : kind === "reject"
-          ? rejectPr
-          : kind === "abandon"
-            ? abandonPr
-            : (r) => completePr(r, completionOptions ?? DEFAULT_COMPLETION_OPTIONS);
-
-    action(ref)
-      .then(() => {
-        setState((current) => ({ ...current, banner: successBanner, loadState: "ready" }));
-        doRefresh("auto");
-      })
-      .catch((cause: unknown) => {
-        setState((current) => ({
-          ...current,
-          banner: `Action failed: ${cause instanceof Error ? cause.message : String(cause)
-            }`,
-          loadState: "error",
-        }));
-      });
-  };
-
-  const armConfirm = (
-    kind: ConfirmKind,
-    completionOptions?: CompletionOptions,
-  ) => {
-    if (!selectedPr) {
-      setState((current) => ({ ...current, banner: "No PR selected." }));
-      return;
-    }
-    const target: PrTarget = {
-      organizationUrl: selectedPr.organizationUrl,
-      project: selectedPr.project,
-      repository: selectedPr.repository,
-      prId: selectedPr.id,
-      title: selectedPr.title,
-    };
-    const verb =
-      kind === "approve"
-        ? "Approve"
-        : kind === "reject"
-          ? "Reject"
-          : kind === "abandon"
-            ? "Abandon"
-            : "Complete & merge";
-    const suffix = kind === "abandon" || kind === "complete" ? " (irreversible)" : "";
-    setState((current) => ({
-      ...current,
-      pendingConfirm: completionOptions
-        ? { kind, target, completionOptions }
-        : { kind, target },
-      focus: kind === "complete" ? "list" : current.focus,
-      banner: `${verb} PR #${target.prId} "${target.title}"${suffix}? (y/n)`,
-    }));
-  };
-
-  const openCompletionEditor = (prefill: CompletionOptions) => {
-    setState((current) => ({
-      ...current,
-      focus: "completion",
-      completionOptions: prefill,
-      completionCursor: 0,
-      banner: "Choose completion options, then press Enter on Complete PR.",
-    }));
-  };
-
-  const submitCompletion = () => {
-    const options = state.completionOptions;
-    setState((current) => ({
-      ...current,
-      focus: "list",
-      commandText: "",
-      completionCursor: 0,
-    }));
-    armConfirm("complete", options);
-  };
-
-  const executeCommand = (rawCommand: string) => {
-    const command = rawCommand.trim().toLowerCase();
-
-    if (!command) {
-      setState((current) => ({
-        ...current,
-        focus: "list",
-        commandText: "",
-        banner: "Command cancelled.",
-      }));
-      return;
-    }
-
-    if (command === "help") {
-      setState((current) => ({
-        ...current,
-        previousFocus: current.focus,
-        focus: "help",
-        commandText: "",
-        banner: "Help view",
-      }));
-      return;
-    }
-
-    if (command === "refresh") {
-      doRefresh("manual");
-      setState((current) => ({ ...current, focus: "list", commandText: "" }));
-      return;
-    }
-
-    if (command === "toggle-auto") {
-      setState((current) => ({
-        ...current,
-        autoRefresh: !current.autoRefresh,
-        focus: "list",
-        commandText: "",
-        banner: !current.autoRefresh
-          ? "Auto-refresh enabled."
-          : "Auto-refresh disabled.",
-      }));
-      return;
-    }
-
-    if (command === "approve") {
-      setState((current) => ({ ...current, focus: "list", commandText: "" }));
-      armConfirm("approve");
-      return;
-    }
-
-    if (command === "reject") {
-      setState((current) => ({ ...current, focus: "list", commandText: "" }));
-      armConfirm("reject");
-      return;
-    }
-
-    if (command.startsWith("filter ")) {
-      const query = command.slice(7).trim();
-      setState((current) => ({
-        ...current,
-        focus: "tree",
-        commandText: "",
-        treeFilter: query,
-        banner: `Tree filter applied: ${query}`,
-      }));
-      return;
-    }
-
-    if (command === "filter") {
-      setState((current) => ({
-        ...current,
-        focus: "tree",
-        commandText: "",
-        treeFilter: "all",
-        banner: `Tree filter cleared.`,
-      }));
-      return;
-    }
-
-    if (command.startsWith("complete")) {
-      openCompletionEditor(parseCompletionCommand(rawCommand));
-      return;
-    }
-
-    if (command === "abandon") {
-      setState((current) => ({ ...current, focus: "list", commandText: "" }));
-      armConfirm("abandon");
-      return;
-    }
-
-    if (command === "open") {
-      if (selectedPr) {
-        openInBrowser(selectedPr.url);
-        setState((current) => ({
-          ...current,
-          focus: "list",
-          commandText: "",
-          banner: "Opened PR in browser.",
-        }));
-      } else {
-        setState((current) => ({
-          ...current,
-          focus: "list",
-          commandText: "",
-          banner: "No PR selected.",
-        }));
-      }
-      return;
-    }
-
-    if (command === "quit") {
-      exitApp();
-      process.exit(0);
-      return;
-    }
-
-    setState((current) => ({
-      ...current,
-      focus: "list",
-      commandText: "",
-      banner: `Unknown command: ${command}`,
-    }));
-  };
-
+  // Initial data load
   useEffect(() => {
     doRefresh("initial");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!state.autoRefresh) {
-      return;
-    }
-    const timer = setInterval(() => {
-      doRefresh("auto");
-    }, REFRESH_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [state.autoRefresh]);
-
-  // Removed the useEffect that automatically jumped to 'files' focus when selectedPr changed.
-  // This ensures the focus stays in the current pane (e.g., 'tree' or 'list') and simply displays
-  // the 'detail' view of the selected PR on the right, as expected.
-
   return {
     state,
-    setState,
+    setState, // kept for useAppKeyboard (internal infrastructure)
     selectedOrg,
     selectedRepo,
     visiblePrs,
@@ -632,9 +75,7 @@ export function useAppState(exitApp: () => void) {
     repoCount,
     activePrs,
     actions: {
-      moveTreeSelection,
-      changePrSelection,
-      changeFileSelection,
+      ...selection,
       addToast,
       doRefresh,
       armConfirm,
@@ -642,6 +83,9 @@ export function useAppState(exitApp: () => void) {
       openCompletionEditor,
       submitCompletion,
       executeCommand,
+      setDiffScrollOffset,
+      setDiffSelectedRow,
+      setCommentInputActive,
     },
   };
 }

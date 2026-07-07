@@ -1,4 +1,6 @@
 import { unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   AppData,
   OrganizationNode,
@@ -25,7 +27,7 @@ import {
 } from "./azureNormalize";
 import { fetchPrComments } from "./azureRest";
 
-const AZ = "az";
+import { AZ, orgArgs, jsonOutput } from "./azureCommon";
 
 /** Identifies a specific PR for actions. */
 export interface PrRef {
@@ -34,13 +36,6 @@ export interface PrRef {
   repository: string;
   prId: number;
 }
-
-const orgArgs = (organization: string): string[] => [
-  "--organization",
-  organization,
-];
-
-const jsonOutput = ["--output", "json"];
 
 /**
  * Returns an Authorization header value for direct Azure DevOps REST calls.
@@ -110,8 +105,8 @@ const buildUnifiedDiff = async (
   newContent: string,
 ): Promise<{ rawDiff: string; additions: number; deletions: number }> => {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const oldPath = `/tmp/adotui-a-${id}`;
-  const newPath = `/tmp/adotui-b-${id}`;
+  const oldPath = join(tmpdir(), `adotui-a-${id}`);
+  const newPath = join(tmpdir(), `adotui-b-${id}`);
   await Bun.write(oldPath, oldContent);
   await Bun.write(newPath, newContent);
 
