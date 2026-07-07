@@ -17,22 +17,23 @@ export function handleGlobals(
       const nextIndex = (FOCUS_ORDER.indexOf(current.focus) + 1) % FOCUS_ORDER.length;
       const nextFocus = FOCUS_ORDER[nextIndex] ?? "tree";
       const resolved = nextFocus === "command" ? "tree" : nextFocus;
-      return { ...current, focus: resolved, banner: `Focus: ${resolved}` };
+      const fileFilter = current.focus === "files" && resolved !== "files" ? "" : current.fileFilter;
+      return { ...current, focus: resolved, fileFilter, banner: `Focus: ${resolved}` };
     });
     return true;
   }
 
   if (selectedPr) {
-    if (input === "1") { setState((c) => ({ ...c, focus: "detail", banner: "Focus: Overview" })); return true; }
+    if (input === "1") { setState((c) => ({ ...c, focus: "detail", fileFilter: "", banner: "Focus: Overview" })); return true; }
     if (input === "2") { setState((c) => ({ ...c, focus: "files", selectedFileIndex: 0, diffScrollOffset: 0, banner: "Focus: Diff" })); return true; }
-    if (input === "3") { setState((c) => ({ ...c, focus: "comments", banner: "Focus: Comments" })); return true; }
-    if (input === "4") { setState((c) => ({ ...c, focus: "runs", banner: "Focus: Pipelines" })); return true; }
+    if (input === "3") { setState((c) => ({ ...c, focus: "comments", fileFilter: "", banner: "Focus: Comments" })); return true; }
+    if (input === "4") { setState((c) => ({ ...c, focus: "runs", fileFilter: "", banner: "Focus: Pipelines" })); return true; }
 
     if (input === "h" && ["detail", "files", "comments", "runs"].includes(state.focus)) {
-      setState((c) => ({ ...c, focus: "list", banner: "Focus: list" })); return true;
+      setState((c) => ({ ...c, focus: "list", fileFilter: "", banner: "Focus: list" })); return true;
     }
     if (key.leftArrow && ["detail", "files", "runs"].includes(state.focus)) {
-      setState((c) => ({ ...c, focus: "list", banner: "Focus: list" })); return true;
+      setState((c) => ({ ...c, focus: "list", fileFilter: "", banner: "Focus: list" })); return true;
     }
   }
 
