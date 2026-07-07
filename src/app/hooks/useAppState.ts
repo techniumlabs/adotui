@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { produce } from "immer";
 import type { OrganizationNode, PullRequest } from "../../domain/types";
 import { DEFAULT_COMPLETION_OPTIONS, INITIAL_STATE } from "../constants";
 import type { AppState, CompletionOptions } from "../types";
+import { useAppStore } from "../store";
 import {
   countTotalPrs,
   countActivePrs,
@@ -21,7 +23,9 @@ import { useCommandDispatch } from "./useCommandDispatch";
 export type AppHandle = ReturnType<typeof useAppState>;
 
 export function useAppState(exitApp: () => void) {
-  const [state, setState] = useState<AppState>(INITIAL_STATE);
+  // Bind to the Zustand store instead of local React state
+  const state = useAppStore();
+  const setState = state.setState;
 
   const { addToast } = useToast(setState);
   const { doRefresh } = useRefresh(state.autoRefresh, setState, addToast);
@@ -58,75 +62,33 @@ export function useAppState(exitApp: () => void) {
 
   const updateFileDiff = (filePath: string, diffData: { rawDiff: string; additions: number; deletions: number } | null) => {
     if (!selectedPr) return;
-    setState((c) => {
-      const newData = { ...c.data };
-      const orgs = [...newData.organizations];
-      const org = orgs[c.selectedOrgIndex];
-      if (!org) return { ...c, data: newData };
+    setState(produce(draft => {
+      const pr = draft.data.organizations[draft.selectedOrgIndex]
+        ?.repositories[draft.selectedRepoIndex]
+        ?.pullRequests.find(p => p.id === selectedPr.id);
       
-      const newOrg = { ...org };
-      const repos = [...newOrg.repositories];
-      const repo = repos[c.selectedRepoIndex];
-      if (!repo) return { ...c, data: newData };
-      
-      const newRepo = { ...repo };
-      const prs = [...newRepo.pullRequests];
-      const prIndex = prs.findIndex(p => p.id === selectedPr.id);
-      
-      if (prIndex >= 0) {
-        const pr = { ...prs[prIndex]! };
-        pr.changedFiles = pr.changedFiles.map(f => {
-          if (f.path === filePath) {
-            return {
-              ...f,
-              rawDiff: diffData ? diffData.rawDiff : "Error loading diff",
-              additions: diffData ? diffData.additions : 0,
-              deletions: diffData ? diffData.deletions : 0,
-              loadingDiff: false,
-            };
-          }
-          return f;
-        });
-        prs[prIndex] = pr;
-        newRepo.pullRequests = prs;
-        repos[c.selectedRepoIndex] = newRepo;
-        newOrg.repositories = repos;
-        orgs[c.selectedOrgIndex] = newOrg;
-        newData.organizations = orgs;
+      const file = pr?.changedFiles?.find(f => f.path === filePath);
+      if (file) {
+        file.rawDiff = diffData ? diffData.rawDiff : "Error loading diff";
+        file.additions = diffData ? diffData.additions : 0;
+        file.deletions = diffData ? diffData.deletions : 0;
+        file.loadingDiff = false;
       }
-      return { ...c, data: newData };
-    });
+    }));
   };
 
   const setFileLoading = (filePath: string) => {
     if (!selectedPr) return;
-    setState((c) => {
-      const newData = { ...c.data };
-      const orgs = [...newData.organizations];
-      const org = orgs[c.selectedOrgIndex];
-      if (!org) return { ...c, data: newData };
-
-      const newOrg = { ...org };
-      const repos = [...newOrg.repositories];
-      const repo = repos[c.selectedRepoIndex];
-      if (!repo) return { ...c, data: newData };
-
-      const newRepo = { ...repo };
-      const prs = [...newRepo.pullRequests];
-      const prIndex = prs.findIndex(p => p.id === selectedPr.id);
+    setState(produce(draft => {
+      const pr = draft.data.organizations[draft.selectedOrgIndex]
+        ?.repositories[draft.selectedRepoIndex]
+        ?.pullRequests.find(p => p.id === selectedPr.id);
       
-      if (prIndex >= 0) {
-        const pr = { ...prs[prIndex]! };
-        pr.changedFiles = pr.changedFiles.map(f => f.path === filePath ? { ...f, loadingDiff: true } : f);
-        prs[prIndex] = pr;
-        newRepo.pullRequests = prs;
-        repos[c.selectedRepoIndex] = newRepo;
-        newOrg.repositories = repos;
-        orgs[c.selectedOrgIndex] = newOrg;
-        newData.organizations = orgs;
+      const file = pr?.changedFiles?.find(f => f.path === filePath);
+      if (file) {
+        file.loadingDiff = true;
       }
-      return { ...c, data: newData };
-    });
+    }));
   };
 
   // Initial data load
