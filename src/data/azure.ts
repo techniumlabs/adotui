@@ -13,6 +13,7 @@ import type { CompletionOptions } from "../app/types";
 import { CommandError, run, runJson } from "./command";
 import type { AdoConfig, AdoProjectConfig } from "./config";
 import type {
+  AzureIteration,
   AzureIterationChanges,
   AzureIterationList,
   AzurePolicyEvaluation,
@@ -292,13 +293,17 @@ const listPrFileChanges = async (
       ...jsonOutput,
     ]);
 
-    const latest = (iterations.value ?? []).reduce(
-      (max, it) => Math.max(max, it.id ?? 0),
-      0,
+    const latestIter = (iterations.value ?? []).reduce(
+      (max, it) => ((it.id ?? 0) > (max.id ?? 0) ? it : max),
+      { id: 0 } as AzureIteration,
     );
+    const latest = latestIter.id ?? 0;
     if (latest === 0) {
       return [];
     }
+
+    const iterSourceCommit = sourceCommit ?? latestIter.sourceRefCommit?.commitId;
+    const iterTargetCommit = targetCommit ?? latestIter.commonRefCommit?.commitId ?? latestIter.targetRefCommit?.commitId;
 
     const changes = await runJson<AzureIterationChanges>(AZ, [
       "devops",
@@ -321,7 +326,7 @@ const listPrFileChanges = async (
     const files = normalizeFileChanges(changes.changeEntries ?? []);
 
     // Fetch actual diff content when commit SHAs are available.
-    if (sourceCommit && targetCommit && files.length > 0) {
+    if (iterSourceCommit && iterTargetCommit && files.length > 0) {
       const authHeader = await getAdoAuthHeader();
       if (authHeader) {
         await Promise.all(
@@ -330,10 +335,10 @@ const listPrFileChanges = async (
             const [oldContent, newContent] = await Promise.all([
               file.status === "added"
                 ? Promise.resolve("")
-                : fetchFileAtCommit(organization, project, repositoryId, filePath, targetCommit, authHeader),
+                : fetchFileAtCommit(organization, project, repositoryId, filePath, iterTargetCommit, authHeader),
               file.status === "deleted"
                 ? Promise.resolve("")
-                : fetchFileAtCommit(organization, project, repositoryId, filePath, sourceCommit, authHeader),
+                : fetchFileAtCommit(organization, project, repositoryId, filePath, iterSourceCommit, authHeader),
             ]);
             if (oldContent !== null && newContent !== null) {
               const diff = await buildUnifiedDiff(file.path, oldContent, newContent);
