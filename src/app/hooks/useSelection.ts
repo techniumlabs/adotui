@@ -53,6 +53,7 @@ export function useSelection(setState: Dispatch<SetStateAction<AppState>>) {
         selectedOrgIndex: nextOrgIndex,
         selectedRepoIndex: nextRepoIndex,
         selectedPrIndex: clamp(current.selectedPrIndex, 0, Math.max(0, nextVisible.length - 1)),
+        fileFilter: "",
         banner: banner ?? current.banner,
       };
     });
@@ -84,6 +85,7 @@ export function useSelection(setState: Dispatch<SetStateAction<AppState>>) {
         selectedFileIndex: 0,
         diffScrollOffset: 0,
         diffSelectedRow: 0,
+        fileFilter: "",
         fileScrollStates: newScrollStates,
       };
     });
