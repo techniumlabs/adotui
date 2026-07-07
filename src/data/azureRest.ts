@@ -4,6 +4,8 @@
  * No direct HTTP/REST calls, no PAT handling — the CLI manages auth.
  */
 
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   CommentType,
   PipelineRun,
@@ -12,13 +14,7 @@ import type {
   RunState,
 } from "../domain/types";
 import { run, runJson } from "./command";
-
-const AZ = "az";
-
-const orgArgs = (organization: string): string[] => [
-  "--organization",
-  organization,
-];
+import { AZ, orgArgs } from "./azureCommon";
 
 // ─── az devops invoke helpers ─────────────────────────────────────────────────
 
@@ -60,11 +56,9 @@ const invokeGet = async <T>(
   }
 };
 
-/**
- * POST via `az devops invoke` using a temporary JSON file written to /tmp.
- * The CLI reads the request body from `--in-file`.
- */
-const invokePost = async <T>(
+/** Shared helper for POST and PATCH mutations via az devops invoke. */
+const invokeMutate = async <T>(
+  method: "POST" | "PATCH",
   organization: string,
   area: string,
   resource: string,
@@ -72,89 +66,24 @@ const invokePost = async <T>(
   body: unknown,
   queryParameters: string[] = [],
 ): Promise<T | null> => {
-  // Write body to a temp file — az devops invoke requires --in-file for POST
-  const tmpPath = `/tmp/adotui_invoke_${Date.now()}_${Math.random().toString(36).slice(2)}.json`;
+  const tmpPath = join(tmpdir(), `adotui_invoke_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
   try {
     await Bun.write(tmpPath, JSON.stringify(body));
-
     const args: string[] = [
-      "devops",
-      "invoke",
-      "--area",
-      area,
-      "--resource",
-      resource,
-      "--route-parameters",
-      ...routeParameters,
-      "--http-method",
-      "POST",
-      "--in-file",
-      tmpPath,
-      "--media-type",
-      "application/json",
-      "--api-version",
-      "7.1",
-      "--output",
-      "json",
+      "devops", "invoke",
+      "--area", area,
+      "--resource", resource,
+      "--route-parameters", ...routeParameters,
+      "--http-method", method,
+      "--in-file", tmpPath,
+      "--media-type", "application/json",
+      "--api-version", "7.1",
+      "--output", "json",
       ...orgArgs(organization),
     ];
-
     if (queryParameters.length > 0) {
       args.push("--query-parameters", ...queryParameters);
     }
-
-    return await runJson<T>(AZ, args, { timeoutMs: 20_000 });
-  } catch {
-    return null;
-  } finally {
-    // Best-effort cleanup
-    try {
-      const { unlink } = await import("node:fs/promises");
-      await unlink(tmpPath);
-    } catch {
-      // ignore
-    }
-  }
-};
-
-const invokePatch = async <T>(
-  organization: string,
-  area: string,
-  resource: string,
-  routeParameters: string[],
-  body: unknown,
-  queryParameters: string[] = [],
-): Promise<T | null> => {
-  const tmpPath = `/tmp/adotui_invoke_${Date.now()}_${Math.random().toString(36).slice(2)}.json`;
-  try {
-    await Bun.write(tmpPath, JSON.stringify(body));
-
-    const args: string[] = [
-      "devops",
-      "invoke",
-      "--area",
-      area,
-      "--resource",
-      resource,
-      "--route-parameters",
-      ...routeParameters,
-      "--http-method",
-      "PATCH",
-      "--in-file",
-      tmpPath,
-      "--media-type",
-      "application/json",
-      "--api-version",
-      "7.1",
-      "--output",
-      "json",
-      ...orgArgs(organization),
-    ];
-
-    if (queryParameters.length > 0) {
-      args.push("--query-parameters", ...queryParameters);
-    }
-
     return await runJson<T>(AZ, args, { timeoutMs: 20_000 });
   } catch {
     return null;
@@ -162,11 +91,21 @@ const invokePatch = async <T>(
     try {
       const { unlink } = await import("node:fs/promises");
       await unlink(tmpPath);
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }
 };
+
+const invokePost = <T>(
+  organization: string, area: string, resource: string,
+  routeParameters: string[], body: unknown, queryParameters?: string[],
+): Promise<T | null> =>
+  invokeMutate<T>("POST", organization, area, resource, routeParameters, body, queryParameters);
+
+const invokePatch = <T>(
+  organization: string, area: string, resource: string,
+  routeParameters: string[], body: unknown, queryParameters?: string[],
+): Promise<T | null> =>
+  invokeMutate<T>("PATCH", organization, area, resource, routeParameters, body, queryParameters);
 
 const invokeDelete = async <T>(
   organization: string,

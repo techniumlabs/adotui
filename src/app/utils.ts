@@ -21,6 +21,18 @@ export const countTotalPrs = (data: AppData): number =>
     0,
   );
 
+export const countActivePrs = (data: AppData): number =>
+  data.organizations.reduce(
+    (orgAcc, org) =>
+      orgAcc +
+      org.repositories.reduce(
+        (repoAcc, repo) =>
+          repoAcc + repo.pullRequests.filter((pr) => pr.status === "active").length,
+        0,
+      ),
+    0,
+  );
+
 export const formatRelativeAge = (isoDate: string): string => {
   const now = Date.now();
   const deltaMs = Math.max(0, now - Date.parse(isoDate));
@@ -93,9 +105,8 @@ export const matchesTreeFilter = (pr: PullRequest, filterStr: string): boolean =
           if (!pr.title.toLowerCase().includes(value)) return false;
           break;
         case "description":
-          // Description is not in PR object currently, but if it is added later, or mapped to title for now
-          if (!pr.title.toLowerCase().includes(value)) return false;
-          break;
+          // Not currently supported — filter returns no match to avoid silent aliasing.
+          return false;
         case "tag":
           if (!pr.tags?.some(tag => tag.toLowerCase().includes(value))) return false;
           break;
