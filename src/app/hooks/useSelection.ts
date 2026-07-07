@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { AppState } from "../types";
-import { clamp, getVisiblePrs, matchesTreeFilter } from "../utils";
+import { clamp, getVisiblePrs, getVisibleFiles, matchesTreeFilter } from "../utils";
 
 export function useSelection(setState: Dispatch<SetStateAction<AppState>>) {
   const moveTreeSelection = (orgDelta: number, repoDelta: number, banner?: string) => {
@@ -69,7 +69,8 @@ export function useSelection(setState: Dispatch<SetStateAction<AppState>>) {
       if (nextIndex === current.selectedPrIndex) return current;
 
       const currentPr = visible[current.selectedPrIndex];
-      const currentFile = currentPr?.changedFiles[current.selectedFileIndex];
+      const visibleFiles = getVisibleFiles(currentPr, current.fileFilter);
+      const currentFile = visibleFiles[current.selectedFileIndex];
       const newScrollStates = { ...current.fileScrollStates };
       if (currentPr && currentFile) {
         newScrollStates[`${currentPr.id}:${currentFile.path}`] = {
@@ -93,12 +94,13 @@ export function useSelection(setState: Dispatch<SetStateAction<AppState>>) {
       const org = current.data.organizations[current.selectedOrgIndex];
       const repo = org?.repositories[current.selectedRepoIndex];
       const pr = repo?.pullRequests[current.selectedPrIndex];
-      if (!pr || pr.changedFiles.length === 0) return current;
+      const visibleFiles = getVisibleFiles(pr, current.fileFilter);
+      if (!pr || visibleFiles.length === 0) return current;
 
-      const nextIndex = clamp(current.selectedFileIndex + delta, 0, pr.changedFiles.length - 1);
+      const nextIndex = clamp(current.selectedFileIndex + delta, 0, visibleFiles.length - 1);
       if (nextIndex === current.selectedFileIndex) return current;
 
-      const currentFile = pr.changedFiles[current.selectedFileIndex];
+      const currentFile = visibleFiles[current.selectedFileIndex];
       const newScrollStates = { ...current.fileScrollStates };
       if (currentFile) {
         newScrollStates[`${pr.id}:${currentFile.path}`] = {
@@ -106,7 +108,7 @@ export function useSelection(setState: Dispatch<SetStateAction<AppState>>) {
           row: current.diffSelectedRow,
         };
       }
-      const nextFile = pr.changedFiles[nextIndex];
+      const nextFile = visibleFiles[nextIndex];
       let nextOffset = 0;
       let nextRow = 0;
       if (nextFile) {

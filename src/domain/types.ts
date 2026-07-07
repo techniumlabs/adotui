@@ -9,6 +9,8 @@ export interface PullRequestFileChange {
   diff: string[];
   /** Complete unified diff text fetched from Azure DevOps (includes --- +++ @@ headers). */
   rawDiff?: string;
+  /** Indicates if the diff content is currently being loaded from Azure. */
+  loadingDiff?: boolean;
 }
 
 export type MergeStatus =
@@ -98,6 +100,8 @@ export interface PullRequest {
   repository: string;
   /** The repository's internal Azure DevOps ID (used for API calls). */
   repositoryId?: string;
+  iterSourceCommit?: string;
+  iterTargetCommit?: string;
 }
 
 export interface RepositoryNode {

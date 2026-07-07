@@ -42,7 +42,7 @@ export function handleGlobals(
   }
   if (input === "q") { exitApp(); process.exit(0); return true; }
   if (input === "/") {
-    setState((c) => ({ ...c, focus: "command", commandText: "", banner: "Command mode." }));
+    setState((c) => ({ ...c, previousFocus: c.focus, focus: "command", commandText: "", banner: "Command mode." }));
     return true;
   }
   if (input === "a") { actions.armConfirm("approve"); return true; }

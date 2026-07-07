@@ -56,7 +56,78 @@ export function useAppState(exitApp: () => void) {
   const setCommentInputActive = (active: boolean) =>
     setState((c) => (c.commentInputActive === active ? c : { ...c, commentInputActive: active }));
 
-  // executeCommand is delegated to useCommandDispatch hook
+  const updateFileDiff = (filePath: string, diffData: { rawDiff: string; additions: number; deletions: number } | null) => {
+    if (!selectedPr) return;
+    setState((c) => {
+      const newData = { ...c.data };
+      const orgs = [...newData.organizations];
+      const org = orgs[c.selectedOrgIndex];
+      if (!org) return { ...c, data: newData };
+      
+      const newOrg = { ...org };
+      const repos = [...newOrg.repositories];
+      const repo = repos[c.selectedRepoIndex];
+      if (!repo) return { ...c, data: newData };
+      
+      const newRepo = { ...repo };
+      const prs = [...newRepo.pullRequests];
+      const prIndex = prs.findIndex(p => p.id === selectedPr.id);
+      
+      if (prIndex >= 0) {
+        const pr = { ...prs[prIndex]! };
+        pr.changedFiles = pr.changedFiles.map(f => {
+          if (f.path === filePath) {
+            return {
+              ...f,
+              rawDiff: diffData ? diffData.rawDiff : "Error loading diff",
+              additions: diffData ? diffData.additions : 0,
+              deletions: diffData ? diffData.deletions : 0,
+              loadingDiff: false,
+            };
+          }
+          return f;
+        });
+        prs[prIndex] = pr;
+        newRepo.pullRequests = prs;
+        repos[c.selectedRepoIndex] = newRepo;
+        newOrg.repositories = repos;
+        orgs[c.selectedOrgIndex] = newOrg;
+        newData.organizations = orgs;
+      }
+      return { ...c, data: newData };
+    });
+  };
+
+  const setFileLoading = (filePath: string) => {
+    if (!selectedPr) return;
+    setState((c) => {
+      const newData = { ...c.data };
+      const orgs = [...newData.organizations];
+      const org = orgs[c.selectedOrgIndex];
+      if (!org) return { ...c, data: newData };
+
+      const newOrg = { ...org };
+      const repos = [...newOrg.repositories];
+      const repo = repos[c.selectedRepoIndex];
+      if (!repo) return { ...c, data: newData };
+
+      const newRepo = { ...repo };
+      const prs = [...newRepo.pullRequests];
+      const prIndex = prs.findIndex(p => p.id === selectedPr.id);
+      
+      if (prIndex >= 0) {
+        const pr = { ...prs[prIndex]! };
+        pr.changedFiles = pr.changedFiles.map(f => f.path === filePath ? { ...f, loadingDiff: true } : f);
+        prs[prIndex] = pr;
+        newRepo.pullRequests = prs;
+        repos[c.selectedRepoIndex] = newRepo;
+        newOrg.repositories = repos;
+        orgs[c.selectedOrgIndex] = newOrg;
+        newData.organizations = orgs;
+      }
+      return { ...c, data: newData };
+    });
+  };
 
   // Initial data load
   useEffect(() => {
@@ -86,6 +157,8 @@ export function useAppState(exitApp: () => void) {
       setDiffScrollOffset,
       setDiffSelectedRow,
       setCommentInputActive,
+      updateFileDiff,
+      setFileLoading,
     },
   };
 }

@@ -1,11 +1,12 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
+import Spinner from "ink-spinner";
 import type { PullRequest } from "../../domain/types";
 import type { DiffViewMode, FocusArea } from "../types";
 import { fileChangeBadge, glyph, palette, truncate } from "../theme";
 import { postPrComment } from "../../data/azureRest";
 import { usePasteHandler } from "../hooks/usePasteHandler";
-
+// import fs from "node:fs";
 type FilesViewProps = {
   selectedPr?: PullRequest;
   selectedFileIndex: number;
@@ -16,6 +17,10 @@ type FilesViewProps = {
   focus: FocusArea;
   diffViewMode: DiffViewMode;
   onInputModeChange: (active: boolean) => void;
+  isLoading?: boolean;
+  fileFilter?: string;
+  updateFileDiff?: (filePath: string, diffData: { rawDiff: string; additions: number; deletions: number } | null) => void;
+  setFileLoading?: (filePath: string) => void;
 };
 
 // ─── diff renderer ──────────────────────────────────────────────────────────
@@ -151,6 +156,10 @@ export const FilesView: React.FC<FilesViewProps> = ({
   focus,
   diffViewMode,
   onInputModeChange,
+  isLoading,
+  fileFilter,
+  updateFileDiff,
+  setFileLoading,
 }) => {
   const active = focus === "files";
   const [commentMode, setCommentMode] = useState(false);
@@ -158,6 +167,12 @@ export const FilesView: React.FC<FilesViewProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const isSubmittingRef = React.useRef(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  // useEffect(() => {
+  //   if (selectedPr) {
+  //     fs.writeFileSync("debug.json", JSON.stringify(selectedPr, null, 2));
+  //   }
+  // }, [selectedPr]);
 
   usePasteHandler((pastedText) => {
     if (commentMode && !submitting) {
@@ -169,8 +184,37 @@ export const FilesView: React.FC<FilesViewProps> = ({
     onInputModeChange(commentMode);
   }, [commentMode, onInputModeChange]);
 
-  const flatFiles = selectedPr?.changedFiles ?? [];
+  const flatFiles = React.useMemo(() => {
+    if (!selectedPr) return [];
+    if (!fileFilter) return selectedPr.changedFiles;
+    try {
+      const regex = new RegExp(fileFilter.replace(/\*/g, '.*'), 'i');
+      return selectedPr.changedFiles.filter(f => regex.test(f.path));
+    } catch {
+      return selectedPr.changedFiles.filter(f => f.path.toLowerCase().includes(fileFilter.toLowerCase()));
+    }
+  }, [selectedPr, fileFilter]);
   const selectedFile = flatFiles[selectedFileIndex];
+
+  useEffect(() => {
+    if (selectedPr && selectedFile && !selectedFile.rawDiff && !selectedFile.loadingDiff && updateFileDiff && setFileLoading) {
+      if (selectedPr.iterSourceCommit && selectedPr.iterTargetCommit) {
+        setFileLoading(selectedFile.path);
+        import("../../data/azure").then(({ fetchFileDiff }) => {
+          fetchFileDiff(
+            selectedPr.organizationUrl,
+            selectedPr.project,
+            selectedPr.repositoryId ?? selectedPr.repository,
+            selectedFile,
+            selectedPr.iterSourceCommit!,
+            selectedPr.iterTargetCommit!
+          ).then(res => {
+            updateFileDiff(selectedFile.path, res);
+          });
+        });
+      }
+    }
+  }, [selectedPr, selectedFile, updateFileDiff, setFileLoading]);
 
   const terminalWidth = process.stdout.columns ?? 120;
   const treePaneWidth = 36;
@@ -421,7 +465,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
     );
   }
 
-  const hasDiff = !!selectedFile && (selectedFile.diff.length > 0 || !!selectedFile.rawDiff);
+  const hasDiff = !!selectedFile && (selectedFile.diff.length > 0 || typeof selectedFile.rawDiff === "string");
 
   const terminalHeight = process.stdout.rows ?? 40;
   const viewportH = Math.max(5, terminalHeight - 32);
@@ -444,13 +488,19 @@ export const FilesView: React.FC<FilesViewProps> = ({
           {glyph.files} Files
         </Text>
         <Text color={palette.muted}>
+          {fileFilter && (
+            <Text color={palette.accentDim}> Filtered: "{fileFilter}" </Text>
+          )}
           {selectedFileIndex + 1}/{flatFiles.length} {glyph.bullet} {diffViewMode}
         </Text>
       </Box>
 
       {/* File list */}
       <Box marginTop={1} flexDirection="column">
-        {flatFiles.map((file, idx) => {
+        {flatFiles.length === 0 ? (
+          <Text color={palette.danger}>No files match the filter "{fileFilter}".</Text>
+        ) : (
+          flatFiles.map((file, idx) => {
           let show = false;
           if (flatFiles.length <= 5) {
             show = true;
@@ -492,7 +542,8 @@ export const FilesView: React.FC<FilesViewProps> = ({
               ) : null}
             </Text>
           );
-        })}
+        })
+        )}
       </Box>
 
       {/* Diff view for selected file */}
@@ -502,18 +553,35 @@ export const FilesView: React.FC<FilesViewProps> = ({
           <Text color={palette.accentDim} wrap="truncate-end">
             {"  "}{truncate(selectedFile.path, filesInnerWidth - 16)}
             {"  "}
-            <Text color={palette.ok}>+{selectedFile.additions}</Text>
-            <Text color={palette.danger}> -{selectedFile.deletions}</Text>
+            <Text color={palette.ok}>+{selectedFile.additions ?? 0}</Text>
+            <Text color={palette.danger}> -{selectedFile.deletions ?? 0}</Text>
           </Text>
-          {hasDiff ? (
-            <Box flexDirection="column">
-              <Box flexDirection="column" height={viewportH} overflow="hidden">{visibleRows}</Box>
-              <Text color={palette.muted}>
-                {canScrollUp ? "↑ " : "  "}
-                {`row ${diffSelectedRow + 1} of ${total}`}
-                {canScrollDown ? " ↓" : "  "}
-              </Text>
+          
+          {selectedFile.loadingDiff ? (
+            <Box marginY={1} marginLeft={2}>
+              <Text color={palette.accent}><Spinner type="dots" /> Loading diff...</Text>
             </Box>
+          ) : hasDiff ? (
+            <Box flexDirection="column">
+              {diffRows.length > 0 ? (
+                <>
+                  <Box flexDirection="column" height={viewportH} overflow="hidden">{visibleRows}</Box>
+                  <Text color={palette.muted}>
+                    {canScrollUp ? "↑ " : "  "}
+                    {`row ${diffSelectedRow + 1} of ${total}`}
+                    {canScrollDown ? " ↓" : "  "}
+                  </Text>
+                </>
+              ) : (
+                <Text color={palette.muted}>
+                  {selectedFile.status === "added" ? "Empty file added." : selectedFile.status === "deleted" ? "Empty file deleted." : "No changes to display."}
+                </Text>
+              )}
+            </Box>
+          ) : isLoading ? (
+            <Text color={palette.muted}>
+              <Spinner type="dots" /> Loading diff...
+            </Text>
           ) : (
             <Text color={palette.muted}>
               Diff content not loaded (Azure change list is metadata-only).

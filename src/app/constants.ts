@@ -32,6 +32,7 @@ export const INITIAL_STATE: AppState = {
   diffScrollOffset: 0,
   diffSelectedRow: 0,
   treeFilter: "with-prs" satisfies TreeFilter,
+  fileFilter: "",
   commentInputActive: false,
   loadState: "loading",
   pendingConfirm: null,

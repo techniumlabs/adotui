@@ -63,6 +63,7 @@ export type AppState = {
   diffScrollOffset: number;
   diffSelectedRow: number;
   treeFilter: TreeFilter;
+  fileFilter: string;
   /**
    * True while CommentsView has a text-input box open (new comment / reply).
    * When set, App.tsx must suppress ALL keyboard shortcuts — including h —
