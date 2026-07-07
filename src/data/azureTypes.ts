@@ -70,6 +70,9 @@ export interface AzureIterationChanges {
 
 export interface AzureIteration {
   id?: number;
+  sourceRefCommit?: { commitId?: string };
+  targetRefCommit?: { commitId?: string };
+  commonRefCommit?: { commitId?: string };
 }
 
 export interface AzureIterationList {
