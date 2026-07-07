@@ -122,9 +122,15 @@ export const App: React.FC = () => {
                 focus={state.focus}
               />
               {selectedPr && <PrTabs focus={state.focus} />}
-              {state.focus === "files" ? (
-                <FilesView
-                  selectedPr={selectedPr}
+              {(() => {
+                const renderFocus = (state.focus === "command" || state.focus === "completion") 
+                  ? (state.previousFocus ?? "detail") 
+                  : state.focus;
+                
+                if (renderFocus === "files") {
+                  return (
+                    <FilesView
+                      selectedPr={selectedPr}
                   selectedFileIndex={state.selectedFileIndex}
                   diffScrollOffset={state.diffScrollOffset}
                   onScrollOffsetChange={actions.setDiffScrollOffset}
@@ -133,19 +139,31 @@ export const App: React.FC = () => {
                   focus={state.focus}
                   diffViewMode={state.diffViewMode}
                   onInputModeChange={actions.setCommentInputActive}
-                />
-              ) : state.focus === "comments" ? (
-                <CommentsView
-                  selectedPr={selectedPr}
+                      isLoading={state.loadState === "loading"}
+                      fileFilter={state.fileFilter}
+                      updateFileDiff={actions.updateFileDiff}
+                      setFileLoading={actions.setFileLoading}
+                    />
+                  );
+                }
+                
+                if (renderFocus === "comments") {
+                  return (
+                    <CommentsView
+                      selectedPr={selectedPr}
                   focus={state.focus}
                   currentUserEmail={state.data.currentUserEmail}
-                  onInputModeChange={actions.setCommentInputActive}
-                />
-              ) : state.focus === "runs" ? (
-                <PipelineRunsView selectedPr={selectedPr} focus={state.focus} />
-              ) : (
-                <PrDetails selectedPr={selectedPr} focus={state.focus} />
-              )}
+                      onInputModeChange={actions.setCommentInputActive}
+                    />
+                  );
+                }
+                
+                if (renderFocus === "runs") {
+                  return <PipelineRunsView selectedPr={selectedPr} focus={state.focus} />;
+                }
+                
+                return <PrDetails selectedPr={selectedPr} focus={state.focus} />;
+              })()}
             </Box>
           </>
         )}

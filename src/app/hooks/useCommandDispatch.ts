@@ -60,6 +60,15 @@ export function useCommandDispatch(
       setState((c) => ({ ...c, focus: "tree", commandText: "", treeFilter: "all", banner: "Tree filter cleared." }));
       return;
     }
+    if (command.startsWith("find ")) {
+      const query = command.slice(5).trim();
+      setState((c) => ({ ...c, focus: "files", commandText: "", fileFilter: query, selectedFileIndex: 0, banner: `File filter applied: ${query}` }));
+      return;
+    }
+    if (command === "find") {
+      setState((c) => ({ ...c, focus: "files", commandText: "", fileFilter: "", banner: "File filter cleared." }));
+      return;
+    }
     if (command.startsWith("complete")) {
       openCompletionEditor(parseCompletionCommand(rawCommand));
       return;

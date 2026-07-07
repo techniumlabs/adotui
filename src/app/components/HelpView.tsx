@@ -41,9 +41,11 @@ export const HelpView: React.FC = () => {
             <Text bold color={palette.text}>Command Bar (`/`)</Text>
           </Box>
           <Box flexDirection="column" marginBottom={1}>
-            <Text><Text color={palette.accent} bold>:filter &lt;query&gt;</Text> Apply tree/list filter</Text>
-            <Text><Text color={palette.accent} bold>:help</Text>           Show command help</Text>
-            <Text><Text color={palette.accent} bold>Esc</Text>             Cancel command</Text>
+            <Text><Text color={palette.accent} bold>filter &lt;query&gt;</Text> Apply tree/list filter</Text>
+            <Text><Text color={palette.accent} bold>find &lt;query&gt;  </Text> Apply wildcard filter in Files view</Text>
+            <Text><Text color={palette.accent} bold>find          </Text> Clear file filter</Text>
+            <Text><Text color={palette.accent} bold>help          </Text> Show command help</Text>
+            <Text><Text color={palette.accent} bold>Esc           </Text> Cancel command</Text>
           </Box>
         </Box>
 

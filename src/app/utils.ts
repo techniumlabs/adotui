@@ -135,6 +135,21 @@ export const getVisiblePrs = (
   return prs;
 };
 
+export const getVisibleFiles = (
+  pr: PullRequest | undefined,
+  fileFilter: string,
+): PullRequestFileChange[] => {
+  if (!pr) return [];
+  if (!fileFilter) return pr.changedFiles;
+  
+  try {
+    const filterRegex = new RegExp(fileFilter.replace(/\*/g, '.*'), 'i');
+    return pr.changedFiles.filter((f) => filterRegex.test(f.path));
+  } catch {
+    return pr.changedFiles.filter((f) => f.path.toLowerCase().includes(fileFilter.toLowerCase()));
+  }
+};
+
 export const cycleMergeStrategy = (
   current: MergeStrategy,
   delta: 1 | -1,

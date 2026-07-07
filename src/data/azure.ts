@@ -274,7 +274,7 @@ const listPrFileChanges = async (
   prId: number,
   sourceCommit: string | undefined,
   targetCommit: string | undefined,
-): Promise<PullRequestFileChange[]> => {
+): Promise<{ files: PullRequestFileChange[]; iterSourceCommit?: string; iterTargetCommit?: string }> => {
   try {
     const iterations = await runJson<AzureIterationList>(AZ, [
       "devops",
@@ -299,7 +299,7 @@ const listPrFileChanges = async (
     );
     const latest = latestIter.id ?? 0;
     if (latest === 0) {
-      return [];
+      return { files: [] };
     }
 
     const iterSourceCommit = sourceCommit ?? latestIter.sourceRefCommit?.commitId;
@@ -320,41 +320,51 @@ const listPrFileChanges = async (
       ...orgArgs(organization),
       "--api-version",
       "7.1",
+      "--query-parameters",
+      "$top=10000",
       ...jsonOutput,
     ]);
 
     const files = normalizeFileChanges(changes.changeEntries ?? []);
 
-    // Fetch actual diff content when commit SHAs are available.
-    if (iterSourceCommit && iterTargetCommit && files.length > 0) {
-      const authHeader = await getAdoAuthHeader();
-      if (authHeader) {
-        await Promise.all(
-          files.map(async (file) => {
-            const filePath = `/${file.path}`;
-            const [oldContent, newContent] = await Promise.all([
-              file.status === "added"
-                ? Promise.resolve("")
-                : fetchFileAtCommit(organization, project, repositoryId, filePath, iterTargetCommit, authHeader),
-              file.status === "deleted"
-                ? Promise.resolve("")
-                : fetchFileAtCommit(organization, project, repositoryId, filePath, iterSourceCommit, authHeader),
-            ]);
-            if (oldContent !== null && newContent !== null) {
-              const diff = await buildUnifiedDiff(file.path, oldContent, newContent);
-              file.rawDiff = diff.rawDiff;
-              file.additions = diff.additions;
-              file.deletions = diff.deletions;
-            }
-          }),
-        );
-      }
-    }
-
-    return files;
+    return { files, iterSourceCommit, iterTargetCommit };
   } catch {
-    return [];
+    return { files: [] };
   }
+};
+
+/** 
+ * Fetches the raw diff for a single file on-demand to avoid rate-limiting.
+ */
+export const fetchFileDiff = async (
+  organization: string,
+  project: string,
+  repositoryId: string,
+  file: PullRequestFileChange,
+  sourceCommit: string,
+  targetCommit: string,
+): Promise<{ rawDiff: string; additions: number; deletions: number } | null> => {
+  const authHeader = await getAdoAuthHeader();
+  if (!authHeader) return null;
+
+  const filePath = `/${file.path}`;
+  try {
+    const [oldContent, newContent] = await Promise.all([
+      file.status === "added"
+        ? Promise.resolve("")
+        : fetchFileAtCommit(organization, project, repositoryId, filePath, targetCommit, authHeader),
+      file.status === "deleted"
+        ? Promise.resolve("")
+        : fetchFileAtCommit(organization, project, repositoryId, filePath, sourceCommit, authHeader),
+    ]);
+
+    if (oldContent !== null && newContent !== null) {
+      return await buildUnifiedDiff(file.path, oldContent, newContent);
+    }
+  } catch (e) {
+    console.error(`Error fetching diff for ${file.path}:`, e);
+  }
+  return null;
 };
 
 /** Wraps errors into a synthetic PR entry so one bad repo doesn't break all. */
@@ -375,9 +385,11 @@ const hydratePullRequest = async (
   let workItems: PullRequestWorkItem[] = [];
   let commentCount = 0;
   let activeCommentCount = 0;
+  let iterSourceCommit: string | undefined;
+  let iterTargetCommit: string | undefined;
 
   if (options.fetchDetails && prId > 0) {
-    const [files, policies, items, threads] = await Promise.all([
+    const [fileRes, policies, items, threads] = await Promise.all([
       listPrFileChanges(
         project.organization,
         project.project,
@@ -390,7 +402,9 @@ const hydratePullRequest = async (
       listPrWorkItems(project.organization, prId),
       fetchPrComments(project.organization, project.project, repositoryId, prId),
     ]);
-    changedFiles = files;
+    changedFiles = fileRes.files;
+    iterSourceCommit = fileRes.iterSourceCommit;
+    iterTargetCommit = fileRes.iterTargetCommit;
     const checks = summarizeChecks(policies);
     checksPassed = checks.passed;
     checksTotal = checks.total;
@@ -414,6 +428,8 @@ const hydratePullRequest = async (
       activeCommentCount,
     }),
     workItems,
+    iterSourceCommit,
+    iterTargetCommit,
   };
 };
 
