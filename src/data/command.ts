@@ -114,9 +114,8 @@ export const runJson = async <T>(
   try {
     return JSON.parse(result.stdout) as T;
   } catch (cause) {
-    const detail = `Could not parse JSON output: ${
-      cause instanceof Error ? cause.message : String(cause)
-    }`;
+    const detail = `Could not parse JSON output: ${cause instanceof Error ? cause.message : String(cause)
+      }`;
     throw new CommandError(command, args, detail);
   }
 };

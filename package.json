@@ -27,7 +27,7 @@
   ],
   "scripts": {
     "build:cli": "bun run dev/build-cli.ts",
-    "dev": "bun run --watch src/main.tsx",
+    "dev": "NODE_ENV=debug bun run --watch src/main.tsx",
     "start": "bun run src/main.tsx",
     "typecheck": "bun x tsc -p tsconfig.json",
     "test": "bun test",

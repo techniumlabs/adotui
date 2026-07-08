@@ -15,6 +15,7 @@ import type {
 } from "../domain/types";
 import { run, runJson } from "./command";
 import { AZ, orgArgs } from "./azureCommon";
+import { debugLog } from "../app/utils";
 
 // ─── az devops invoke helpers ─────────────────────────────────────────────────
 
@@ -50,6 +51,7 @@ const invokeGet = async <T>(
   }
 
   try {
+    debugLog("invokeGet", args);
     return await runJson<T>(AZ, args, { timeoutMs: 20_000 });
   } catch {
     return null;
@@ -185,43 +187,48 @@ export const fetchPrComments = async (
 
   // az devops invoke --area git --resource pullRequestThreads
   //   --route-parameters project=<p> repositoryId=<r> pullRequestId=<id>
-  const data = await invokeGet<{ value?: RawThread[] }>(
-    organizationUrl,
-    "git",
-    "pullRequestThreads",
-    [
-      `project=${project}`,
-      `repositoryId=${repositoryId}`,
-      `pullRequestId=${prId}`,
-    ],
-  );
+  try {
+    const data = await invokeGet<{ value?: RawThread[] }>(
+      organizationUrl,
+      "git",
+      "pullRequestThreads",
+      [
+        `project=${project}`,
+        `repositoryId=${repositoryId}`,
+        `pullRequestId=${prId}`,
+      ],
+    );
+    // debugLog("fetchPrComments", data);
+    if (!data?.value) return [];
 
-  if (!data?.value) return [];
-
-  return data.value
-    .filter((thread) => !thread.isDeleted)
-    .map((thread) => ({
-      id: thread.id,
-      status: (thread.status ?? "unknown") as PrCommentThread["status"],
-      filePath: thread.threadContext?.filePath ?? null,
-      lineNumber: thread.threadContext?.rightFileStart?.line ?? null,
-      comments: (thread.comments ?? [])
-        .filter((c) => !c.isDeleted && c.commentType !== "system")
-        .map(
-          (c): import("../domain/types").PrComment => ({
-            id: c.id,
-            threadId: thread.id,
-            author: c.author?.displayName ?? "Unknown",
-            authorEmail: c.author?.uniqueName,
-            content: c.content ?? "",
-            publishedDate: c.publishedDate ?? "",
-            lastUpdatedDate: c.lastUpdatedDate ?? "",
-            commentType: (c.commentType ?? "text") as CommentType,
-            isDeleted: false,
-          }),
-        ),
-    }))
-    .filter((t) => t.comments.length > 0);
+    return data.value
+      .filter((thread) => !thread.isDeleted)
+      .map((thread) => ({
+        id: thread.id,
+        status: (thread.status ?? "unknown") as PrCommentThread["status"],
+        filePath: thread.threadContext?.filePath ?? null,
+        lineNumber: thread.threadContext?.rightFileStart?.line ?? null,
+        comments: (thread.comments ?? [])
+          .filter((c) => !c.isDeleted && c.commentType !== "system")
+          .map(
+            (c): import("../domain/types").PrComment => ({
+              id: c.id,
+              threadId: thread.id,
+              author: c.author?.displayName ?? "Unknown",
+              authorEmail: c.author?.uniqueName,
+              content: c.content ?? "",
+              publishedDate: c.publishedDate ?? "",
+              lastUpdatedDate: c.lastUpdatedDate ?? "",
+              commentType: (c.commentType ?? "text") as CommentType,
+              isDeleted: false,
+            }),
+          ),
+      }))
+      .filter((t) => t.comments.length > 0);
+  } catch (e) {
+    debugLog("fetchPrComments error", e);
+    return [];
+  }
 };
 
 export const postPrComment = async (
