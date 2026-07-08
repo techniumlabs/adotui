@@ -4,7 +4,7 @@ import Spinner from "ink-spinner";
 import type { PrCommentThread, PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
 import { glyph, palette, truncate } from "../theme";
-import { formatRelativeAge } from "../utils";
+import { debugLog, formatRelativeAge } from "../utils";
 import {
   fetchPrComments,
   postPrComment,
@@ -113,6 +113,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
       setLoading(true);
       setError(null);
       try {
+
         const data = await fetchPrComments(
           selectedPr.organizationUrl,
           selectedPr.project,
@@ -132,8 +133,10 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
   );
 
   useEffect(() => {
+
     if (selectedPr) {
       void loadComments();
+
     } else {
       setThreads([]);
     }

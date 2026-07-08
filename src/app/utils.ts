@@ -1,6 +1,7 @@
 import type { AppData, PullRequest, PullRequestFileChange, ReviewState } from "../domain/types";
 import { DEFAULT_COMPLETION_OPTIONS } from "./constants";
 import type { CompletionOptions, MergeStrategy } from "./types";
+import * as fs from "node:fs";
 
 export const clamp = (value: number, min: number, max: number): number => {
   if (max < min) {
@@ -141,7 +142,7 @@ export const getVisibleFiles = (
 ): PullRequestFileChange[] => {
   if (!pr) return [];
   if (!fileFilter) return pr.changedFiles;
-  
+
   try {
     const filterRegex = new RegExp(fileFilter.replace(/\*/g, '.*'), 'i');
     return pr.changedFiles.filter((f) => filterRegex.test(f.path));
@@ -396,4 +397,16 @@ export const buildFileTree = (
   }
 
   return root;
+};
+
+
+export const debugLog = (...args: any[]) => {
+  if (process.env.NODE_ENV == 'debug') {
+
+    const msg = args
+      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg, null, 2) : String(arg)))
+      .join(" ");
+    fs.appendFileSync("debug.log", `${msg}\n`);
+  }
+
 };
