@@ -48,6 +48,7 @@ export function handleGlobals(
   }
   if (input === "a") { actions.armConfirm("approve"); return true; }
   if (input === "x") { actions.armConfirm("reject"); return true; }
+  if (input === "b") { actions.armConfirm("abandon"); return true; }
   if (input === "c") { actions.openCompletionEditor(DEFAULT_COMPLETION_OPTIONS); return true; }
 
   // Guard: suppress r/o shortcuts when focus is comments or runs
