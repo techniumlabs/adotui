@@ -32,6 +32,7 @@ export const HelpView: React.FC = () => {
           <Box flexDirection="column" marginBottom={1}>
             <Text><Text color={palette.accent} bold>a    </Text> Approve PR</Text>
             <Text><Text color={palette.accent} bold>x    </Text> Reject PR (request changes)</Text>
+            <Text><Text color={palette.accent} bold>b    </Text> Abandon PR</Text>
             <Text><Text color={palette.accent} bold>c    </Text> Complete & Merge PR</Text>
             <Text><Text color={palette.accent} bold>enter</Text> Open PR in default web browser (if in list)</Text>
             <Text><Text color={palette.accent} bold>o    </Text> Open PR in default web browser</Text>

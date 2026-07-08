@@ -4,7 +4,7 @@ import Spinner from "ink-spinner";
 import type { PrCommentThread, PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
 import { glyph, palette, truncate } from "../theme";
-import { debugLog, formatRelativeAge } from "../utils";
+import { formatRelativeAge } from "../utils";
 import {
   fetchPrComments,
   postPrComment,

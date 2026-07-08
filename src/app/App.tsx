@@ -196,6 +196,7 @@ export const App: React.FC = () => {
             <>
               <Text color={palette.accent} bold>a</Text> approve{"   "}
               <Text color={palette.accent} bold>x</Text> reject{"   "}
+              <Text color={palette.accent} bold>b</Text> abandon{"   "}
               <Text color={palette.accent} bold>c</Text> complete{"   "}
             </>
           ) : (
