@@ -29,6 +29,12 @@ brew install adotui
 curl -fsSL https://raw.githubusercontent.com/techniumlabs/adotui/main/install.sh | bash
 ```
 
+> [!NOTE]
+> On Windows PowerShell, `curl` is a built-in alias for `Invoke-WebRequest` which does not support the same flags. To bypass the alias, use `curl.exe` instead, or run the command inside Git Bash:
+> ```bash
+> curl.exe -fsSL https://raw.githubusercontent.com/techniumlabs/adotui/main/install.sh | bash
+> ```
+
 ### Manual Download
 
 Download the binary for your platform from [Releases](https://github.com/techniumlabs/adotui/releases):
