@@ -99,6 +99,7 @@ export const PipelineRunsView: React.FC<PipelineRunsViewProps> = ({
     } else {
       setRuns([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPr?.id]);
 
   // ── Keyboard ───────────────────────────────────────────────────────────────

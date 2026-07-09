@@ -13,14 +13,12 @@ import {
 } from "../../data/azure";
 import { resolvePrRefFromParts } from "../dataController";
 
-type AddToast = (msg: string, type?: "info" | "success" | "error") => void;
 type DoRefresh = (reason: "manual" | "auto" | "initial") => void;
 
 export function useConfirmAction(
   setState: Dispatch<SetStateAction<AppState>>,
   selectedPr: PullRequest | undefined,
   doRefresh: DoRefresh,
-  addToast: AddToast,
 ) {
   const transformPrById = (
     target: { organizationUrl: string; repository: string; prId: number },

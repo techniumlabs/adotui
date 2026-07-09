@@ -11,7 +11,11 @@ OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 
 if [ "$OS" = "linux" ]; then
-    TARGET="adotui-linux-x64"
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+        TARGET="adotui-linux-arm64"
+    else
+        TARGET="adotui-linux-x64"
+    fi
 elif [ "$OS" = "darwin" ]; then
     if [ "$ARCH" = "arm64" ]; then
         TARGET="adotui-macos-arm64"

@@ -39,13 +39,12 @@ describe("Adotui E2E Navigation", () => {
     const { stdin, lastFrame } = render(<App />);
     await delay(100);
 
-    let frame = lastFrame();
     // In our updated App, if the banner isn't explicitly set to Focus: tree on load,
     // we can just check it switches to Focus: list when tab is pressed.
     
     stdin.write("\t");
     await delay(50);
-    frame = lastFrame();
+    let frame = lastFrame();
     expect(frame).toInclude("Focus: list");
 
     stdin.write("l");

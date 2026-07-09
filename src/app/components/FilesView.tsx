@@ -501,16 +501,14 @@ export const FilesView: React.FC<FilesViewProps> = ({
           <Text color={palette.danger}>No files match the filter "{fileFilter}".</Text>
         ) : (
           flatFiles.map((file, idx) => {
-          let show = false;
-          if (flatFiles.length <= 5) {
-            show = true;
-          } else if (selectedFileIndex < 2) {
-            show = idx < 5;
-          } else if (selectedFileIndex >= flatFiles.length - 2) {
-            show = idx >= flatFiles.length - 5;
-          } else {
-            show = Math.abs(idx - selectedFileIndex) <= 2;
-          }
+          const show =
+            flatFiles.length <= 5
+              ? true
+              : selectedFileIndex < 2
+                ? idx < 5
+                : selectedFileIndex >= flatFiles.length - 2
+                  ? idx >= flatFiles.length - 5
+                  : Math.abs(idx - selectedFileIndex) <= 2;
           if (!show) return null;
 
           const isSelected = idx === selectedFileIndex;

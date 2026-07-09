@@ -140,6 +140,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
     } else {
       setThreads([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPr?.id]);
 
   // ── Actions ────────────────────────────────────────────────────────────────

@@ -28,22 +28,28 @@
   "scripts": {
     "build:cli": "bun run dev/build-cli.ts",
     "build:linux": "bun build ./src/main.tsx --compile --target=bun-linux-x64 --external react-devtools-core --outfile=dist/adotui-linux-x64",
+    "build:linux-arm": "bun build ./src/main.tsx --compile --target=bun-linux-arm64 --external react-devtools-core --outfile=dist/adotui-linux-arm64",
     "build:windows": "bun build ./src/main.tsx --compile --target=bun-windows-x64 --external react-devtools-core --outfile=dist/adotui-windows-x64.exe",
+    "build:windows-arm": "bun build ./src/main.tsx --compile --target=bun-windows-arm64 --external react-devtools-core --outfile=dist/adotui-windows-arm64.exe",
     "build:macos": "bun build ./src/main.tsx --compile --target=bun-darwin-x64 --external react-devtools-core --outfile=dist/adotui-macos-x64",
     "build:macos-arm": "bun build ./src/main.tsx --compile --target=bun-darwin-arm64 --external react-devtools-core --outfile=dist/adotui-macos-arm64",
-    "build:all-binaries": "bun run build:linux && bun run build:windows && bun run build:macos && bun run build:macos-arm",
+    "build:all-binaries": "bun run build:linux && bun run build:linux-arm && bun run build:windows && bun run build:windows-arm && bun run build:macos && bun run build:macos-arm",
     "dev": "NODE_ENV=debug bun run --watch src/main.tsx",
     "start": "bun run src/main.tsx",
     "typecheck": "bun x tsc -p tsconfig.json",
     "test": "bun test",
-    "lint": "bun x eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "bun x eslint . --max-warnings 0",
     "prepack": "bun run build:cli"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bun": "latest",
     "@types/react": "^19.2.17",
+    "eslint": "^10.6.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "ink-testing-library": "^4.0.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "^8.63.0"
   },
   "dependencies": {
     "@git-diff-view/cli": "^0.1.8",

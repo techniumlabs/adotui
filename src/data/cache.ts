@@ -67,7 +67,7 @@ export const readAppCache = async (): Promise<AppData | null> => {
     if (await file.exists()) {
       return (await file.json()) as AppData;
     }
-  } catch (err) {
+  } catch (_err) {
     // Ignore cache read errors (corrupted JSON, etc)
   }
   return null;
@@ -79,7 +79,7 @@ export const readAppCache = async (): Promise<AppData | null> => {
 export const writeAppCache = async (data: AppData): Promise<void> => {
   try {
     await Bun.write(APP_CACHE_FILE, JSON.stringify(data, null, 2));
-  } catch (err) {
+  } catch (_err) {
     // Silently ignore cache write errors
   }
 };

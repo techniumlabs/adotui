@@ -14,7 +14,6 @@ export function usePasteHandler(onPaste: (text: string) => void) {
     let isPasting = false;
     let pasteBuffer = "";
 
-    // @ts-ignore
     process.stdin.emit = (event: string, ...args: any[]) => {
       if (event === "data" && args[0] instanceof Buffer) {
         const data = args[0] as Buffer;

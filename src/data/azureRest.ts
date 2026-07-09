@@ -385,8 +385,7 @@ export const fetchPipelineRuns = async (
   organizationUrl: string,
   project: string,
 ): Promise<PipelineRun[]> => {
-  // `az pipelines runs list` is a first-class CLI command — prefer it over invoke.
-  let rows: RawRun[] = [];
+  let rows: RawRun[];
 
   try {
     rows = await runJson<RawRun[]>(

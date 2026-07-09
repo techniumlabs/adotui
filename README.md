@@ -14,6 +14,43 @@ Terminal UI for monitoring pull requests across multiple Azure DevOps organizati
 - Initial load + manual/auto refresh against Azure DevOps
 - Mock fallback for offline/demo use
 
+## Installation
+
+### Homebrew (macOS / Linux)
+
+```bash
+brew tap techniumlabs/adotui https://github.com/techniumlabs/adotui
+brew install adotui
+```
+
+### Shell Script (macOS / Linux)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/techniumlabs/adotui/main/install.sh | bash
+```
+
+### Manual Download
+
+Download the binary for your platform from [Releases](https://github.com/techniumlabs/adotui/releases):
+
+| Platform | Binary |
+|----------|--------|
+| Linux x64 | `adotui-linux-x64` |
+| Linux ARM64 | `adotui-linux-arm64` |
+| macOS x64 | `adotui-macos-x64` |
+| macOS ARM64 (Apple Silicon) | `adotui-macos-arm64` |
+| Windows x64 | `adotui-windows-x64.exe` |
+| Windows ARM64 | `adotui-windows-arm64.exe` |
+
+### From Source
+
+```bash
+git clone https://github.com/techniumlabs/adotui.git
+cd adotui
+bun install
+bun run start
+```
+
 ## Prerequisites
 
 1. [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed (`az`).

@@ -1,14 +1,10 @@
 import { useEffect, useMemo } from "react";
 import { produce } from "immer";
 import type { OrganizationNode, PullRequest } from "../../domain/types";
-import { DEFAULT_COMPLETION_OPTIONS, INITIAL_STATE } from "../constants";
-import type { AppState, CompletionOptions } from "../types";
 import { useAppStore } from "../store";
 import {
   countTotalPrs,
   countActivePrs,
-  openInBrowser,
-  parseCompletionCommand,
   getVisiblePrs,
 } from "../utils";
 import { useToast } from "./useToast";
@@ -48,7 +44,7 @@ export function useAppState(exitApp: () => void) {
   const activePrs = useMemo(() => countActivePrs(state.data), [state.data]);
 
   const selection = useSelection(setState);
-  const { armConfirm, runConfirmedAction } = useConfirmAction(setState, selectedPr, doRefresh, addToast);
+  const { armConfirm, runConfirmedAction } = useConfirmAction(setState, selectedPr, doRefresh);
   const { openCompletionEditor, submitCompletion } = useCompletionEditor(setState, armConfirm);
   const { executeCommand } = useCommandDispatch(setState, selectedPr, doRefresh, armConfirm, openCompletionEditor, exitApp);
 

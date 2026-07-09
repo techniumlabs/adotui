@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { produce } from "immer";
 import { INITIAL_STATE } from "./constants";
 import type { AppState } from "./types";
 

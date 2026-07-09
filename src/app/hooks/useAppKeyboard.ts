@@ -12,7 +12,7 @@ import { handleFiles } from "./keyboard/filesKeyboard";
 type AppHandle = ReturnType<typeof useAppState>;
 
 export function useAppKeyboard(app: AppHandle, exitApp: () => void) {
-  const { state, setState, selectedPr, actions } = app;
+  const { state, setState, actions } = app;
 
   useInput((input, key) => {
     // 1. Ctrl+C always exits immediately

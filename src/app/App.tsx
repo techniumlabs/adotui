@@ -173,7 +173,6 @@ export const App: React.FC = () => {
         focus={state.focus}
         commandText={state.commandText}
         pendingConfirm={state.pendingConfirm}
-        hasSelectedPr={!!selectedPr}
       />
 
       {/* Unified Footer */}
