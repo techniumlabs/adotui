@@ -69,6 +69,17 @@ export function useCommandDispatch(
       setState((c) => ({ ...c, focus: "files", commandText: "", fileFilter: "", banner: "File filter cleared." }));
       return;
     }
+    if (command === "reset" || command === "clear") {
+      setState((c) => ({
+        ...c,
+        focus: "list",
+        commandText: "",
+        treeFilter: "all",
+        fileFilter: "",
+        banner: "All filters reset.",
+      }));
+      return;
+    }
     if (command.startsWith("complete")) {
       openCompletionEditor(parseCompletionCommand(rawCommand));
       return;
