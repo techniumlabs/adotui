@@ -23,7 +23,7 @@ brew tap techniumlabs/adotui https://github.com/techniumlabs/adotui
 brew install adotui
 ```
 
-### Shell Script (macOS / Linux)
+### Shell Script (macOS / Linux / Windows Git Bash)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/techniumlabs/adotui/main/install.sh | bash
