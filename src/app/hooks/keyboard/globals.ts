@@ -14,8 +14,12 @@ export function handleGlobals(
 
   if (key.tab) {
     setState((current) => {
-      const nextIndex = (FOCUS_ORDER.indexOf(current.focus) + 1) % FOCUS_ORDER.length;
-      const nextFocus = FOCUS_ORDER[nextIndex] ?? "tree";
+      let nextIndex = (FOCUS_ORDER.indexOf(current.focus) + 1) % FOCUS_ORDER.length;
+      let nextFocus = FOCUS_ORDER[nextIndex] ?? "tree";
+      if (nextFocus === "runs" && process.env.NODE_ENV !== "debug") {
+        nextIndex = (nextIndex + 1) % FOCUS_ORDER.length;
+        nextFocus = FOCUS_ORDER[nextIndex] ?? "tree";
+      }
       const resolved = nextFocus === "command" ? "tree" : nextFocus;
       const fileFilter = current.focus === "files" && resolved !== "files" ? "" : current.fileFilter;
       return { ...current, focus: resolved, fileFilter, banner: `Focus: ${resolved}` };
@@ -27,7 +31,12 @@ export function handleGlobals(
     if (input === "1") { setState((c) => ({ ...c, focus: "detail", fileFilter: "", banner: "Focus: Overview" })); return true; }
     if (input === "2") { setState((c) => ({ ...c, focus: "files", selectedFileIndex: 0, diffScrollOffset: 0, banner: "Focus: Diff" })); return true; }
     if (input === "3") { setState((c) => ({ ...c, focus: "comments", fileFilter: "", banner: "Focus: Comments" })); return true; }
-    if (input === "4") { setState((c) => ({ ...c, focus: "runs", fileFilter: "", banner: "Focus: Pipelines" })); return true; }
+    if (input === "4") {
+      if (process.env.NODE_ENV === "debug") {
+        setState((c) => ({ ...c, focus: "runs", fileFilter: "", banner: "Focus: Pipelines" }));
+      }
+      return true;
+    }
 
     if (input === "h" && ["detail", "files", "comments", "runs"].includes(state.focus)) {
       setState((c) => ({ ...c, focus: "list", fileFilter: "", banner: "Focus: list" })); return true;

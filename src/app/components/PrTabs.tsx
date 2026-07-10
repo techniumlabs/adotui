@@ -22,7 +22,7 @@ export const PrTabs: React.FC<PrTabsProps> = ({ focus }) => {
     { id: "detail", label: "Overview", shortcut: "1" },
     { id: "files", label: "Diff", shortcut: "2" },
     { id: "comments", label: "Comments", shortcut: "3" },
-    { id: "runs", label: "Pipelines", shortcut: "4" },
+    ...(process.env.NODE_ENV === "debug" ? [{ id: "runs", label: "Pipelines", shortcut: "4" }] : []),
   ];
 
   return (

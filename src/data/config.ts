@@ -26,6 +26,8 @@ export interface AdoConfig {
   reviewer?: string;
   /** Limit to PRs created by the given user. */
   creator?: string;
+  /** Azure DevOps personal access token (optional). */
+  pat?: string;
 }
 
 export type ConfigResult =
@@ -177,6 +179,7 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
     top,
     ...(typeof record.reviewer === "string" ? { reviewer: record.reviewer } : {}),
     ...(typeof record.creator === "string" ? { creator: record.creator } : {}),
+    ...(typeof record.pat === "string" ? { pat: record.pat } : {}),
   };
 
   return { ok: true, config, source };

@@ -51,6 +51,10 @@ export const loadInitialData = async (allowCache = false, onProgress?: (msg: str
     };
   }
 
+  if (configResult.config.pat) {
+    process.env.AZURE_DEVOPS_EXT_PAT = configResult.config.pat;
+  }
+
   if (allowCache) {
     const cachedData = await readAppCache();
     if (cachedData) {

@@ -168,7 +168,9 @@ export const App: React.FC = () => {
                 }
                 
                 if (renderFocus === "runs") {
-                  return <PipelineRunsView selectedPr={selectedPr} focus={state.focus} />;
+                  if (process.env.NODE_ENV === "debug") {
+                    return <PipelineRunsView selectedPr={selectedPr} focus={state.focus} />;
+                  }
                 }
                 
                 return <PrDetails selectedPr={selectedPr} focus={state.focus} />;

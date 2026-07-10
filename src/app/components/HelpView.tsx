@@ -19,7 +19,19 @@ export const HelpView: React.FC = () => {
           </Box>
           <Box flexDirection="column" marginBottom={1}>
             <Text><Text color={palette.accent} bold>Tab  </Text> Cycle focus between panes</Text>
-            <Text><Text color={palette.accent} bold>1-4  </Text> Switch to Details(1), Diff(2), Comments(3), Runs(4)</Text>
+            <Text>
+              {process.env.NODE_ENV === "debug" ? (
+                <>
+                  <Text color={palette.accent} bold>1-4  </Text>
+                  Switch to Details(1), Diff(2), Comments(3), Runs(4)
+                </>
+              ) : (
+                <>
+                  <Text color={palette.accent} bold>1-3  </Text>
+                  Switch to Details(1), Diff(2), Comments(3)
+                </>
+              )}
+            </Text>
             <Text><Text color={palette.accent} bold>?    </Text> Toggle this help screen</Text>
             <Text><Text color={palette.accent} bold>q    </Text> Quit application</Text>
             <Text><Text color={palette.accent} bold>r    </Text> Manual refresh</Text>

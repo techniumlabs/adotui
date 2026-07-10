@@ -58,9 +58,21 @@ export const CommandBar: React.FC<CommandBarProps> = ({
         {commandMode ? ":" : glyph.dot}{" "}
       </Text>
       <Text color={commandMode ? palette.textBright : palette.muted}>
-        {commandMode
-          ? commandText || "type a command (filter, help, refresh, approve, abandon, complete…)"
-          : "Press / to filter or run commands"}
+        {commandMode ? (
+          commandText ? (
+            <>
+              {commandText}
+              <Text color={palette.accent}>▌</Text>
+            </>
+          ) : (
+            <>
+              <Text color={palette.accent}>▌</Text>
+              <Text color={palette.muted}>type a command (filter, help, refresh, approve, abandon, complete…)</Text>
+            </>
+          )
+        ) : (
+          "Press / to filter or run commands"
+        )}
       </Text>
     </Box>
   );

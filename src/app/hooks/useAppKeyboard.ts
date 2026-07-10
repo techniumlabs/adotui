@@ -14,14 +14,11 @@ type AppHandle = ReturnType<typeof useAppState>;
 export function useAppKeyboard(app: AppHandle, exitApp: () => void) {
   const { state, setState, actions } = app;
 
-  useInput((input, key) => {
-    // 1. Ctrl+C always exits immediately
-    if (key.ctrl && input === "c") { exitApp(); process.exit(0); return; }
-
-    // Bypass shortcuts if we are on the initial setup screen
-    if (state.loadState === "setup") {
-      return;
-    }
+  useInput(
+    (input, key) => {
+      // 1. Ctrl+C always exits immediately
+      if (key.ctrl && input === "c") { exitApp(); process.exit(0); return; }
+    
 
     // 2. Confirmation gate — awaiting y/n for a destructive action
     if (state.pendingConfirm) {
@@ -55,5 +52,7 @@ export function useAppKeyboard(app: AppHandle, exitApp: () => void) {
     if (state.focus === "detail") { handleDetail(input, key, app, exitApp); return; }
     if (state.focus === "files")  { handleFiles(input, key, app, exitApp); return; }
     // "comments" and "runs" — handled by their own internal components; globals guard is enough
-  });
+    },
+    { isActive: state.loadState !== "setup" }
+  );
 }
