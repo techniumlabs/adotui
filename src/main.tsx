@@ -1,25 +1,10 @@
 import { render } from "ink";
 import { App } from "./app/App";
-import { readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import pkg from "../package.json";
 
-/** Read the version from the nearest package.json. */
+/** Get the version from package.json. */
 const getVersion = (): string => {
-  try {
-    // In compiled binaries, __dirname points to the bundle root.
-    // Walk up from this file's directory to find package.json.
-    let dir = dirname(new URL(import.meta.url).pathname);
-    for (let i = 0; i < 5; i++) {
-      try {
-        const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8"));
-        if (pkg.version) return pkg.version;
-      } catch { /* not found at this level, keep walking */ }
-      dir = dirname(dir);
-    }
-    return "0.0.0-unknown";
-  } catch {
-    return "0.0.0-unknown";
-  }
+  return pkg.version || "0.0.0-unknown";
 };
 
 const HELP_TEXT = `
