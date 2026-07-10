@@ -389,6 +389,9 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  const terminalHeight = process.stdout.rows ?? 40;
+  const viewportH = Math.max(5, terminalHeight - 22);
+
   return (
     <Box
       marginTop={1}
@@ -406,43 +409,58 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         <Text color={active ? palette.accent : palette.muted} bold>
           {glyph.dot} Comments
         </Text>
-        <Text color={palette.muted}>
+        <Box>
           {loading ? (
             <Text color={palette.muted}>
               <Spinner type="dots" /> loading…
             </Text>
           ) : (
-            `${threads.length > 0 ? selectedThread + 1 : 0}/${threads.length} thread${threads.length !== 1 ? "s" : ""} (${threads.reduce((acc, t) => acc + t.comments.length, 0)} comment${threads.reduce((acc, t) => acc + t.comments.length, 0) !== 1 ? "s" : ""})`
+            <Text color={palette.muted}>
+              {threads.length > 0 ? selectedThread + 1 : 0}/{threads.length} thread{threads.length !== 1 ? "s" : ""} ({threads.reduce((acc, t) => acc + t.comments.length, 0)} comment{threads.reduce((acc, t) => acc + t.comments.length, 0) !== 1 ? "s" : ""})
+            </Text>
           )}
-        </Text>
+        </Box>
       </Box>
 
       {/* Status / error */}
-      {(statusMsg ?? error) ? (
-        <Text color={error ? palette.danger : palette.warn}>
-          {statusMsg ?? error}
-        </Text>
-      ) : submitting ? (
-        <Text color={palette.accent}>
-          <Spinner type="dots" /> processing...
-        </Text>
-      ) : null}
+      <Box height={1}>
+        {(statusMsg ?? error) ? (
+          <Text color={error ? palette.danger : palette.warn}>
+            {statusMsg ?? error}
+          </Text>
+        ) : submitting ? (
+          <Text color={palette.accent}>
+            <Spinner type="dots" /> processing...
+          </Text>
+        ) : null}
+      </Box>
 
       {/* No PR selected */}
       {!selectedPr && (
-        <Text color={palette.muted}>Select a PR to view comments.</Text>
+        <Box height={viewportH} justifyContent="center" alignItems="center" flexDirection="column">
+          <Text color={palette.muted}>Select a PR to view comments.</Text>
+        </Box>
       )}
 
-      {/* Thread list */}
+      {/* Loading state when empty */}
+      {selectedPr && loading && threads.length === 0 && (
+        <Box height={viewportH} justifyContent="center" alignItems="center" flexDirection="column">
+          <Text color={palette.accent}>
+            <Spinner type="dots" /> Loading comments...
+          </Text>
+        </Box>
+      )}
+
+      {/* Empty state */}
       {selectedPr && !loading && threads.length === 0 && !error && (
-        <Text color={palette.muted}>No comments yet.</Text>
+        <Box height={viewportH} justifyContent="center" alignItems="center" flexDirection="column">
+          <Text color={palette.muted}>No comments yet.</Text>
+        </Box>
       )}
 
       {(() => {
-        const terminalHeight = process.stdout.rows ?? 40;
-        const viewportH = Math.max(5, terminalHeight - 22);
         const maxVis = Math.max(4, Math.floor(viewportH / 5));
-        
+
         const total = threads.length;
         const clampedOffset = Math.max(0, Math.min(threadScrollOffset, total - maxVis));
         const visibleThreads = threads.slice(clampedOffset, clampedOffset + maxVis);
@@ -462,82 +480,122 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
                 const replyCount = thread.comments.length - 1;
 
                 return (
-                <Box
-                  key={thread.id}
-                  flexDirection="column"
-                  marginTop={1}
-                  borderStyle={isSelected ? "round" : undefined}
-                  borderColor={isSelected ? palette.accent : undefined}
-                  paddingX={isSelected ? 1 : 0}
-                >
-                  {/* Thread header */}
-                  <Box>
-                    <Text color={isSelected ? palette.accent : palette.muted}>
-                      {isSelected ? glyph.pointer : glyph.pointerIdle}{" "}
-                    </Text>
-                    <Text color={threadStatusColor(thread.status)}>
-                      [{threadStatusLabel(thread.status)}]{"  "}
-                    </Text>
-                    {thread.filePath && (
-                      <Text color={palette.info}>
-                        {truncate(thread.filePath, 35)}
-                        {thread.lineNumber ? `:${thread.lineNumber}` : ""}
-                        {"  "}
+                  <Box
+                    key={thread.id}
+                    flexDirection="column"
+                    flexShrink={0}
+                    marginTop={1}
+                    borderStyle={isSelected ? "round" : undefined}
+                    borderColor={isSelected ? palette.accent : undefined}
+                    paddingX={isSelected ? 1 : 0}
+                  >
+                    {/* Thread header */}
+                    <Box>
+                      <Text color={isSelected ? palette.accent : palette.muted}>
+                        {isSelected ? glyph.pointer : glyph.pointerIdle}{" "}
                       </Text>
-                    )}
-                    <Text color={palette.muted}>
-                      {thread.comments.length} comment{thread.comments.length !== 1 ? "s" : ""}
-                    </Text>
-                  </Box>
-
-                  {/* First comment preview */}
-                  {firstComment && (
-                    <Box marginLeft={2} flexDirection="column">
-                      <Box>
-                        <Text color={palette.textBright} bold inverse={isSelected && selectedCommentIndex === -1}>
-                          {isSelected && selectedCommentIndex === -1 ? "> " : ""}
-                          {firstComment.author}
-                        </Text>
-                        <Text color={palette.muted}>
-                          {"  "}{formatRelativeAge(firstComment.publishedDate)}
-                        </Text>
-                      </Box>
-                      <Text color={palette.text} wrap="wrap">
-                        {truncate(firstComment.content, 72)}
+                      <Text color={threadStatusColor(thread.status)}>
+                        [{threadStatusLabel(thread.status)}]{"  "}
                       </Text>
-                      {/* Show all replies when thread is selected */}
-                      {isSelected &&
-                        thread.comments.slice(1).map((reply, index) => {
-                          const isReplySelected = selectedCommentIndex === index;
-                          return (
-                            <Box key={reply.id} marginTop={1} flexDirection="column">
-                              <Box>
-                                <Text color={palette.accentDim} bold inverse={isReplySelected}>
-                                  {isReplySelected ? "> ↳ " : "↳ "}
-                                  {reply.author}
-                                </Text>
-                                <Text color={palette.muted}>
-                                  {"  "}{formatRelativeAge(reply.publishedDate)}
-                                </Text>
-                              </Box>
-                              <Text color={palette.text} wrap="wrap">
-                                {truncate(reply.content, 68)}
-                              </Text>
-                            </Box>
-                          );
-                        })}
-                      {!isSelected && replyCount > 0 && (
-                        <Text color={palette.muted}>
-                          {"  "}↳ {replyCount} repl{replyCount !== 1 ? "ies" : "y"}
+                      {thread.filePath && (
+                        <Text color={palette.info}>
+                          {truncate(thread.filePath, 35)}
+                          {thread.lineNumber ? `:${thread.lineNumber}` : ""}
+                          {"  "}
                         </Text>
                       )}
+                      <Text color={palette.muted}>
+                        {thread.comments.length} comment{thread.comments.length !== 1 ? "s" : ""}
+                      </Text>
                     </Box>
-                  )}
-                </Box>
-              );
-            })}
+
+                    {/* First comment preview */}
+                    {firstComment && (
+                      <Box marginLeft={2} flexDirection="column">
+                        <Box>
+                          <Text color={palette.textBright} bold inverse={isSelected && selectedCommentIndex === -1}>
+                            {isSelected && selectedCommentIndex === -1 ? "> " : ""}
+                            {firstComment.author}
+                          </Text>
+                          <Text color={palette.muted}>
+                            {"  "}{formatRelativeAge(firstComment.publishedDate)}
+                          </Text>
+                        </Box>
+                        <Box flexShrink={0}>
+                          <Text color={palette.text} wrap="wrap">
+                            {truncate(firstComment.content, 72)}
+                          </Text>
+                        </Box>
+                        {/* Show bordered replies box when thread is selected */}
+                        {isSelected && replyCount > 0 && (() => {
+                          const visibleRepliesCount = 4;
+                          let replyOffset = 0;
+                          if (replyCount > visibleRepliesCount) {
+                            if (selectedCommentIndex > 1) {
+                              replyOffset = Math.min(selectedCommentIndex - 1, replyCount - visibleRepliesCount);
+                            }
+                          }
+                          const visibleReplies = thread.comments.slice(1).slice(replyOffset, replyOffset + visibleRepliesCount);
+
+                          return (
+                            <Box
+                              marginTop={0.25}
+                              borderStyle="single"
+                              borderColor={palette.border}
+                              borderBottom={false}
+                              borderLeft={false}
+                              borderRight={false}
+                              flexDirection="column"
+                              flexShrink={0}
+                            // paddingX={1}
+                            >
+                              <Box justifyContent="space-between">
+                                <Text color={palette.muted}>Replies</Text>
+                                <Text color={palette.accentDim}>{Math.max(0, selectedCommentIndex + 1)}/{replyCount}</Text>
+                              </Box>
+                              <Box flexDirection="column" marginTop={1} paddingLeft={1}>
+                                {visibleReplies.map((reply, visIndex) => {
+                                  const index = replyOffset + visIndex;
+                                  const isReplySelected = selectedCommentIndex === index;
+                                  return (
+                                    <Box key={reply.id} marginTop={visIndex === 0 ? 0 : 1} flexDirection="column" flexShrink={0}>
+                                      <Box>
+                                        <Text color={palette.accentDim} bold inverse={isReplySelected}>
+                                          {isReplySelected ? "> ↳ " : "↳ "}
+                                          {reply.author}
+                                        </Text>
+                                        <Text color={palette.muted}>
+                                          {"  "}{formatRelativeAge(reply.publishedDate)}
+                                        </Text>
+                                      </Box>
+                                      <Box flexShrink={0}>
+                                        <Text color={palette.text} wrap="wrap">
+                                          {truncate(reply.content, 64)}
+                                        </Text>
+                                      </Box>
+                                    </Box>
+                                  );
+                                })}
+                              </Box>
+                            </Box>
+                          );
+                        })()}
+
+                        {/* Show simple reply indicator when thread is not selected */}
+                        {!isSelected && replyCount > 0 && (
+                          <Box flexShrink={0}>
+                            <Text color={palette.muted}>
+                              {"  "}↳ {replyCount} repl{replyCount !== 1 ? "ies" : "y"}
+                            </Text>
+                          </Box>
+                        )}
+                      </Box>
+                    )}
+                  </Box>
+                );
+              })}
             </Box>
-            
+
             {/* Scroll indicators at bottom edge */}
             {(canScrollUp || canScrollDown) && (
               <Box justifyContent="flex-end" marginTop={0}>
