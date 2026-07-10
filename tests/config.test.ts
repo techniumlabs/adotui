@@ -44,6 +44,22 @@ describe("Config validation", () => {
     }
   });
 
+  test("valid config with optional project name", async () => {
+    const configPath = writeConfig("optional-project.json", {
+      projects: [
+        { organization: "https://dev.azure.com/contoso" },
+      ],
+    });
+    process.env.ADOTUI_CONFIG = configPath;
+    const result = await loadConfig();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.config.projects).toHaveLength(1);
+      expect(result.config.projects[0]?.organization).toBe("https://dev.azure.com/contoso");
+      expect(result.config.projects[0]?.project).toBeUndefined();
+    }
+  });
+
   test("valid config with org shorthand", async () => {
     const configPath = writeConfig("shorthand.json", {
       projects: [

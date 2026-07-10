@@ -1,19 +1,19 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { palette, glyph } from "../theme";
-import { writeConfig } from "../../data/config";
+import { writeConfig, loadConfig } from "../../data/config";
 import type { AdoProjectConfig } from "../../data/config";
 
 interface SetupScreenProps {
   onComplete: () => void;
 }
 
-type ScreenMode = "list" | "add" | "pat";
+type ScreenMode = "list" | "add" | "pat" | "help";
 type AddField = "org" | "project" | "repos" | "submit" | "cancel";
 type PatField = "input" | "submit" | "cancel";
 
 interface SetupMenuItem {
-  type: "project" | "add" | "pat" | "save" | "exit";
+  type: "project" | "add" | "pat" | "save" | "exit" | "help";
   projectIndex?: number;
   label: string;
 }
@@ -31,6 +31,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
   const [project, setProject] = useState("");
   const [repos, setRepos] = useState("");
   const [addActiveField, setAddActiveField] = useState<AddField>("org");
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   // PAT Token State
   const [pat, setPat] = useState("");
@@ -39,13 +40,28 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    const fetchExistingConfig = async () => {
+      const res = await loadConfig();
+      if (res.ok) {
+        if (res.config.projects) {
+          setProjects(res.config.projects);
+        }
+        if (res.config.pat) {
+          setPat(res.config.pat);
+        }
+      }
+    };
+    void fetchExistingConfig();
+  }, []);
+
   // Build list of menu items dynamically
   const menuItems: SetupMenuItem[] = [];
   projects.forEach((proj, idx) => {
     menuItems.push({
       type: "project",
       projectIndex: idx,
-      label: `${proj.project} (${proj.organization})`,
+      label: `${proj.project || "All Projects"} (${proj.organization})`,
     });
   });
   menuItems.push({ type: "add", label: "+ Add New Project" });
@@ -53,6 +69,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
     type: "pat",
     label: `🔑 Configure PAT Token (optional)${pat ? ` [Set: ...${pat.slice(-4)}]` : ""}`,
   });
+  menuItems.push({ type: "help", label: "❓ Keyboard & CLI Help" });
   if (projects.length > 0) {
     menuItems.push({ type: "save", label: "✓ Save & Load Configuration" });
   }
@@ -66,6 +83,12 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
       }
 
       if (isSubmitting) return;
+
+      if (mode === "help") {
+        setMode("list");
+        setError(null);
+        return;
+      }
 
       if (mode === "list") {
         // Navigation in the list of items
@@ -90,11 +113,25 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
             setOrg("");
             setProject("");
             setRepos("");
+            setEditingIndex(null);
+            setAddActiveField("org");
+            setError(null);
+          } else if (currentItem.type === "project") {
+            const idx = currentItem.projectIndex!;
+            const proj = projects[idx]!;
+            setOrg(proj.organization);
+            setProject(proj.project || "");
+            setRepos(proj.repositories?.join(", ") || "");
+            setEditingIndex(idx);
+            setMode("add");
             setAddActiveField("org");
             setError(null);
           } else if (currentItem.type === "pat") {
             setMode("pat");
             setPatActiveField("input");
+            setError(null);
+          } else if (currentItem.type === "help") {
+            setMode("help");
             setError(null);
           } else if (currentItem.type === "save") {
             void handleSubmit();
@@ -161,6 +198,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
           } else if (addActiveField === "cancel") {
             setMode("list");
             setSelectedIndex(0);
+            setEditingIndex(null);
             setError(null);
           }
           return;
@@ -246,11 +284,6 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
       setAddActiveField("org");
       return;
     }
-    if (!trimmedProject) {
-      setError("Project Name cannot be empty.");
-      setAddActiveField("project");
-      return;
-    }
     if (!trimmedOrg.startsWith("http://") && !trimmedOrg.startsWith("https://")) {
       setError("Organization URL must start with http:// or https://");
       setAddActiveField("org");
@@ -264,15 +297,21 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
           .filter(Boolean)
       : undefined;
 
-    setProjects((prev) => [
-      ...prev,
-      {
+    setProjects((prev) => {
+      const updated = {
         organization: trimmedOrg,
-        project: trimmedProject,
+        ...(trimmedProject ? { project: trimmedProject } : {}),
         ...(reposList && reposList.length > 0 ? { repositories: reposList } : {}),
-      },
-    ]);
+      };
+      if (editingIndex !== null) {
+        const copy = [...prev];
+        copy[editingIndex] = updated;
+        return copy;
+      }
+      return [...prev, updated];
+    });
 
+    setEditingIndex(null);
     setMode("list");
     setSelectedIndex(0);
     setError(null);
@@ -294,6 +333,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
         projects,
         ...(pat.trim() ? { pat: pat.trim() } : {}),
       });
+      delete process.env.ADOTUI_FORCE_SETUP;
       onComplete();
     } catch (e) {
       setIsSubmitting(false);
@@ -339,7 +379,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
                   <Text color={isSelected ? palette.textBright : palette.text}>
                     {isSelected ? `${glyph.pointer} ` : "  "}
                     <Text color={palette.accent} bold>
-                      {proj.project}
+                      {proj.project || "All Projects"}
                     </Text>{" "}
                     ({proj.organization})
                   </Text>
@@ -382,7 +422,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
       <Box flexDirection="column" width={60}>
         <Box justifyContent="center" marginBottom={1}>
           <Text color={palette.accent} bold>
-            {glyph.added} ADD NEW PROJECT
+            {editingIndex !== null ? "✏ EDIT PROJECT" : `${glyph.added} ADD NEW PROJECT`}
           </Text>
         </Box>
 
@@ -419,7 +459,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
         {/* Project Name Field */}
         <Box flexDirection="column" marginBottom={1}>
           <Text color={addActiveField === "project" ? palette.accent : palette.text} bold>
-            {addActiveField === "project" ? `${glyph.pointer} ` : "  "}Project Name:
+            {addActiveField === "project" ? `${glyph.pointer} ` : "  "}Project Name (optional):
           </Text>
           <Box
             borderStyle="single"
@@ -436,11 +476,11 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
                 ) : (
                   <>
                     <Text color={palette.accent}>▌</Text>
-                    <Text color={palette.muted}>MyProject</Text>
+                    <Text color={palette.muted}>All Projects</Text>
                   </>
                 )
               ) : (
-                project || "MyProject"
+                project || "All Projects"
               )}
             </Text>
           </Box>
@@ -484,7 +524,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
               bold={addActiveField === "submit"}
               inverse={addActiveField === "submit"}
             >
-              {"  "}[ Add Project ]{"  "}
+              {"  "}[ {editingIndex !== null ? "Save Changes" : "Add Project"} ]{"  "}
             </Text>
           </Box>
           <Box>
@@ -571,12 +611,61 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
     );
   };
 
+  const renderHelpMode = () => {
+    return (
+      <Box flexDirection="column" width={60}>
+        <Box justifyContent="center" marginBottom={1}>
+          <Text color={palette.accent} bold>
+            ❓ HELP & KEYBOARD SHORTCUTS
+          </Text>
+        </Box>
+
+        <Box
+          flexDirection="column"
+          borderStyle="single"
+          borderColor={palette.border}
+          paddingX={2}
+          paddingY={1}
+          marginBottom={1}
+        >
+          <Box flexDirection="row" marginBottom={1}>
+            <Text color={palette.accent} bold>Navigation : </Text>
+            <Text color={palette.text}>Tab / Shift+Tab or Arrow keys</Text>
+          </Box>
+          <Box flexDirection="row" marginBottom={1}>
+            <Text color={palette.accent} bold>Select/Edit: </Text>
+            <Text color={palette.text}>Enter (on menu items or form fields)</Text>
+          </Box>
+          <Box flexDirection="row" marginBottom={1}>
+            <Text color={palette.accent} bold>Delete Proj: </Text>
+            <Text color={palette.text}>Delete or Backspace (in List mode)</Text>
+          </Box>
+          <Box flexDirection="row" marginBottom={1}>
+            <Text color={palette.accent} bold>Text Input : </Text>
+            <Text color={palette.text}>Type characters directly; Backspace to erase</Text>
+          </Box>
+          <Box flexDirection="row">
+            <Text color={palette.accent} bold>Quit Wizard: </Text>
+            <Text color={palette.text}>Ctrl+C (any time)</Text>
+          </Box>
+        </Box>
+
+        <Box flexDirection="column" alignItems="center" marginTop={1}>
+          <Text color={palette.textBright} inverse>  Press any key to return  </Text>
+        </Box>
+      </Box>
+    );
+  };
+
   // Helper to build instructions for footer dynamically
   const getInstructions = () => {
+    if (mode === "help") {
+      return "Press any key to return to the menu";
+    }
     if (mode === "list") {
       const currentItem = menuItems[selectedIndex];
       if (currentItem && currentItem.type === "project") {
-        return "Press Tab/Arrows to navigate · Delete/Backspace to remove project · Enter to select · Ctrl+C to quit";
+        return "Press Tab/Arrows to navigate · Delete/Backspace to remove project · Enter to edit project · Ctrl+C to quit";
       }
       return "Press Tab/Arrows to navigate · Enter to select · Ctrl+C to quit";
     }
@@ -586,6 +675,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
   const renderContent = () => {
     if (mode === "list") return renderListMode();
     if (mode === "add") return renderAddMode();
+    if (mode === "help") return renderHelpMode();
     return renderPatMode();
   };
 

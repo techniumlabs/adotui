@@ -53,8 +53,8 @@ export function useRefresh(
           const nextRepo = nextOrg?.repositories[nextRepoIndex];
           const nextVisible = getVisiblePrs(nextRepo, current.treeFilter);
           
-          const isMissingConfig = !result.ok && result.errorType === "missing";
-          const nextLoadState = result.ok ? "ready" : (isMissingConfig ? "setup" : "error");
+          const isMissingConfig = (!result.ok && result.errorType === "missing") || process.env.ADOTUI_FORCE_SETUP === "1";
+          const nextLoadState = isMissingConfig ? "setup" : (result.ok ? "ready" : "error");
 
           return {
             ...current,
@@ -65,9 +65,11 @@ export function useRefresh(
             lastRefreshISO: new Date().toISOString(),
             loadState: nextLoadState,
             banner: result.ok
-              ? reason === "auto"
-                ? `Auto-refresh synced. ${result.banner}`
-                : result.banner
+              ? (isMissingConfig
+                ? "Welcome to the configuration setup wizard!"
+                : (reason === "auto"
+                  ? `Auto-refresh synced. ${result.banner}`
+                  : result.banner))
               : isMissingConfig
                 ? "No configuration found. Welcome to initial setup!"
                 : "Failed to load data. See toast for details.",

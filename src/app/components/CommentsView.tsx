@@ -72,6 +72,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedThread, setSelectedThread] = useState(0);
   const [selectedCommentIndex, setSelectedCommentIndex] = useState(-1);
+  const [threadScrollOffset, setThreadScrollOffset] = useState(0);
   const [inputMode, setInputMode] = useState<CommentInputMode>("none");
   const [inputText, setInputText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -218,10 +219,10 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
 
   // ── Keyboard ───────────────────────────────────────────────────────────────
 
-  const stateRef = useRef({ threads, selectedThread, selectedCommentIndex });
+  const stateRef = useRef({ threads, selectedThread, selectedCommentIndex, threadScrollOffset });
   useEffect(() => {
-    stateRef.current = { threads, selectedThread, selectedCommentIndex };
-  }, [threads, selectedThread, selectedCommentIndex]);
+    stateRef.current = { threads, selectedThread, selectedCommentIndex, threadScrollOffset };
+  }, [threads, selectedThread, selectedCommentIndex, threadScrollOffset]);
 
   useInput(
     (input, key) => {
@@ -253,14 +254,55 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         setSelectedThread((i) => {
           const next = Math.min(i + 1, stateRef.current.threads.length - 1);
           if (next !== i) setSelectedCommentIndex(-1);
+          const termH = process.stdout.rows ?? 40;
+          const maxVis = Math.max(4, Math.floor((Math.max(5, termH - 22)) / 5));
+          if (next >= stateRef.current.threadScrollOffset + maxVis) {
+            setThreadScrollOffset(next - maxVis + 1);
+          }
           return next;
         });
       } else if (input === "k" || key.upArrow) {
         setSelectedThread((i) => {
           const next = Math.max(i - 1, 0);
           if (next !== i) setSelectedCommentIndex(-1);
+          if (next < stateRef.current.threadScrollOffset) {
+            setThreadScrollOffset(next);
+          }
           return next;
         });
+      } else if (key.pageDown) {
+        setSelectedThread((i) => {
+          const termH = process.stdout.rows ?? 40;
+          const maxVis = Math.max(4, Math.floor((Math.max(5, termH - 22)) / 5));
+          const next = Math.min(i + maxVis, stateRef.current.threads.length - 1);
+          setSelectedCommentIndex(-1);
+          if (next >= stateRef.current.threadScrollOffset + maxVis) {
+            setThreadScrollOffset(Math.min(next - maxVis + 1, stateRef.current.threads.length - maxVis));
+          }
+          return next;
+        });
+      } else if (key.pageUp) {
+        setSelectedThread((i) => {
+          const termH = process.stdout.rows ?? 40;
+          const maxVis = Math.max(4, Math.floor((Math.max(5, termH - 22)) / 5));
+          const next = Math.max(i - maxVis, 0);
+          setSelectedCommentIndex(-1);
+          if (next < stateRef.current.threadScrollOffset) {
+            setThreadScrollOffset(Math.max(next, 0));
+          }
+          return next;
+        });
+      } else if (input === "g") {
+        setSelectedThread(0);
+        setSelectedCommentIndex(-1);
+        setThreadScrollOffset(0);
+      } else if (input === "G") {
+        const last = Math.max(0, stateRef.current.threads.length - 1);
+        const termH = process.stdout.rows ?? 40;
+        const maxVis = Math.max(4, Math.floor((Math.max(5, termH - 22)) / 5));
+        setSelectedThread(last);
+        setSelectedCommentIndex(-1);
+        setThreadScrollOffset(Math.max(0, last - maxVis + 1));
       } else if (input === "[" || key.leftArrow) {
         setSelectedCommentIndex((i) => Math.max(i - 1, -1));
       } else if (input === "]" || key.rightArrow) {
@@ -370,7 +412,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
               <Spinner type="dots" /> loading…
             </Text>
           ) : (
-            `${threads.length} thread${threads.length !== 1 ? "s" : ""} (${threads.reduce((acc, t) => acc + t.comments.length, 0)} comment${threads.reduce((acc, t) => acc + t.comments.length, 0) !== 1 ? "s" : ""})`
+            `${threads.length > 0 ? selectedThread + 1 : 0}/${threads.length} thread${threads.length !== 1 ? "s" : ""} (${threads.reduce((acc, t) => acc + t.comments.length, 0)} comment${threads.reduce((acc, t) => acc + t.comments.length, 0) !== 1 ? "s" : ""})`
           )}
         </Text>
       </Box>
@@ -396,86 +438,119 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         <Text color={palette.muted}>No comments yet.</Text>
       )}
 
-      {threads.map((thread, idx) => {
-        const isSelected = idx === selectedThread && active;
-        const firstComment = thread.comments[0];
-        const replyCount = thread.comments.length - 1;
+      {(() => {
+        const terminalHeight = process.stdout.rows ?? 40;
+        const viewportH = Math.max(5, terminalHeight - 22);
+        const maxVis = Math.max(4, Math.floor(viewportH / 5));
+        
+        const total = threads.length;
+        const clampedOffset = Math.max(0, Math.min(threadScrollOffset, total - maxVis));
+        const visibleThreads = threads.slice(clampedOffset, clampedOffset + maxVis);
+
+        if (total === 0) return null;
+
+        const canScrollUp = clampedOffset > 0;
+        const canScrollDown = clampedOffset + maxVis < total;
 
         return (
-          <Box
-            key={thread.id}
-            flexDirection="column"
-            marginTop={1}
-            borderStyle={isSelected ? "round" : undefined}
-            borderColor={isSelected ? palette.accent : undefined}
-            paddingX={isSelected ? 1 : 0}
-          >
-            {/* Thread header */}
-            <Box>
-              <Text color={isSelected ? palette.accent : palette.muted}>
-                {isSelected ? glyph.pointer : glyph.pointerIdle}{" "}
-              </Text>
-              <Text color={threadStatusColor(thread.status)}>
-                [{threadStatusLabel(thread.status)}]{"  "}
-              </Text>
-              {thread.filePath && (
-                <Text color={palette.info}>
-                  {truncate(thread.filePath, 35)}
-                  {thread.lineNumber ? `:${thread.lineNumber}` : ""}
-                  {"  "}
-                </Text>
-              )}
-              <Text color={palette.muted}>
-                {thread.comments.length} comment{thread.comments.length !== 1 ? "s" : ""}
-              </Text>
-            </Box>
+          <Box flexDirection="column">
+            <Box flexDirection="column" height={viewportH} overflow="hidden">
+              {visibleThreads.map((thread) => {
+                const idx = threads.findIndex(t => t.id === thread.id);
+                const isSelected = idx === selectedThread && active;
+                const firstComment = thread.comments[0];
+                const replyCount = thread.comments.length - 1;
 
-            {/* First comment preview */}
-            {firstComment && (
-              <Box marginLeft={2} flexDirection="column">
-                <Box>
-                  <Text color={palette.textBright} bold inverse={isSelected && selectedCommentIndex === -1}>
-                    {isSelected && selectedCommentIndex === -1 ? "> " : ""}
-                    {firstComment.author}
-                  </Text>
-                  <Text color={palette.muted}>
-                    {"  "}{formatRelativeAge(firstComment.publishedDate)}
-                  </Text>
-                </Box>
-                <Text color={palette.text} wrap="wrap">
-                  {truncate(firstComment.content, 72)}
-                </Text>
-                {/* Show all replies when thread is selected */}
-                {isSelected &&
-                  thread.comments.slice(1).map((reply, index) => {
-                    const isReplySelected = selectedCommentIndex === index;
-                    return (
-                      <Box key={reply.id} marginTop={1} flexDirection="column">
-                        <Box>
-                          <Text color={palette.accentDim} bold inverse={isReplySelected}>
-                            {isReplySelected ? "> ↳ " : "↳ "}
-                            {reply.author}
-                          </Text>
-                          <Text color={palette.muted}>
-                            {"  "}{formatRelativeAge(reply.publishedDate)}
-                          </Text>
-                        </Box>
-                        <Text color={palette.text} wrap="wrap">
-                          {truncate(reply.content, 68)}
+                return (
+                <Box
+                  key={thread.id}
+                  flexDirection="column"
+                  marginTop={1}
+                  borderStyle={isSelected ? "round" : undefined}
+                  borderColor={isSelected ? palette.accent : undefined}
+                  paddingX={isSelected ? 1 : 0}
+                >
+                  {/* Thread header */}
+                  <Box>
+                    <Text color={isSelected ? palette.accent : palette.muted}>
+                      {isSelected ? glyph.pointer : glyph.pointerIdle}{" "}
+                    </Text>
+                    <Text color={threadStatusColor(thread.status)}>
+                      [{threadStatusLabel(thread.status)}]{"  "}
+                    </Text>
+                    {thread.filePath && (
+                      <Text color={palette.info}>
+                        {truncate(thread.filePath, 35)}
+                        {thread.lineNumber ? `:${thread.lineNumber}` : ""}
+                        {"  "}
+                      </Text>
+                    )}
+                    <Text color={palette.muted}>
+                      {thread.comments.length} comment{thread.comments.length !== 1 ? "s" : ""}
+                    </Text>
+                  </Box>
+
+                  {/* First comment preview */}
+                  {firstComment && (
+                    <Box marginLeft={2} flexDirection="column">
+                      <Box>
+                        <Text color={palette.textBright} bold inverse={isSelected && selectedCommentIndex === -1}>
+                          {isSelected && selectedCommentIndex === -1 ? "> " : ""}
+                          {firstComment.author}
+                        </Text>
+                        <Text color={palette.muted}>
+                          {"  "}{formatRelativeAge(firstComment.publishedDate)}
                         </Text>
                       </Box>
-                    );
-                  })}
-                {!isSelected && replyCount > 0 && (
-                  <Text color={palette.muted}>
-                    {"  "}↳ {replyCount} repl{replyCount !== 1 ? "ies" : "y"}
-                  </Text>
-                )}
+                      <Text color={palette.text} wrap="wrap">
+                        {truncate(firstComment.content, 72)}
+                      </Text>
+                      {/* Show all replies when thread is selected */}
+                      {isSelected &&
+                        thread.comments.slice(1).map((reply, index) => {
+                          const isReplySelected = selectedCommentIndex === index;
+                          return (
+                            <Box key={reply.id} marginTop={1} flexDirection="column">
+                              <Box>
+                                <Text color={palette.accentDim} bold inverse={isReplySelected}>
+                                  {isReplySelected ? "> ↳ " : "↳ "}
+                                  {reply.author}
+                                </Text>
+                                <Text color={palette.muted}>
+                                  {"  "}{formatRelativeAge(reply.publishedDate)}
+                                </Text>
+                              </Box>
+                              <Text color={palette.text} wrap="wrap">
+                                {truncate(reply.content, 68)}
+                              </Text>
+                            </Box>
+                          );
+                        })}
+                      {!isSelected && replyCount > 0 && (
+                        <Text color={palette.muted}>
+                          {"  "}↳ {replyCount} repl{replyCount !== 1 ? "ies" : "y"}
+                        </Text>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+              );
+            })}
+            </Box>
+            
+            {/* Scroll indicators at bottom edge */}
+            {(canScrollUp || canScrollDown) && (
+              <Box justifyContent="flex-end" marginTop={0}>
+                <Text color={palette.muted}>
+                  {canScrollUp ? "↑ more above " : ""}
+                  {canScrollUp && canScrollDown ? "· " : ""}
+                  {canScrollDown ? "↓ more below" : ""}
+                </Text>
               </Box>
             )}
           </Box>
         );
-      })}
+      })()}
 
       {/* Comment input box */}
       {inputMode !== "none" && (

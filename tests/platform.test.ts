@@ -37,6 +37,19 @@ mock.module("../src/data/command", () => {
         ];
       }
 
+      // Mock `az devops project list`
+      if (args.includes("project") && args.includes("list")) {
+        return {
+          value: [
+            {
+              id: "project-1",
+              name: "test-project",
+              state: "wellFormed",
+            }
+          ]
+        };
+      }
+
       // Mock `az account get-access-token`
       if (args.includes("account") && args.includes("get-access-token")) {
         return { accessToken: "fake-token" };
@@ -79,5 +92,26 @@ describe("Azure Platform Integration", () => {
     expect(pr.title).toBe("Fix bug");
     expect(pr.author).toBe("Alice");
     expect(pr.status).toBe("active");
+  });
+
+  test("loadAppData resolves projects when project is omitted/undefined", async () => {
+    const fakeConfig: AdoConfig = {
+      projects: [
+        {
+          organization: "https://dev.azure.com/test-org",
+        }
+      ]
+    };
+
+    const { data: appData } = await loadAppData(fakeConfig);
+    
+    expect(appData.organizations).toHaveLength(1);
+    expect(appData.organizations[0]!.name).toBe("test-org");
+    expect(appData.organizations[0]!.repositories).toHaveLength(1);
+    
+    const repo = appData.organizations[0]!.repositories[0]!;
+    expect(repo.name).toBe("services-gateway");
+    expect(repo.project).toBe("test-project");
+    expect(repo.pullRequests).toHaveLength(1);
   });
 });

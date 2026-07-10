@@ -160,6 +160,26 @@ export const checkAzAvailable = async (): Promise<
   }
 };
 
+interface AzureProject {
+  id: string;
+  name: string;
+  state: string;
+}
+
+/** Lists all projects in an organization. */
+const listProjects = async (
+  organization: string,
+): Promise<AzureProject[]> => {
+  const result = await runJson<{ value: AzureProject[] }>(AZ, [
+    "devops",
+    "project",
+    "list",
+    ...orgArgs(organization),
+    ...jsonOutput,
+  ]);
+  return result.value.filter((proj) => proj.state === "wellFormed" && !!proj.name);
+};
+
 /** Lists repositories in a project (auto-discovery). */
 const listRepositories = async (
   project: AdoProjectConfig,
@@ -169,7 +189,7 @@ const listRepositories = async (
     "list",
     ...orgArgs(project.organization),
     "--project",
-    project.project,
+    project.project!,
     ...jsonOutput,
   ]);
   return repos.filter((repo) => repo.isDisabled !== true && !!repo.name);
@@ -187,7 +207,7 @@ const listPullRequests = async (
     "list",
     ...orgArgs(project.organization),
     "--project",
-    project.project,
+    project.project!,
     "--repository",
     repository,
     "--status",
@@ -378,6 +398,7 @@ const hydratePullRequest = async (
   const repositoryId = raw.repository?.id ?? repository;
   const sourceCommit = raw.lastMergeSourceCommit?.commitId;
   const targetCommit = raw.lastMergeTargetCommit?.commitId;
+  const projectStr = project.project!;
 
   let changedFiles: PullRequestFileChange[] = [];
   let checksPassed = 0;
@@ -392,15 +413,15 @@ const hydratePullRequest = async (
     const [fileRes, policies, items, threads] = await Promise.all([
       listPrFileChanges(
         project.organization,
-        project.project,
+        projectStr,
         repositoryId,
         prId,
         sourceCommit,
         targetCommit,
       ),
-      listPrPolicies(project.organization, project.project, prId),
+      listPrPolicies(project.organization, projectStr, prId),
       listPrWorkItems(project.organization, prId),
-      fetchPrComments(project.organization, project.project, repositoryId, prId),
+      fetchPrComments(project.organization, projectStr, repositoryId, prId),
     ]);
     changedFiles = fileRes.files;
     iterSourceCommit = fileRes.iterSourceCommit;
@@ -419,7 +440,7 @@ const hydratePullRequest = async (
   return {
     ...normalizePullRequest(raw, {
       organization: project.organization,
-      project: project.project,
+      project: projectStr,
       repository,
       changedFiles,
       checksPassed,
@@ -466,7 +487,31 @@ export const loadAppData = async (
   for (const [organization, projects] of byOrg) {
     const repositories: RepositoryNode[] = [];
 
+    const resolvedProjects: AdoProjectConfig[] = [];
     for (const project of projects) {
+      if (!project.project) {
+        try {
+          options.onProgress?.(`Discovering projects in ${orgLabel(organization)}...`);
+          const discovered = await listProjects(organization);
+          for (const dp of discovered) {
+            resolvedProjects.push({
+              organization: project.organization,
+              project: dp.name,
+              repositories: project.repositories,
+            });
+          }
+        } catch (cause) {
+          warnings.push(
+            `Could not list projects for ${organization}: ${cause instanceof CommandError ? cause.detail : String(cause)
+            }`,
+          );
+        }
+      } else {
+        resolvedProjects.push(project);
+      }
+    }
+
+    for (const project of resolvedProjects) {
       let repoNames = project.repositories ?? [];
 
       if (repoNames.length === 0) {
@@ -495,13 +540,13 @@ export const loadAppData = async (
                 hydratePullRequest(project, repository, raw, { fetchDetails }),
               ),
             );
-            return { name: repository, project: project.project, pullRequests };
+            return { name: repository, project: project.project!, pullRequests };
           } catch (cause) {
             warnings.push(
               `Could not list PRs for ${project.project}/${repository}: ${cause instanceof CommandError ? cause.detail : String(cause)
               }`,
             );
-            return { name: repository, project: project.project, pullRequests: [] };
+            return { name: repository, project: project.project!, pullRequests: [] };
           }
         }),
       );

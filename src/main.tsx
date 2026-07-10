@@ -12,6 +12,10 @@ adotui — Terminal UI for managing Azure DevOps pull requests
 
 USAGE:
   adotui [OPTIONS]
+  adotui [COMMAND]
+
+COMMANDS:
+  setup, init      Open the interactive configuration wizard
 
 OPTIONS:
   --help, -h       Show this help message and exit
@@ -96,6 +100,10 @@ const updateCli = async () => {
 };
 
 const args = process.argv.slice(2);
+
+if (args.includes("init") || args.includes("setup") || args.includes("--setup") || args.includes("--init")) {
+  process.env.ADOTUI_FORCE_SETUP = "1";
+}
 
 if (args.includes("--help") || args.includes("-h")) {
   console.log(HELP_TEXT);

@@ -83,7 +83,28 @@ explicitly. Config is searched in this order:
 4. `~/.adotui.json`
 5. `./adotui.config.json`
 
+### Interactive Configuration Wizard
+
+If no configuration file is found, `adotui` automatically launches the interactive setup configuration wizard.
+
+You can also force open the configuration wizard at any time to add, edit, or delete projects and configure a Personal Access Token (PAT) by running:
+
+```bash
+adotui setup
+# or
+adotui init
+```
+
+Within the configuration wizard:
+- Navigate menu items and form inputs using **Tab** / **Shift+Tab** or **Arrow keys**.
+- Select a menu option or advance fields by pressing **Enter**.
+- Press **Enter** on an existing project item to edit it.
+- Press **Backspace** or **Delete** on an existing project item in the list to remove it.
+- View keyboard instructions or general CLI tips by selecting **❓ Keyboard & CLI Help**.
+- Save and load the configuration by selecting **✓ Save & Load Configuration**.
+
 Example (`adotui.config.example.json`):
+
 
 ```json
 {

@@ -11,7 +11,7 @@ import { dirname, join, parse } from "node:path";
  */
 export interface AdoProjectConfig {
   organization: string;
-  project: string;
+  project?: string;
   repositories?: string[];
 }
 
@@ -135,7 +135,7 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
           : undefined;
     const project = typeof item.project === "string" ? item.project : undefined;
 
-    if (!organization || !project) {
+    if (!organization) {
       continue;
     }
 
@@ -147,7 +147,7 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
 
     projects.push({
       organization: organization.replace(/\/+$/, ""),
-      project,
+      ...(project ? { project } : {}),
       ...(repositories && repositories.length > 0 ? { repositories } : {}),
     });
   }
@@ -156,7 +156,7 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
     return {
       ok: false,
       errorType: "invalid",
-      error: `Config at ${source} has no valid projects (each needs "organization" and "project").`,
+      error: `Config at ${source} has no valid projects (each needs at least "organization").`,
       searchedPaths: [source],
     };
   }
