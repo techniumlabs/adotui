@@ -6,20 +6,20 @@ class Adotui < Formula
   on_macos do
     if Hardware::CPU.intel?
       url "https://github.com/techniumlabs/adotui/releases/download/v0.1.0/adotui-macos-x64"
-      sha256 "37aee4f5a3ce9952aa18d22ab1bc2d1f275d3a37c969a76288cdc221158ff21b"
+      sha256 "ce80b60b64b981e01db7d055c8ac222143bd93c46eef5384aef8e0c427680676"
     elsif Hardware::CPU.arm?
       url "https://github.com/techniumlabs/adotui/releases/download/v0.1.0/adotui-macos-arm64"
-      sha256 "ab348d88ad424d707fb9b4e2acf2774f62efc75040bbc358739ac3f12f72ea8d"
+      sha256 "19e110f1bc44cffd4d0b1dbf1058adbdef814867f262137dc74da866375f4e5c"
     end
   end
 
   on_linux do
     if Hardware::CPU.intel?
       url "https://github.com/techniumlabs/adotui/releases/download/v0.1.0/adotui-linux-x64"
-      sha256 "2f8c95bcb0e56c0e2f77a66ee077294be257479cd44cb09815c6050d6f5138ee"
+      sha256 "1b9c7df6223a2cc4d1c0366c654ce53e669ddfcb52d521da928671196e733653"
     elsif Hardware::CPU.arm?
       url "https://github.com/techniumlabs/adotui/releases/download/v0.1.0/adotui-linux-arm64"
-      sha256 "84cad3261ecad045a66f3f2e05064113d41250c2124ad5e3017baaa5bd5cfbdc"
+      sha256 "7907eb6f81be0e6c1673ce3df6a5b5907e99c172fe8a084e08aaa54619da7dce"
     end
   end
 
