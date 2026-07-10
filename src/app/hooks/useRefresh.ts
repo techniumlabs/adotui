@@ -38,7 +38,7 @@ export function useRefresh(
 
     void load()
       .then((result) => {
-        if (!result.ok) {
+        if (!result.ok && result.errorType !== "missing") {
           addToast(result.banner, "error");
         }
         if (result.fromCache) {
@@ -52,6 +52,10 @@ export function useRefresh(
           const nextRepoIndex = clamp(current.selectedRepoIndex, 0, Math.max(0, repoCount - 1));
           const nextRepo = nextOrg?.repositories[nextRepoIndex];
           const nextVisible = getVisiblePrs(nextRepo, current.treeFilter);
+          
+          const isMissingConfig = !result.ok && result.errorType === "missing";
+          const nextLoadState = result.ok ? "ready" : (isMissingConfig ? "setup" : "error");
+
           return {
             ...current,
             data: result.data,
@@ -59,12 +63,14 @@ export function useRefresh(
             selectedRepoIndex: nextRepoIndex,
             selectedPrIndex: clamp(current.selectedPrIndex, 0, Math.max(0, nextVisible.length - 1)),
             lastRefreshISO: new Date().toISOString(),
-            loadState: result.ok ? "ready" : "error",
+            loadState: nextLoadState,
             banner: result.ok
               ? reason === "auto"
                 ? `Auto-refresh synced. ${result.banner}`
                 : result.banner
-              : "Failed to load data. See toast for details.",
+              : isMissingConfig
+                ? "No configuration found. Welcome to initial setup!"
+                : "Failed to load data. See toast for details.",
           };
         });
       })

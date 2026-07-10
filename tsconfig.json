@@ -8,6 +8,10 @@
     "jsx": "react-jsx",
     "allowJs": true,
     "types": ["bun"],
+    "baseUrl": ".",
+    "paths": {
+      "react-devtools-core": ["./src/mock-devtools.ts"]
+    },
 
     // Bundler mode
     "moduleResolution": "bundler",

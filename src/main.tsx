@@ -32,6 +32,7 @@ OPTIONS:
   --help, -h       Show this help message and exit
   --version, -v    Print version number and exit
   --diagnostic     Print diagnostic information (OS, arch, bun, az versions)
+  --update         Update adotui to the latest version
 
 ENVIRONMENT:
   ADOTUI_CONFIG            Path to config file
@@ -64,6 +65,51 @@ const printDiagnostic = async () => {
   }
 };
 
+const updateCli = async () => {
+  console.log("Checking for updates...");
+  try {
+    const res = await fetch("https://api.github.com/repos/techniumlabs/adotui/releases/latest", {
+      headers: { "User-Agent": "adotui-cli" }
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to fetch latest release: ${res.statusText}`);
+    }
+    const release = (await res.json()) as { tag_name: string };
+    const latestVersion = release.tag_name.replace(/^v/, "");
+    const currentVersion = getVersion();
+
+    if (currentVersion === "0.0.0-unknown" || currentVersion === "0.1.0-dev") {
+      console.log(`Running in development/local build mode. Current: ${currentVersion}, Latest: ${latestVersion}`);
+    } else if (currentVersion === latestVersion) {
+      console.log(`adotui is already up-to-date (version ${currentVersion}).`);
+      return;
+    }
+
+    console.log(`Updating adotui from version ${currentVersion} to ${latestVersion}...`);
+    
+    const installUrl = "https://raw.githubusercontent.com/techniumlabs/adotui/main/install.sh";
+    console.log(`Running installation script from ${installUrl}...`);
+    
+    const { spawn } = await import("node:child_process");
+    const child = spawn("bash", ["-c", `curl -fsSL ${installUrl} | bash`], {
+      stdio: "inherit"
+    });
+    
+    child.on("close", (code) => {
+      if (code === 0) {
+        console.log("Update completed successfully!");
+        process.exit(0);
+      } else {
+        console.error(`Update script failed with exit code ${code}.`);
+        process.exit(code ?? 1);
+      }
+    });
+  } catch (err) {
+    console.error(`Failed to update: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+};
+
 const args = process.argv.slice(2);
 
 if (args.includes("--help") || args.includes("-h")) {
@@ -79,6 +125,12 @@ if (args.includes("--version") || args.includes("-v")) {
 if (args.includes("--diagnostic")) {
   await printDiagnostic();
   process.exit(0);
+}
+
+if (args.includes("--update")) {
+  await updateCli();
+  // Wait for asynchronous update process to complete and exit
+  await new Promise(() => {});
 }
 
 render(<App />);

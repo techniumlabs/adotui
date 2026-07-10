@@ -14,6 +14,7 @@ export interface LoadResult {
   banner: string;
   ok: boolean;
   fromCache?: boolean;
+  errorType?: "missing" | "invalid";
 }
 
 const isMockMode = (): boolean => {
@@ -46,6 +47,7 @@ export const loadInitialData = async (allowCache = false, onProgress?: (msg: str
       data: { organizations: [] },
       banner: `${configResult.error} ${hint}`,
       ok: false,
+      errorType: configResult.errorType,
     };
   }
 

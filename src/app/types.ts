@@ -8,7 +8,7 @@ export type DiffViewMode = "unified" | "split";
 
 export type TreeFilter = string;
 
-export type LoadState = "loading" | "ready" | "error";
+export type LoadState = "loading" | "ready" | "error" | "setup";
 
 export type ConfirmKind = "approve" | "reject" | "abandon" | "complete";
 

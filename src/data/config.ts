@@ -30,7 +30,7 @@ export interface AdoConfig {
 
 export type ConfigResult =
   | { ok: true; config: AdoConfig; source: string }
-  | { ok: false; error: string; searchedPaths: string[] };
+  | { ok: false; error: string; errorType?: "missing" | "invalid"; searchedPaths: string[] };
 
 const CONFIG_ENV = "ADOTUI_CONFIG";
 
@@ -94,6 +94,7 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
   if (typeof raw !== "object" || raw === null) {
     return {
       ok: false,
+      errorType: "invalid",
       error: `Config at ${source} is not a JSON object.`,
       searchedPaths: [source],
     };
@@ -112,6 +113,7 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
   if (!projectsRaw || projectsRaw.length === 0) {
     return {
       ok: false,
+      errorType: "invalid",
       error: `Config at ${source} has no "projects". Add at least one { organization, project }.`,
       searchedPaths: [source],
     };
@@ -151,6 +153,7 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
   if (projects.length === 0) {
     return {
       ok: false,
+      errorType: "invalid",
       error: `Config at ${source} has no valid projects (each needs "organization" and "project").`,
       searchedPaths: [source],
     };
@@ -206,6 +209,7 @@ export const loadConfig = async (): Promise<ConfigResult> => {
     } catch (cause) {
       return {
         ok: false,
+        errorType: "invalid",
         error: `Failed to parse config at ${path}: ${
           cause instanceof Error ? cause.message : String(cause)
         }`,
@@ -218,9 +222,15 @@ export const loadConfig = async (): Promise<ConfigResult> => {
 
   return {
     ok: false,
+    errorType: "missing",
     error: "No adotui config found.",
     searchedPaths,
   };
 };
 
 export const configSearchPathsForHelp = (): string[] => configSearchPaths();
+
+export const writeConfig = async (config: AdoConfig): Promise<void> => {
+  const path = join(process.cwd(), "adotui.config.json");
+  await Bun.write(path, JSON.stringify(config, null, 2));
+};

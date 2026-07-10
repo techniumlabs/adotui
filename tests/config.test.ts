@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadConfig } from "../src/data/config";
+import { loadConfig, writeConfig as writeConfigUtil } from "../src/data/config";
 
 const TMP_DIR = join(tmpdir(), `adotui-config-test-${Date.now()}`);
 mkdirSync(TMP_DIR, { recursive: true });
@@ -152,5 +152,56 @@ describe("Config validation", () => {
     process.env.ADOTUI_CONFIG = configPath;
     const result = await loadConfig();
     expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errorType).toBe("invalid");
+    }
+  });
+
+  test("writeConfig writes config to process.cwd()", async () => {
+    const originalCwd = process.cwd();
+    const testDir = join(tmpdir(), `adotui-write-test-${Date.now()}`);
+    mkdirSync(testDir, { recursive: true });
+    process.chdir(testDir);
+    try {
+      const sampleConfig = {
+        projects: [{ organization: "https://dev.azure.com/test", project: "Proj" }],
+        status: "active" as const,
+        top: 50,
+      };
+      await writeConfigUtil(sampleConfig);
+      const filePath = join(testDir, "adotui.config.json");
+      const fileExists = await Bun.file(filePath).exists();
+      expect(fileExists).toBe(true);
+      const content = await Bun.file(filePath).json();
+      expect(content).toEqual(sampleConfig);
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+
+  test("returns errorType: 'missing' when no config file exists", async () => {
+    const originalCwd = process.cwd();
+    const testDir = join(tmpdir(), `adotui-missing-test-${Date.now()}`);
+    mkdirSync(testDir, { recursive: true });
+    process.chdir(testDir);
+    
+    const originalEnv = process.env.ADOTUI_CONFIG;
+    // Set to a non-existent path
+    process.env.ADOTUI_CONFIG = join(testDir, "does-not-exist.json");
+    
+    try {
+      const result = await loadConfig();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errorType).toBe("missing");
+      }
+    } finally {
+      process.chdir(originalCwd);
+      if (originalEnv !== undefined) {
+        process.env.ADOTUI_CONFIG = originalEnv;
+      } else {
+        delete process.env.ADOTUI_CONFIG;
+      }
+    }
   });
 });

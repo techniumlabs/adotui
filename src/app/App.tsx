@@ -19,6 +19,7 @@ import { useAppKeyboard } from "./hooks/useAppKeyboard";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { Splash } from "./components/Splash";
 import { HelpView } from "./components/HelpView";
+import { SetupScreen } from "./components/SetupScreen";
 
 export const App: React.FC = () => {
   const [showSplash, setShowSplash] = React.useState(process.env.NODE_ENV !== "test");
@@ -28,6 +29,10 @@ export const App: React.FC = () => {
   useAppKeyboard(app, exit);
 
   React.useEffect(() => {
+    if (app.state.loadState === "setup") {
+      setShowSplash(false);
+      return;
+    }
     // If we've finished the initial load, wait a short moment and dismiss splash
     if (app.state.loadState !== "loading" && showSplash) {
       const t = setTimeout(() => setShowSplash(false), 2000);
@@ -48,6 +53,10 @@ export const App: React.FC = () => {
 
   if (showSplash) {
     return <Splash />;
+  }
+
+  if (state.loadState === "setup") {
+    return <SetupScreen onComplete={() => actions.doRefresh("initial")} />;
   }
 
   return (
