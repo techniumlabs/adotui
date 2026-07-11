@@ -149,7 +149,7 @@ describe("SetupScreen UI & Submission", () => {
 
     try {
       const { stdin, lastFrame } = render(
-        <SetupScreen onComplete={() => {}} />
+        <SetupScreen onComplete={() => { }} />
       );
 
       await delay(50);
