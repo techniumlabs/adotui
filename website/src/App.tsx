@@ -19,7 +19,7 @@ function App() {
       <header className="header container">
         <div className="header-logo">Adotui</div>
         <div className="header-links">
-          <a href="https://github.com/narenthiranj/adotui" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/techniumlabs/adotui" target="_blank" rel="noopener noreferrer">GitHub</a>
           <a href="#installation">Install</a>
           <a href="#features">Features</a>
         </div>
@@ -33,7 +33,7 @@ function App() {
           </p>
           <div className="hero-buttons">
             <a href="#installation" className="btn btn-primary">Get Started</a>
-            <a href="https://github.com/narenthiranj/adotui" className="btn btn-outline" target="_blank" rel="noopener noreferrer">View Source</a>
+            <a href="https://github.com/techniumlabs/adotui" className="btn btn-outline" target="_blank" rel="noopener noreferrer">View Source</a>
           </div>
 
           <div className="terminal-window">
@@ -95,7 +95,7 @@ function App() {
             <div className="terminal-window" style={{ margin: '0 auto', maxWidth: '700px' }}>
               <div className="terminal-body" style={{ padding: '1rem 1.5rem' }}>
                 <span className="prompt">$</span>
-                <span className="command">curl -fsSL https://raw.githubusercontent.com/narenthiranj/adotui/main/install.sh | bash</span>
+                <span className="command">curl -fsSL https://raw.githubusercontent.com/techniumlabs/adotui/main/install.sh | bash</span>
               </div>
             </div>
           </div>
@@ -104,7 +104,7 @@ function App() {
             <div className="terminal-window" style={{ margin: '0 auto', maxWidth: '700px' }}>
               <div className="terminal-body" style={{ padding: '1rem 1.5rem' }}>
                 <span className="prompt">&gt;</span>
-                <span className="command">iwr -useb https://raw.githubusercontent.com/narenthiranj/adotui/main/install.ps1 | iex</span>
+                <span className="command">iwr -useb https://raw.githubusercontent.com/techniumlabs/adotui/main/install.ps1 | iex</span>
               </div>
             </div>
           </div>
