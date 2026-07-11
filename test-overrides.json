@@ -1,0 +1,12 @@
+{
+  "name": "test-overrides",
+  "dependencies": {
+    "typescript": "^7.0.0",
+    "@typescript-eslint/typescript-estree": "^8.63.0"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "typescript": "6.0.3"
+    }
+  }
+}

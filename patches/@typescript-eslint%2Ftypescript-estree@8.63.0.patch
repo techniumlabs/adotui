@@ -1,0 +1,88 @@
+diff --git a/dist/create-program/getScriptKind.js b/dist/create-program/getScriptKind.js
+index 6c948b5b42b0d37fd642c705138d5385d59d7fca..63f1e1321603c7cad7b73ae459237d8f6e1c43bc 100644
+--- a/dist/create-program/getScriptKind.js
++++ b/dist/create-program/getScriptKind.js
+@@ -47,19 +47,19 @@ function getScriptKind(filePath, jsx) {
+     // weird errors due to a mismatch.
+     // https://github.com/microsoft/TypeScript/blob/da00ba67ed1182ad334f7c713b8254fba174aeba/src/compiler/utilities.ts#L6948-L6968
+     switch (extension) {
+-        case ts.Extension.Cjs:
+-        case ts.Extension.Js:
+-        case ts.Extension.Mjs:
++        case ".cjs":
++        case ".js":
++        case ".mjs":
+             return ts.ScriptKind.JS;
+-        case ts.Extension.Cts:
+-        case ts.Extension.Mts:
+-        case ts.Extension.Ts:
++        case ".cts":
++        case ".mts":
++        case ".ts":
+             return ts.ScriptKind.TS;
+-        case ts.Extension.Json:
++        case ".json":
+             return ts.ScriptKind.JSON;
+-        case ts.Extension.Jsx:
++        case ".jsx":
+             return ts.ScriptKind.JSX;
+-        case ts.Extension.Tsx:
++        case ".tsx":
+             return ts.ScriptKind.TSX;
+         default:
+             // unknown extension, force typescript to ignore the file extension, and respect the user's setting
+diff --git a/dist/create-program/shared.js b/dist/create-program/shared.js
+index cbbd59c7ed8d5d9cfc26353b09f67247e0505f43..fe5e13bca3c1cce0993e62d7a863cf4c0c5ee5df 100644
+--- a/dist/create-program/shared.js
++++ b/dist/create-program/shared.js
+@@ -56,14 +56,14 @@ const DEFAULT_COMPILER_OPTIONS = {
+     checkJs: true,
+ };
+ exports.DEFAULT_EXTRA_FILE_EXTENSIONS = new Set([
+-    ts.Extension.Cjs,
+-    ts.Extension.Cts,
+-    ts.Extension.Js,
+-    ts.Extension.Jsx,
+-    ts.Extension.Mjs,
+-    ts.Extension.Mts,
+-    ts.Extension.Ts,
+-    ts.Extension.Tsx,
++    ".cjs",
++    ".cts",
++    ".js",
++    ".jsx",
++    ".mjs",
++    ".mts",
++    ".ts",
++    ".tsx",
+ ]);
+ function createDefaultCompilerOptionsFromExtra(parseSettings) {
+     if (parseSettings.debugLevel.has('typescript')) {
+@@ -95,9 +95,9 @@ function canonicalDirname(p) {
+     return node_path_1.default.dirname(p);
+ }
+ const DEFINITION_EXTENSIONS = [
+-    ts.Extension.Dts,
+-    ts.Extension.Dcts,
+-    ts.Extension.Dmts,
++    ".d.ts",
++    ".d.cts",
++    ".d.mts",
+ ];
+ function getExtension(fileName) {
+     if (!fileName) {
+diff --git a/dist/parseSettings/createParseSettings.js b/dist/parseSettings/createParseSettings.js
+index 01091805e57baa3b5f2541ea34f9962b9eb1ff1b..9f7a2c826b0e11662d321c773c2615eb9091fce2 100644
+--- a/dist/parseSettings/createParseSettings.js
++++ b/dist/parseSettings/createParseSettings.js
+@@ -151,8 +151,8 @@ function createParseSettings(code, tsestreeOptions = {}) {
+             })
+             : undefined,
+         setExternalModuleIndicator: tsestreeOptions.sourceType === 'module' ||
+-            (tsestreeOptions.sourceType == null && extension === ts.Extension.Mjs) ||
+-            (tsestreeOptions.sourceType == null && extension === ts.Extension.Mts)
++            (tsestreeOptions.sourceType == null && extension === ".mjs") ||
++            (tsestreeOptions.sourceType == null && extension === ".mts")
+             ? (file) => {
+                 file.externalModuleIndicator = true;
+             }

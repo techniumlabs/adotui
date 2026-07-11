@@ -1,6 +1,6 @@
 {
   "name": "adotui",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "description": "Terminal UI for managing Azure DevOps pull requests",
   "main": "dist/main.js",
   "type": "module",
