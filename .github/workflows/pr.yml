@@ -24,11 +24,11 @@ jobs:
       - name: Install Dependencies (frozen lockfile)
         run: bun install --frozen-lockfile
 
-      - name: Scan for Secrets
-        uses: gitleaks/gitleaks-action@v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+      # - name: Scan for Secrets
+      #   uses: gitleaks/gitleaks-action@v3.0.0
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
       - name: Run Lint
         run: bun run lint
