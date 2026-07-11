@@ -6,6 +6,7 @@
 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { writeFile } from "node:fs/promises";
 import type {
   CommentType,
   PipelineRun,
@@ -70,7 +71,7 @@ const invokeMutate = async <T>(
 ): Promise<T | null> => {
   const tmpPath = join(tmpdir(), `adotui_invoke_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
   try {
-    await Bun.write(tmpPath, JSON.stringify(body));
+    await writeFile(tmpPath, JSON.stringify(body), "utf-8");
     const args: string[] = [
       "devops", "invoke",
       "--area", area,

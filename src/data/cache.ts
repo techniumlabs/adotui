@@ -53,6 +53,7 @@ export const runsCacheKey = (organizationUrl: string, project: string): string =
 
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { promises as fs } from "node:fs";
 import type { AppData } from "../domain/types";
 
 const APP_CACHE_DIR = join(homedir(), ".cache", "adotui");
@@ -63,10 +64,8 @@ const APP_CACHE_FILE = join(APP_CACHE_DIR, "data_cache.json");
  */
 export const readAppCache = async (): Promise<AppData | null> => {
   try {
-    const file = Bun.file(APP_CACHE_FILE);
-    if (await file.exists()) {
-      return (await file.json()) as AppData;
-    }
+    const content = await fs.readFile(APP_CACHE_FILE, "utf-8");
+    return JSON.parse(content) as AppData;
   } catch (_err) {
     // Ignore cache read errors (corrupted JSON, etc)
   }
@@ -78,7 +77,8 @@ export const readAppCache = async (): Promise<AppData | null> => {
  */
 export const writeAppCache = async (data: AppData): Promise<void> => {
   try {
-    await Bun.write(APP_CACHE_FILE, JSON.stringify(data, null, 2));
+    await fs.mkdir(APP_CACHE_DIR, { recursive: true });
+    await fs.writeFile(APP_CACHE_FILE, JSON.stringify(data, null, 2), "utf-8");
   } catch (_err) {
     // Silently ignore cache write errors
   }

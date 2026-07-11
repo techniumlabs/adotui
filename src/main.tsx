@@ -45,8 +45,10 @@ const printDiagnostic = async () => {
 
   // Check az CLI
   try {
-    const proc = Bun.spawn(["az", "--version"], { stdout: "pipe", stderr: "pipe" });
-    const text = await new Response(proc.stdout).text();
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execFileAsync = promisify(execFile);
+    const { stdout: text } = await execFileAsync("az", ["--version"]);
     const firstLine = text.split("\n")[0]?.trim() ?? "unknown";
     console.log(`  Azure CLI: ${firstLine}`);
   } catch {

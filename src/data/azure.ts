@@ -1,6 +1,7 @@
-import { unlink } from "node:fs/promises";
+import { unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawn } from "node:child_process";
 import type {
   AppData,
   OrganizationNode,
@@ -108,22 +109,23 @@ const buildUnifiedDiff = async (
   const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const oldPath = join(tmpdir(), `adotui-a-${id}`);
   const newPath = join(tmpdir(), `adotui-b-${id}`);
-  await Bun.write(oldPath, oldContent);
-  await Bun.write(newPath, newContent);
+  await writeFile(oldPath, oldContent);
+  await writeFile(newPath, newContent);
 
-  const proc = Bun.spawn({
-    cmd: [
-      "diff", "-u",
-      "-L", `a/${filePath}`,
-      "-L", `b/${filePath}`,
-      oldPath, newPath,
-    ],
-    stdout: "pipe",
-    stderr: "ignore",
+  const proc = spawn("diff", [
+    "-u",
+    "-L", `a/${filePath}`,
+    "-L", `b/${filePath}`,
+    oldPath, newPath,
+  ], {
+    stdio: ["ignore", "pipe", "ignore"],
   });
 
-  const rawDiff = await new Response(proc.stdout).text();
-  await proc.exited; // exit 0 (identical) or 1 (differs) are both valid
+  const rawDiff = await new Promise<string>((resolve) => {
+    let out = "";
+    proc.stdout.on("data", (chunk) => { out += chunk; });
+    proc.on("close", () => resolve(out));
+  });
 
   await unlink(oldPath).catch(() => { });
   await unlink(newPath).catch(() => { });

@@ -2,6 +2,7 @@ import type { AppData, PullRequest, PullRequestFileChange, ReviewState } from ".
 import { DEFAULT_COMPLETION_OPTIONS } from "./constants";
 import type { CompletionOptions, MergeStrategy } from "./types";
 import * as fs from "node:fs";
+import { spawn } from "node:child_process";
 
 export const clamp = (value: number, min: number, max: number): number => {
   if (max < min) {
@@ -282,7 +283,7 @@ export const openInBrowser = (url: string): void => {
         ? ["cmd", "/c", "start", "", url]
         : ["xdg-open", url];
 
-  Bun.spawn({ cmd, stdout: "ignore", stderr: "ignore" });
+  spawn(cmd[0]!, cmd.slice(1), { stdio: "ignore" });
 };
 
 const ensureDiffPrefix = (line: string): string => {

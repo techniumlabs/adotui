@@ -1,10 +1,11 @@
 /**
- * Thin, CLI-agnostic process runner built on Bun.spawn.
+ * Thin, CLI-agnostic process runner built on node:child_process.
  *
  * Mirrors the ghui CommandRunner pattern: it is the single place a subprocess
  * is spawned. `run` returns raw stdout/stderr/exitCode; `runJson` parses stdout
  * as JSON. Non-zero exit codes and JSON parse failures surface as CommandError.
  */
+import { spawn } from "node:child_process";
 
 export interface CommandResult {
   stdout: string;
@@ -29,12 +30,16 @@ export class CommandError extends Error {
 const DEFAULT_TIMEOUT_MS = 20_000;
 
 const readStream = async (
-  stream: ReadableStream<Uint8Array> | undefined,
+  stream: NodeJS.ReadableStream | null,
 ): Promise<string> => {
   if (!stream) {
     return "";
   }
-  return await new Response(stream).text();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf-8");
 };
 
 export interface RunOptions {
@@ -52,13 +57,10 @@ export const run = async (
 ): Promise<CommandResult> => {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  let proc: Bun.Subprocess<"ignore", "pipe", "pipe">;
+  let proc: ReturnType<typeof spawn>;
   try {
-    proc = Bun.spawn({
-      cmd: [command, ...args],
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
+    proc = spawn(command, args as string[], {
+      stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (cause) {
     const detail =
@@ -74,8 +76,13 @@ export const run = async (
   let stdout: string;
   let stderr: string;
   try {
+    const exited = new Promise<number>((resolve, reject) => {
+      proc.on("close", (code) => resolve(code ?? 1));
+      proc.on("error", reject);
+    });
+    
     [exitCode, stdout, stderr] = await Promise.all([
-      proc.exited,
+      exited,
       readStream(proc.stdout),
       readStream(proc.stderr),
     ]);
