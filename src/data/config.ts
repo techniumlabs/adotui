@@ -142,8 +142,8 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
 
     const repositories = Array.isArray(item.repositories)
       ? item.repositories.filter(
-          (value): value is string => typeof value === "string",
-        )
+        (value): value is string => typeof value === "string",
+      )
       : undefined;
 
     projects.push({
@@ -164,8 +164,8 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
 
   const status =
     record.status === "completed" ||
-    record.status === "abandoned" ||
-    record.status === "all"
+      record.status === "abandoned" ||
+      record.status === "all"
       ? record.status
       : "active";
 
@@ -196,14 +196,12 @@ export const loadConfig = async (): Promise<ConfigResult> => {
 
   const existsResults = await Promise.all(
     searchedPaths.map(async (path) => {
-      let exists = false;
       try {
         await fs.access(path);
-        exists = true;
+        return { path, exists: true };
       } catch {
-        exists = false;
+        return { path, exists: false };
       }
-      return { path, exists };
     })
   );
 
@@ -220,9 +218,8 @@ export const loadConfig = async (): Promise<ConfigResult> => {
       return {
         ok: false,
         errorType: "invalid",
-        error: `Failed to parse config at ${path}: ${
-          cause instanceof Error ? cause.message : String(cause)
-        }`,
+        error: `Failed to parse config at ${path}: ${cause instanceof Error ? cause.message : String(cause)
+          }`,
         searchedPaths,
       };
     }

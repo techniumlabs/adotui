@@ -1,6 +1,6 @@
 {
   "name": "adotui",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Terminal UI for managing Azure DevOps pull requests",
   "main": "dist/main.js",
   "type": "module",
@@ -45,11 +45,13 @@
     "@eslint/js": "^10.0.1",
     "@types/bun": "latest",
     "@types/react": "^19.2.17",
+    "@typescript-eslint/eslint-plugin": "^8.63.0",
+    "@typescript-eslint/parser": "^8.63.0",
     "eslint": "^10.6.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "ink-testing-library": "^4.0.0",
     "react-devtools-core": "^7.0.1",
-    "typescript": "^5",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.63.0"
   },
   "dependencies": {

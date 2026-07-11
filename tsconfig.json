@@ -8,7 +8,6 @@
     "jsx": "react-jsx",
     "allowJs": true,
     "types": ["bun"],
-    "baseUrl": ".",
     "paths": {
       "react-devtools-core": ["./src/mock-devtools.ts"]
     },
@@ -30,5 +29,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "exclude": ["website"]
 }
