@@ -32,6 +32,7 @@ export default [
       "out/**",
       "node_modules/**",
       "dev/**",
+      "website/**",
       "test-*.ts",
     ],
   },

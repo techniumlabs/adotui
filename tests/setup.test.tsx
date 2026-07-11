@@ -13,7 +13,7 @@ describe("SetupScreen UI & Submission", () => {
     const { mkdirSync } = await import("node:fs");
     const testDir = join(tmpdir(), `adotui-setup-test-${Date.now()}`);
     mkdirSync(testDir, { recursive: true });
-    
+
     const originalCwd = process.cwd();
     process.chdir(testDir);
 
@@ -139,22 +139,21 @@ describe("SetupScreen UI & Submission", () => {
   });
 
   test("allows editing and deleting projects in setup wizard", async () => {
-    let completed = false;
     const { tmpdir } = await import("node:os");
     const { mkdirSync } = await import("node:fs");
     const testDir = join(tmpdir(), `adotui-setup-edit-test-${Date.now()}`);
     mkdirSync(testDir, { recursive: true });
-    
+
     const originalCwd = process.cwd();
     process.chdir(testDir);
 
     try {
       const { stdin, lastFrame } = render(
-        <SetupScreen onComplete={() => { completed = true; }} />
+        <SetupScreen onComplete={() => { }} />
       );
 
       await delay(50);
-      
+
       // 1. Go to Add mode
       stdin.write("\r");
       await delay(50);
@@ -162,7 +161,7 @@ describe("SetupScreen UI & Submission", () => {
       // 2. Type Org URL
       stdin.write("https://dev.azure.com/edit-org");
       await delay(50);
-      
+
       // Advance to Project
       stdin.write("\r");
       await delay(50);
@@ -170,7 +169,7 @@ describe("SetupScreen UI & Submission", () => {
       // 3. Type Project Name
       stdin.write("edit-project");
       await delay(50);
-      
+
       // Advance to Repos
       stdin.write("\r");
       await delay(50);
@@ -178,7 +177,7 @@ describe("SetupScreen UI & Submission", () => {
       // 4. Advance to Submit button
       stdin.write("\r");
       await delay(50);
-      
+
       // Submit
       stdin.write("\r");
       await delay(50);
@@ -195,26 +194,26 @@ describe("SetupScreen UI & Submission", () => {
       // 6. Advance to Project Name
       stdin.write("\r");
       await delay(50);
-      
+
       // Clear project name with backspaces
       for (let i = 0; i < 20; i++) {
         stdin.write("\u007F"); // Backspace key
         await delay(10);
       }
       await delay(50);
-      
+
       // Type new project name
       stdin.write("new-edited-project");
       await delay(50);
-      
+
       // Advance to Repos
       stdin.write("\r");
       await delay(50);
-      
+
       // Advance to Submit button
       stdin.write("\r");
       await delay(50);
-      
+
       // Submit edit
       stdin.write("\r");
       await delay(50);
@@ -252,19 +251,19 @@ describe("SetupScreen UI & Submission", () => {
       // Press Enter to go to add mode
       stdin.write("\r");
       await delay(50);
-      
+
       // Press Enter on Organization URL to advance (moves to project)
       stdin.write("\r");
       await delay(50);
-      
+
       // Press Enter on Project to advance (moves to repos)
       stdin.write("\r");
       await delay(50);
-      
+
       // Press Enter on Repos to advance (moves to submit/Add Project)
       stdin.write("\r");
       await delay(50);
-      
+
       // Press Enter on submit
       stdin.write("\r");
       await delay(50);
