@@ -1,25 +1,25 @@
 class Adotui < Formula
   desc "Terminal UI for managing Azure DevOps pull requests"
   homepage "https://github.com/techniumlabs/adotui"
-  version "0.1.6"
+  version "0.1.7"
 
   on_macos do
     if Hardware::CPU.intel?
-      url "https://github.com/techniumlabs/adotui/releases/download/v0.1.6/adotui-macos-x64"
-      sha256 "2524be19c4179755874f374df6c7647d78fd0f23998040f6919d1137a3f154dc"
+      url "https://github.com/techniumlabs/adotui/releases/download/v0.1.7/adotui-macos-x64"
+      sha256 "4b86c72692cc3477b2da31cc64476ce7e1853a479e91a6a91f8a5ef0440543fd"
     elsif Hardware::CPU.arm?
-      url "https://github.com/techniumlabs/adotui/releases/download/v0.1.6/adotui-macos-arm64"
-      sha256 "3472513e23133839f4a51542cbde5ae1c21ec7fa53ba4d844546378080110b6e"
+      url "https://github.com/techniumlabs/adotui/releases/download/v0.1.7/adotui-macos-arm64"
+      sha256 "157cba23012e9b925377a94cd55902dc6b7ce541839f98336d4dbda5d3f4ab84"
     end
   end
 
   on_linux do
     if Hardware::CPU.intel?
-      url "https://github.com/techniumlabs/adotui/releases/download/v0.1.6/adotui-linux-x64"
-      sha256 "ee192f6adf8ee13b2a4e7e4b9559d1f4798de452b27f743576d8b6fd45334878"
+      url "https://github.com/techniumlabs/adotui/releases/download/v0.1.7/adotui-linux-x64"
+      sha256 "f00b6fe1132f2693b5d94fa5d27a97fb552a25515af1600912337f66986bd479"
     elsif Hardware::CPU.arm?
-      url "https://github.com/techniumlabs/adotui/releases/download/v0.1.6/adotui-linux-arm64"
-      sha256 "722fa2cb94e1cedd1dc87ae245eb5cd860d7216791ae442934cc72f239fb2e07"
+      url "https://github.com/techniumlabs/adotui/releases/download/v0.1.7/adotui-linux-arm64"
+      sha256 "b31a3b77df03621e4d5716f1b768abe59b68607ffa0798ead91012a4af212b79"
     end
   end
 
