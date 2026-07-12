@@ -26,7 +26,7 @@ export const PrTabs: React.FC<PrTabsProps> = ({ focus }) => {
   ];
 
   return (
-    <Box marginTop={1} marginLeft={2}>
+    <Box marginLeft={2} >
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (

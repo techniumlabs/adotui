@@ -35,7 +35,7 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
 
   return (
     <Box
-      marginTop={1}
+      borderStyle="single"
       borderTop={true}
       borderBottom={false}
       borderLeft={false}
@@ -72,7 +72,7 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
                 ) : null}
               </Box>
 
-              <Box marginTop={1} flexDirection="row">
+              <Box marginTop={1} flexDirection="row" paddingLeft={2}>
                 {/* Left Column */}
                 <Box flexDirection="column" flexBasis="50%">
                   <Row label="author">
@@ -93,10 +93,10 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
                       {review.symbol} {review.label}
                     </Text>
                   </Row>
-                </Box>
+                  {/* </Box> */}
 
-                {/* Right Column */}
-                <Box flexDirection="column" flexBasis="50%">
+                  {/* Right Column */}
+                  {/* <Box flexDirection="column" flexBasis="50%"> */}
                   <Row label="status">
                     <Text color={status.color}>
                       {status.symbol} {status.label}
@@ -144,7 +144,7 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
               </Box>
 
               {/* Tags full width below columns */}
-              <Box marginTop={1} flexDirection="column">
+              <Box marginTop={1} flexDirection="column" paddingLeft={2}>
                 <Row label="tags">
                   {selectedPr.tags && selectedPr.tags.length > 0 ? (
                     <Box flexDirection="row" flexWrap="wrap">
@@ -161,7 +161,7 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
               </Box>
 
               {/* Work Items full width below columns */}
-              <Box marginTop={1} flexDirection="column">
+              <Box marginTop={1} flexDirection="column" paddingLeft={2}>
                 <Row label="work items">
                   {selectedPr.workItems && selectedPr.workItems.length > 0 ? (
                     <Box flexDirection="column">
@@ -178,12 +178,12 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
                       ))}
                     </Box>
                   ) : (
-                    <Text color={palette.muted}>none</Text>
+                    <Text color={palette.muted}> none</Text>
                   )}
                 </Row>
               </Box>
 
-              <Box marginTop={1}>
+              <Box marginTop={1} paddingLeft={2}>
                 <Text color={palette.muted}>{truncate(selectedPr.url, 66)}</Text>
               </Box>
             </Box>

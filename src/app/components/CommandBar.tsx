@@ -17,7 +17,6 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   if (pendingConfirm) {
     return (
       <Box
-        marginTop={1}
         borderStyle="single"
         borderTop={true}
         borderLeft={false}
@@ -45,7 +44,6 @@ export const CommandBar: React.FC<CommandBarProps> = ({
 
   return (
     <Box
-      marginTop={1}
       borderStyle="single"
       borderTop={true}
       borderLeft={false}

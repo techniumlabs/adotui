@@ -390,11 +390,11 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const terminalHeight = process.stdout.rows ?? 40;
-  const viewportH = Math.max(5, terminalHeight - 22);
+  const viewportH = Math.max(5, terminalHeight - 20);
 
   return (
     <Box
-      marginTop={1}
+      // marginTop={1}
       borderStyle="single"
       borderTop={true}
       borderBottom={false}
@@ -472,7 +472,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
 
         return (
           <Box flexDirection="column">
-            <Box flexDirection="column" height={viewportH} overflow="hidden">
+            <Box flexDirection="column" height={inputMode !== "none" ? viewportH - 6 : viewportH} overflow="hidden">
               {visibleThreads.map((thread) => {
                 const idx = threads.findIndex(t => t.id === thread.id);
                 const isSelected = idx === selectedThread && active;
@@ -632,8 +632,8 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
       )}
 
       {/* Keyboard hint */}
-      {active && inputMode === "none" && (
-        <Box marginTop={1}>
+      <Box height={1} marginTop={1} flexShrink={0}>
+        {active && inputMode === "none" && (
           <Text color={palette.muted}>
             <Text color={palette.accentDim}>j/k</Text> navigate{"  "}
             <Text color={palette.accentDim}>[/]</Text> select comment{"  "}
@@ -645,8 +645,9 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
             <Text color={palette.accentDim}>Ctrl+R</Text> refresh{"  "}
             <Text color={palette.accentDim}>h</Text> back
           </Text>
-        </Box>
-      )}
+        )}
+      </Box>
+
     </Box>
   );
 };

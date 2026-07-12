@@ -392,7 +392,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
           onSelectedRowChange(nextRow);
 
           const terminalHeight = process.stdout.rows ?? 40;
-          const viewportH = Math.max(5, terminalHeight - 35);
+          const viewportH = Math.max(5, terminalHeight - 27);
           if (nextRow >= diffScrollOffset + viewportH) {
             onScrollOffsetChange(nextRow - viewportH + 1);
           }
@@ -409,7 +409,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
         }
 
         const terminalHeight = process.stdout.rows ?? 40;
-        const viewportH = Math.max(5, terminalHeight - 35);
+        const viewportH = Math.max(5, terminalHeight - 27);
 
         if (input === "g") {
           onSelectedRowChange(0);
@@ -468,7 +468,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
   const hasDiff = !!selectedFile && (selectedFile.diff.length > 0 || typeof selectedFile.rawDiff === "string");
 
   const terminalHeight = process.stdout.rows ?? 40;
-  const viewportH = Math.max(5, terminalHeight - 32);
+  const viewportH = Math.max(5, terminalHeight - 27);
   const total = diffRows.length;
   const clampedOffset = Math.min(diffScrollOffset, Math.max(0, total - viewportH));
   const visibleRows = diffRows.slice(clampedOffset, clampedOffset + viewportH).map(r => r.element);
@@ -477,8 +477,11 @@ export const FilesView: React.FC<FilesViewProps> = ({
 
   return (
     <Box
-      marginTop={1}
       borderStyle="single"
+      borderTop={true}
+      borderBottom={false}
+      borderLeft={false}
+      borderRight={false}
       borderColor={palette.border}
       paddingX={1}
       flexDirection="column"
@@ -501,46 +504,46 @@ export const FilesView: React.FC<FilesViewProps> = ({
           <Text color={palette.danger}>No files match the filter "{fileFilter}".</Text>
         ) : (
           flatFiles.map((file, idx) => {
-          const show =
-            flatFiles.length <= 5
-              ? true
-              : selectedFileIndex < 2
-                ? idx < 5
-                : selectedFileIndex >= flatFiles.length - 2
-                  ? idx >= flatFiles.length - 5
-                  : Math.abs(idx - selectedFileIndex) <= 2;
-          if (!show) return null;
+            const show =
+              flatFiles.length <= 5
+                ? true
+                : selectedFileIndex < 2
+                  ? idx < 5
+                  : selectedFileIndex >= flatFiles.length - 2
+                    ? idx >= flatFiles.length - 5
+                    : Math.abs(idx - selectedFileIndex) <= 2;
+            if (!show) return null;
 
-          const isSelected = idx === selectedFileIndex;
-          const badge = fileChangeBadge(file.status);
-          const parts = file.path.split("/");
-          const fileName = parts[parts.length - 1] ?? file.path;
-          const dir = parts.slice(0, -1).join("/");
+            const isSelected = idx === selectedFileIndex;
+            const badge = fileChangeBadge(file.status);
+            const parts = file.path.split("/");
+            const fileName = parts[parts.length - 1] ?? file.path;
+            const dir = parts.slice(0, -1).join("/");
 
-          return (
-            <Text key={file.path} wrap="truncate-end">
-              <Text color={isSelected ? palette.accent : palette.muted}>
-                {isSelected ? glyph.pointer : glyph.pointerIdle}{" "}
-              </Text>
-              <Text color={badge.color} bold>
-                {badge.symbol}{" "}
-              </Text>
-              <Text color={isSelected ? palette.textBright : palette.text}>
-                {dir ? (
-                  <Text color={palette.muted}>{dir}/</Text>
-                ) : null}
-                {fileName}
-              </Text>
-              {file.additions > 0 || file.deletions > 0 ? (
-                <Text>
-                  {" "}
-                  <Text color={palette.ok}>+{file.additions}</Text>
-                  <Text color={palette.danger}> -{file.deletions}</Text>
+            return (
+              <Text key={file.path} wrap="truncate-end">
+                <Text color={isSelected ? palette.accent : palette.muted}>
+                  {isSelected ? glyph.pointer : glyph.pointerIdle}{" "}
                 </Text>
-              ) : null}
-            </Text>
-          );
-        })
+                <Text color={badge.color} bold>
+                  {badge.symbol}{" "}
+                </Text>
+                <Text color={isSelected ? palette.textBright : palette.text}>
+                  {dir ? (
+                    <Text color={palette.muted}>{dir}/</Text>
+                  ) : null}
+                  {fileName}
+                </Text>
+                {file.additions > 0 || file.deletions > 0 ? (
+                  <Text>
+                    {" "}
+                    <Text color={palette.ok}>+{file.additions}</Text>
+                    <Text color={palette.danger}> -{file.deletions}</Text>
+                  </Text>
+                ) : null}
+              </Text>
+            );
+          })
         )}
       </Box>
 
@@ -554,7 +557,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
             <Text color={palette.ok}>+{selectedFile.additions ?? 0}</Text>
             <Text color={palette.danger}> -{selectedFile.deletions ?? 0}</Text>
           </Text>
-          
+
           {selectedFile.loadingDiff ? (
             <Box marginY={1} marginLeft={2}>
               <Text color={palette.accent}><Spinner type="dots" /> Loading diff...</Text>
@@ -563,7 +566,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
             <Box flexDirection="column">
               {diffRows.length > 0 ? (
                 <>
-                  <Box flexDirection="column" height={viewportH} overflow="hidden">{visibleRows}</Box>
+                  <Box flexDirection="column" height={commentMode ? viewportH - 3.5 : viewportH} overflow="hidden">{visibleRows}</Box>
                   <Text color={palette.muted}>
                     {canScrollUp ? "↑ " : "  "}
                     {`row ${diffSelectedRow + 1} of ${total}`}
@@ -589,10 +592,10 @@ export const FilesView: React.FC<FilesViewProps> = ({
           {active && !commentMode && (
             <Box marginTop={1}>
               <Text color={palette.muted}>
-                <Text color={palette.accentDim}>j/k</Text> navigate{"  "}
+
                 <Text color={palette.accentDim}>n</Text> comment{"  "}
                 <Text color={palette.accentDim}>[/]</Text> switch files{"  "}
-                <Text color={palette.accentDim}>PgDn/PgUp</Text> page{"  "}
+                <Text color={palette.accentDim}>j/k, ↑/↓</Text> navigate{"  "}
                 <Text color={palette.accentDim}>g/G</Text> top/end
               </Text>
             </Box>

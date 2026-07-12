@@ -52,7 +52,7 @@ const invokeGet = async <T>(
   }
 
   try {
-    debugLog("invokeGet", args);
+    debugLog("invokeGet");
     return await runJson<T>(AZ, args, { timeoutMs: 20_000 });
   } catch {
     return null;

@@ -60,7 +60,7 @@ export const App: React.FC = () => {
   }
 
   return (
-    <Box flexDirection="column" minHeight={size.rows} width="100%">
+    <Box flexDirection="column" height={size.rows} width="100%">
       <ToastContainer toasts={state.toasts || []} />
       {/* Header */}
       <Box paddingX={1} justifyContent="space-between">
@@ -73,7 +73,7 @@ export const App: React.FC = () => {
       </Box>
 
       {/* Banner / Status line */}
-      <Box paddingX={1} borderBottom={false} borderStyle="single" borderColor={palette.border}>
+      <Box paddingX={1} borderStyle="single" borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} borderColor={palette.border}>
         <Text
           color={
             state.loadState === "error"
@@ -122,6 +122,7 @@ export const App: React.FC = () => {
               flexDirection="column"
               borderStyle="round"
               borderColor={state.focus !== "tree" ? palette.accent : palette.border}
+              width={size.columns - 20}
             >
               <PullRequestList
                 pullRequests={selectedRepo?.pullRequests ?? []}
@@ -132,22 +133,22 @@ export const App: React.FC = () => {
               />
               {selectedPr && <PrTabs focus={state.focus} />}
               {(() => {
-                const renderFocus = (state.focus === "command" || state.focus === "completion") 
-                  ? (state.previousFocus ?? "detail") 
+                const renderFocus = (state.focus === "command" || state.focus === "completion")
+                  ? (state.previousFocus ?? "detail")
                   : state.focus;
-                
+
                 if (renderFocus === "files") {
                   return (
                     <FilesView
                       selectedPr={selectedPr}
-                  selectedFileIndex={state.selectedFileIndex}
-                  diffScrollOffset={state.diffScrollOffset}
-                  onScrollOffsetChange={actions.setDiffScrollOffset}
-                  diffSelectedRow={state.diffSelectedRow}
-                  onSelectedRowChange={actions.setDiffSelectedRow}
-                  focus={state.focus}
-                  diffViewMode={state.diffViewMode}
-                  onInputModeChange={actions.setCommentInputActive}
+                      selectedFileIndex={state.selectedFileIndex}
+                      diffScrollOffset={state.diffScrollOffset}
+                      onScrollOffsetChange={actions.setDiffScrollOffset}
+                      diffSelectedRow={state.diffSelectedRow}
+                      onSelectedRowChange={actions.setDiffSelectedRow}
+                      focus={state.focus}
+                      diffViewMode={state.diffViewMode}
+                      onInputModeChange={actions.setCommentInputActive}
                       isLoading={state.loadState === "loading"}
                       fileFilter={state.fileFilter}
                       updateFileDiff={actions.updateFileDiff}
@@ -155,24 +156,24 @@ export const App: React.FC = () => {
                     />
                   );
                 }
-                
+
                 if (renderFocus === "comments") {
                   return (
                     <CommentsView
                       selectedPr={selectedPr}
-                  focus={state.focus}
-                  currentUserEmail={state.data.currentUserEmail}
+                      focus={state.focus}
+                      currentUserEmail={state.data.currentUserEmail}
                       onInputModeChange={actions.setCommentInputActive}
                     />
                   );
                 }
-                
+
                 if (renderFocus === "runs") {
                   if (process.env.NODE_ENV === "debug") {
                     return <PipelineRunsView selectedPr={selectedPr} focus={state.focus} />;
                   }
                 }
-                
+
                 return <PrDetails selectedPr={selectedPr} focus={state.focus} />;
               })()}
             </Box>
@@ -195,7 +196,6 @@ export const App: React.FC = () => {
         borderBottom={false}
         borderColor={palette.border}
         paddingX={2}
-        paddingBottom={1}
       >
         <Text color={palette.muted}>
           <Text color={palette.accent} bold>/</Text> filter{"   "}
