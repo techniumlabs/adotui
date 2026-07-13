@@ -453,6 +453,42 @@ const hydratePullRequest = async (
     workItems,
     iterSourceCommit,
     iterTargetCommit,
+    detailsLoaded: options.fetchDetails,
+  };
+};
+
+export const fetchPrDetails = async (pr: PullRequest): Promise<Partial<PullRequest>> => {
+  const repositoryId = pr.repositoryId ?? pr.repository;
+  
+  const [fileRes, policies, items, threads] = await Promise.all([
+    listPrFileChanges(
+      pr.organizationUrl,
+      pr.project,
+      repositoryId,
+      pr.id,
+      undefined,
+      undefined,
+    ),
+    listPrPolicies(pr.organizationUrl, pr.project, pr.id),
+    listPrWorkItems(pr.organizationUrl, pr.id),
+    fetchPrComments(pr.organizationUrl, pr.project, repositoryId, pr.id),
+  ]);
+
+  const checks = summarizeChecks(policies);
+
+  return {
+    changedFiles: fileRes.files,
+    iterSourceCommit: fileRes.iterSourceCommit,
+    iterTargetCommit: fileRes.iterTargetCommit,
+    checksPassed: checks.passed,
+    checksTotal: checks.total,
+    workItems: items,
+    comments: threads.reduce((acc, t) => acc + t.comments.length, 0),
+    activeComments: threads.reduce(
+      (acc, t) => acc + (t.status === "active" || t.status === "pending" ? t.comments.length : 0),
+      0
+    ),
+    detailsLoaded: true,
   };
 };
 

@@ -31,8 +31,8 @@ export function useAppState(exitApp: () => void) {
   const selectedRepo = selectedOrg?.repositories[state.selectedRepoIndex];
 
   const visiblePrs = useMemo(
-    () => getVisiblePrs(selectedRepo, state.treeFilter),
-    [selectedRepo, state.treeFilter],
+    () => getVisiblePrs(selectedRepo, state.treeFilter, state.data.currentUserEmail),
+    [selectedRepo, state.treeFilter, state.data.currentUserEmail],
   );
 
   const selectedPr: PullRequest | undefined = visiblePrs[state.selectedPrIndex];
@@ -87,6 +87,19 @@ export function useAppState(exitApp: () => void) {
     }));
   };
 
+  const updatePr = (orgUrl: string, repoName: string, prId: number, updates: Partial<PullRequest>) => {
+    setState(produce(draft => {
+      const org = draft.data.organizations.find(o => o.organizationUrl === orgUrl);
+      if (!org) return;
+      const repo = org.repositories.find(r => r.name === repoName);
+      if (!repo) return;
+      const pr = repo.pullRequests.find(p => p.id === prId);
+      if (pr) {
+        Object.assign(pr, updates);
+      }
+    }));
+  };
+
   // Initial data load
   useEffect(() => {
     doRefresh("initial");
@@ -117,6 +130,7 @@ export function useAppState(exitApp: () => void) {
       setCommentInputActive,
       updateFileDiff,
       setFileLoading,
+      updatePr,
     },
   };
 }

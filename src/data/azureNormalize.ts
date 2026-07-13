@@ -188,6 +188,11 @@ export const normalizePullRequest = (
     tags,
     changedFiles: context.changedFiles ?? [],
     mergeStatus: normalizeMergeStatus(pr.mergeStatus),
+    workItems: [],
+    reviewers: (pr.reviewers ?? []).map(r => ({
+      displayName: r.displayName ?? "",
+      uniqueName: r.uniqueName ?? "",
+    })),
     organizationUrl: context.organization,
     project: context.project,
     repository: context.repository,

@@ -69,7 +69,7 @@ export const loadInitialData = async (allowCache = false, onProgress?: (msg: str
 
   try {
     const [{ data, warnings }, currentUserResult] = await Promise.all([
-      loadAppData(configResult.config, { onProgress }),
+      loadAppData(configResult.config, { onProgress, fetchDetails: false }),
       runJson<{ user?: { name?: string } }>("az", ["account", "show", "--output", "json"]).catch(() => null)
     ]);
 

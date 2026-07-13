@@ -86,8 +86,32 @@ export const clampPrIndex = (
   index: number,
 ): number => clamp(index, 0, Math.max(0, (repo?.pullRequests.length ?? 1) - 1));
 
-export const matchesTreeFilter = (pr: PullRequest, filterStr: string): boolean => {
+export const matchesTreeFilter = (pr: PullRequest, filterStr: string, currentUserEmail?: string): boolean => {
   if (!filterStr || filterStr === "all" || filterStr === "with-prs") return true;
+
+  if (filterStr === "me") {
+    if (!currentUserEmail) return true;
+    const emailPrefix = currentUserEmail.split('@')[0]?.toLowerCase();
+    if (!emailPrefix) return true;
+    
+    const emailParts = emailPrefix.split(/[.\-_]/);
+    const lowerAuthor = pr.author.toLowerCase();
+    
+    // Check if author matches
+    if (emailParts.some(part => part.length > 2 && lowerAuthor.includes(part))) {
+      return true;
+    }
+    
+    // Check if user is in reviewers
+    if (pr.reviewers) {
+      return pr.reviewers.some(r => {
+        const lowerName = (r.displayName + " " + r.uniqueName).toLowerCase();
+        return emailParts.some(part => part.length > 2 && lowerName.includes(part));
+      });
+    }
+    
+    return false;
+  }
 
   const parts = filterStr.split(/\s+/);
   for (const part of parts) {
@@ -128,11 +152,12 @@ export const matchesTreeFilter = (pr: PullRequest, filterStr: string): boolean =
 export const getVisiblePrs = (
   repo: { pullRequests: PullRequest[] } | undefined,
   treeFilter: string,
+  currentUserEmail?: string,
 ): PullRequest[] => {
   if (!repo) return [];
   let prs = repo.pullRequests;
   if (treeFilter !== "all" && treeFilter !== "with-prs") {
-    prs = prs.filter((pr) => matchesTreeFilter(pr, treeFilter));
+    prs = prs.filter((pr) => matchesTreeFilter(pr, treeFilter, currentUserEmail));
   }
   return prs;
 };

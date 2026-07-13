@@ -58,7 +58,13 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
           {glyph.files} Organizations
         </Text>
         <Text color={filteringByPrs || isCustomFilter ? palette.warn : palette.muted}>
-          {filteringByPrs ? "PRs only" : isCustomFilter ? "filtered" : "all"}
+          {filteringByPrs 
+            ? "PRs only" 
+            : treeFilter === "all" 
+              ? "All" 
+              : treeFilter === "me" 
+                ? "My PRs" 
+                : `Filter: ${treeFilter}`}
         </Text>
       </Box>
 
@@ -69,10 +75,10 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
           const orgSelected = orgIndex === selectedOrgIndex;
 
           const visibleRepos = org.repositories.map(repo => {
-             const matchingPrs = (treeFilter === "all" || treeFilter === "with-prs") 
-                 ? repo.pullRequests 
-                 : repo.pullRequests.filter(pr => matchesTreeFilter(pr, treeFilter));
-             return { ...repo, pullRequests: matchingPrs };
+            const matchingPrs = (treeFilter === "all" || treeFilter === "with-prs")
+              ? repo.pullRequests
+              : repo.pullRequests.filter(pr => matchesTreeFilter(pr, treeFilter));
+            return { ...repo, pullRequests: matchingPrs };
           }).filter(r => (treeFilter === "all" ? true : r.pullRequests.length > 0));
 
           const prCount = visibleRepos.reduce(
@@ -85,10 +91,10 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
           // Build flat-index-preserving groups from the FILTERED repos.
           const filteredWithIndex = org.repositories
             .map((repo, idx) => {
-               const matchingPrs = (treeFilter === "all" || treeFilter === "with-prs")
-                 ? repo.pullRequests 
-                 : repo.pullRequests.filter(pr => matchesTreeFilter(pr, treeFilter));
-               return { repo: { ...repo, pullRequests: matchingPrs }, flatIndex: idx };
+              const matchingPrs = (treeFilter === "all" || treeFilter === "with-prs")
+                ? repo.pullRequests
+                : repo.pullRequests.filter(pr => matchesTreeFilter(pr, treeFilter));
+              return { repo: { ...repo, pullRequests: matchingPrs }, flatIndex: idx };
             })
             .filter(({ repo }) => (treeFilter === "all" ? true : repo.pullRequests.length > 0));
 

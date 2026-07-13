@@ -91,6 +91,7 @@ export interface PullRequest {
   changedFiles: PullRequestFileChange[];
   mergeStatus: MergeStatus;
   workItems?: PullRequestWorkItem[];
+  reviewers?: { displayName: string; uniqueName: string }[];
   /**
    * Routing info identifying where this PR lives, used to dispatch `az`
    * actions unambiguously (independent of how the tree is grouped/labelled).
@@ -102,6 +103,7 @@ export interface PullRequest {
   repositoryId?: string;
   iterSourceCommit?: string;
   iterTargetCommit?: string;
+  detailsLoaded?: boolean;
 }
 
 export interface RepositoryNode {

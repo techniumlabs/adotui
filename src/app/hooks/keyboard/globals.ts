@@ -55,6 +55,16 @@ export function handleGlobals(
     setState((c) => ({ ...c, previousFocus: c.focus, focus: "command", commandText: "", banner: "Command mode." }));
     return true;
   }
+  if (input === "v" || input === "V") {
+    setState((c) => {
+      const filters = ["me", "with-prs", "all"];
+      const currentIndex = filters.indexOf(c.treeFilter);
+      const nextIndex = (currentIndex + 1) % filters.length;
+      const nextFilter = filters[nextIndex] ?? "me";
+      return { ...c, treeFilter: nextFilter, selectedOrgIndex: 0, selectedRepoIndex: 0, selectedPrIndex: 0, banner: `Filter changed to: ${nextFilter}` };
+    });
+    return true;
+  }
   if (input === "a") { actions.armConfirm("approve"); return true; }
   if (input === "x") { actions.armConfirm("reject"); return true; }
   if (input === "b") { actions.armConfirm("abandon"); return true; }

@@ -16,6 +16,7 @@ import { formatRelativeAge } from "./utils";
 import { glyph, palette } from "./theme";
 import { useAppState } from "./hooks/useAppState";
 import { useAppKeyboard } from "./hooks/useAppKeyboard";
+import { usePrDetails } from "./hooks/usePrDetails";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { Splash } from "./components/Splash";
 import { HelpView } from "./components/HelpView";
@@ -27,6 +28,7 @@ export const App: React.FC = () => {
   const size = useTerminalSize();
   const app = useAppState(exit);
   useAppKeyboard(app, exit);
+  usePrDetails(app.selectedPr, app.actions.updatePr);
 
   React.useEffect(() => {
     if (app.state.loadState === "setup") {
@@ -50,6 +52,9 @@ export const App: React.FC = () => {
     activePrs,
     actions,
   } = app;
+
+  const availableContentHeight = Math.max(10, size.rows - 15);
+  const maxPrs = Math.max(5, Math.floor(availableContentHeight / 2));
 
   if (showSplash) {
     return <Splash />;
@@ -130,6 +135,7 @@ export const App: React.FC = () => {
                 repoName={selectedRepo?.name}
                 selectedPrIndex={state.selectedPrIndex}
                 focus={state.focus}
+                maxPrs={maxPrs}
               />
               {selectedPr && <PrTabs focus={state.focus} />}
               {(() => {

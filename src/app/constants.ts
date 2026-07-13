@@ -31,7 +31,7 @@ export const INITIAL_STATE: AppState = {
   diffViewMode: "unified",
   diffScrollOffset: 0,
   diffSelectedRow: 0,
-  treeFilter: "with-prs" satisfies TreeFilter,
+  treeFilter: "me" satisfies TreeFilter,
   fileFilter: "",
   commentInputActive: false,
   loadState: "loading",
