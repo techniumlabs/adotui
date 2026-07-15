@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import type { PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
 import { glyph, palette, reviewBadge, statusBadge, truncate } from "../theme";
+import { isAssignedReviewer, isMyPr } from "../utils";
 
 type PullRequestListProps = {
   pullRequests: PullRequest[];
@@ -11,22 +12,35 @@ type PullRequestListProps = {
   selectedPrIndex: number;
   focus: FocusArea;
   maxPrs?: number;
+  currentUserEmail?: string;
 };
 
-const PrRow: React.FC<{ pr: PullRequest; selected: boolean }> = ({
-  pr,
-  selected,
-}) => {
+const PrRow: React.FC<{
+  pr: PullRequest;
+  selected: boolean;
+  currentUserEmail?: string;
+}> = ({ pr, selected, currentUserEmail }) => {
   const review = reviewBadge(pr.reviewState);
   const status = statusBadge(pr.status);
   const hasConflict = pr.mergeStatus === "conflicts";
+  const mine = isMyPr(pr, currentUserEmail);
+  const toReview = !mine && isAssignedReviewer(pr, currentUserEmail);
 
   return (
     <Box>
       <Text color={selected ? palette.accent : palette.muted}>
         {selected ? glyph.pointer : glyph.pointerIdle}{" "}
       </Text>
-      
+
+      {/* Mine / assigned-to-review marker */}
+      <Box width={2}>
+        {mine ? (
+          <Text color={palette.accent}>{glyph.mine}</Text>
+        ) : toReview ? (
+          <Text color={palette.warn}>{glyph.review}</Text>
+        ) : null}
+      </Box>
+
       {/* ID */}
       <Box width={6}>
         <Text color={palette.muted}>#{pr.id}</Text>
@@ -78,6 +92,7 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
   selectedPrIndex,
   focus,
   maxPrs,
+  currentUserEmail,
 }) => {
   const active = focus === "list";
 
@@ -121,7 +136,12 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
           displayedPrs.map((pr, i) => {
             const actualIndex = startIndex + i;
             return (
-              <PrRow key={pr.id} pr={pr} selected={actualIndex === selectedPrIndex} />
+              <PrRow
+                key={pr.id}
+                pr={pr}
+                selected={actualIndex === selectedPrIndex}
+                currentUserEmail={currentUserEmail}
+              />
             );
           })
         ) : (
@@ -130,6 +150,7 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
               key={visiblePrs[selectedPrIndex].id}
               pr={visiblePrs[selectedPrIndex]}
               selected={true}
+              currentUserEmail={currentUserEmail}
             />
           ) : null
         )

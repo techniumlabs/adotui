@@ -44,6 +44,8 @@ export const glyph = {
   modified: "~",
   auto: "⟳",
   bullet: "·",
+  mine: "◆",
+  review: "◈",
 } as const;
 
 export interface Badge {

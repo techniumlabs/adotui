@@ -37,6 +37,10 @@ const RAW_MOCK_DATA: { organizations: RawOrg[] } = {
               draft: false,
               status: "active",
               reviewState: "pending",
+              reviewers: [
+                { displayName: "Ram Patel", uniqueName: "ram@example.com" },
+                { displayName: "Nina Alvarez", uniqueName: "nina@example.com" },
+              ],
               sourceBranch: "feature/grouped-feed",
               targetBranch: "main",
               updatedAt: "2026-07-01T14:00:00.000Z",
@@ -108,6 +112,49 @@ const RAW_MOCK_DATA: { organizations: RawOrg[] } = {
               mergeStatus: "succeeded",
             }
           ]
+        },
+        // Same repo name under two different projects: Azure DevOps repo names
+        // are unique per project, not per org. One of the pair has no PRs, so
+        // filter switches (all → with-prs/me) must drop it without leaving
+        // stale tree rows behind.
+        {
+          name: "enrollment-service",
+          project: "platform-core",
+          pullRequests: [],
+        },
+        {
+          name: "enrollment-service",
+          project: "platform-edge",
+          pullRequests: [
+            {
+              id: 512,
+              title: "Handle duplicate repo names across projects",
+              author: "maya",
+              draft: false,
+              status: "active",
+              reviewState: "pending",
+              sourceBranch: "fix/duplicate-repo-names",
+              targetBranch: "main",
+              updatedAt: "2026-07-02T10:30:00.000Z",
+              comments: 0, activeComments: 0,
+              checksPassed: 4,
+              checksTotal: 4,
+              url: "https://dev.azure.com/contoso-platform/platform-edge/_git/enrollment-service/pullrequest/512",
+              changedFiles: [
+                {
+                  path: "src/app/components/OrganizationTree.tsx",
+                  status: "modified",
+                  additions: 6,
+                  deletions: 9,
+                  diff: [
+                    "- <Box key={`${orgKey}-repo-${repo.name}`}>",
+                    "+ <Box key={`${orgKey}-repo-${flatIndex}`}>",
+                  ],
+                },
+              ],
+              mergeStatus: "succeeded",
+            },
+          ],
         },
         {
           name: "adotui-connectors",
@@ -229,6 +276,12 @@ const RAW_MOCK_DATA: { organizations: RawOrg[] } = {
               draft: false,
               status: "active",
               reviewState: "pending",
+              // Review assigned to the mock login user (not the author) so a
+              // small org also exercises the "to review" path.
+              reviewers: [
+                { displayName: "Maya Iyer", uniqueName: "maya@example.com" },
+                { displayName: "Lee Wong", uniqueName: "lee@example.com" },
+              ],
               sourceBranch: "feature/swr-cache",
               targetBranch: "main",
               updatedAt: "2026-06-30T23:10:00.000Z",
@@ -273,6 +326,20 @@ const STRESS_TITLES = [
 const STRESS_AUTHORS = ["maya", "ram", "sanjay", "nina", "lee", "ivy"];
 const STRESS_REVIEWS: ReviewState[] = ["pending", "approved", "changes-requested"];
 
+/** The user mock mode pretends is logged in (drives the "My PRs" tree filter). */
+export const MOCK_CURRENT_USER_EMAIL = "maya@example.com";
+
+const MOCK_CURRENT_USER_REVIEWER = {
+  displayName: "Maya Iyer",
+  uniqueName: MOCK_CURRENT_USER_EMAIL,
+};
+
+const STRESS_REVIEWERS = [
+  { displayName: "Ram Patel", uniqueName: "ram@example.com" },
+  { displayName: "Nina Alvarez", uniqueName: "nina@example.com" },
+  { displayName: "Sanjay Rao", uniqueName: "sanjay@example.com" },
+];
+
 const makeStressPr = (repoName: string, seed: number, prIdx: number): RawPr => {
   const n = seed * 7 + prIdx;
   return {
@@ -299,6 +366,13 @@ const makeStressPr = (repoName: string, seed: number, prIdx: number): RawPr => {
         diff: ["+ // updated handler", "- // old handler"],
       },
     ],
+    // Every third PR is assigned to the mock login user for review; the rest
+    // rotate through other reviewers, so the "My PRs" filter has both matches
+    // and non-matches to exercise in this org.
+    reviewers:
+      n % 3 === 0
+        ? [MOCK_CURRENT_USER_REVIEWER, STRESS_REVIEWERS[n % STRESS_REVIEWERS.length]!]
+        : [STRESS_REVIEWERS[n % STRESS_REVIEWERS.length]!],
     mergeStatus: n % 9 === 0 ? "conflicts" : "succeeded",
   };
 };
@@ -329,6 +403,9 @@ RAW_MOCK_DATA.organizations.push(STRESS_ORG);
  * `az` actions, so these values are illustrative only.
  */
 export const MOCK_DATA: AppData = {
+  // Without a current user, the "me" tree filter matches every PR; pin a mock
+  // identity so "My PRs" is testable in mock mode.
+  currentUserEmail: MOCK_CURRENT_USER_EMAIL,
   organizations: RAW_MOCK_DATA.organizations.map((org) => {
     const organizationUrl = `https://dev.azure.com/${org.name}`;
     return {

@@ -65,7 +65,7 @@ export function useRefresh(
           const repoCount = nextOrg?.repositories.length ?? 0;
           const nextRepoIndex = clamp(current.selectedRepoIndex, 0, Math.max(0, repoCount - 1));
           const nextRepo = nextOrg?.repositories[nextRepoIndex];
-          const nextVisible = getVisiblePrs(nextRepo, current.treeFilter);
+          const nextVisible = getVisiblePrs(nextRepo, current.treeFilter, result.data.currentUserEmail);
           
           const isMissingConfig = (!result.ok && result.errorType === "missing") || process.env.ADOTUI_FORCE_SETUP === "1";
           const nextLoadState = isMissingConfig ? "setup" : (result.ok ? "ready" : "error");

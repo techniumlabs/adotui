@@ -14,7 +14,9 @@ export function useSelection(setState: Dispatch<SetStateAction<AppState>>) {
           const matchingPrs =
             filter === "all" || filter === "with-prs"
               ? repo.pullRequests
-              : repo.pullRequests.filter((pr) => matchesTreeFilter(pr, filter));
+              : repo.pullRequests.filter((pr) =>
+                  matchesTreeFilter(pr, filter, current.data.currentUserEmail),
+                );
           if (filter === "all" || matchingPrs.length > 0) {
             flatList.push({ orgIndex: orgIdx, repoIndex: repoIdx });
             added = true;
@@ -46,7 +48,7 @@ export function useSelection(setState: Dispatch<SetStateAction<AppState>>) {
       const { orgIndex: nextOrgIndex, repoIndex: nextRepoIndex } = flatList[nextIndex]!;
       const nextOrg = current.data.organizations[nextOrgIndex];
       const nextRepo = nextOrg?.repositories[nextRepoIndex];
-      const nextVisible = getVisiblePrs(nextRepo, current.treeFilter);
+      const nextVisible = getVisiblePrs(nextRepo, current.treeFilter, current.data.currentUserEmail);
 
       return {
         ...current,
@@ -63,7 +65,7 @@ export function useSelection(setState: Dispatch<SetStateAction<AppState>>) {
     setState((current) => {
       const org = current.data.organizations[current.selectedOrgIndex];
       const repo = org?.repositories[current.selectedRepoIndex];
-      const visible = getVisiblePrs(repo, current.treeFilter);
+      const visible = getVisiblePrs(repo, current.treeFilter, current.data.currentUserEmail);
       if (visible.length === 0) return current;
 
       const nextIndex = clamp(current.selectedPrIndex + delta, 0, visible.length - 1);

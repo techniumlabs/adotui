@@ -17,20 +17,20 @@ type OrganizationTreeProps = {
 
 const PANEL_WIDTH = 36;
 
-/** Groups repos by their project name, preserving the original flat index. */
+/** Groups repos by their project name, preserving each repo's original flat index. */
 const groupByProject = (
-  repos: RepositoryNode[],
+  entries: { repo: RepositoryNode; flatIndex: number }[],
 ): { projectName: string; entries: { repo: RepositoryNode; flatIndex: number }[] }[] => {
   const groups: { projectName: string; entries: { repo: RepositoryNode; flatIndex: number }[] }[] = [];
   const map = new Map<string, typeof groups[number]>();
-  repos.forEach((repo, idx) => {
-    const key = repo.project;
+  entries.forEach((entry) => {
+    const key = entry.repo.project;
     if (!map.has(key)) {
-      const g = { projectName: key, entries: [] };
+      const g: typeof groups[number] = { projectName: key, entries: [] };
       map.set(key, g);
       groups.push(g);
     }
-    map.get(key)!.entries.push({ repo, flatIndex: idx });
+    map.get(key)!.entries.push(entry);
   });
   return groups;
 };
@@ -56,21 +56,8 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
     const orgSelected = orgIndex === selectedOrgIndex;
     const orgKey = org.organizationUrl || org.name;
 
-    const visibleRepos = org.repositories.map(repo => {
-      const matchingPrs = (treeFilter === "all" || treeFilter === "with-prs")
-        ? repo.pullRequests
-        : repo.pullRequests.filter(pr => matchesTreeFilter(pr, treeFilter, data.currentUserEmail));
-      return { ...repo, pullRequests: matchingPrs };
-    }).filter(r => (treeFilter === "all" ? true : r.pullRequests.length > 0));
-
-    const prCount = visibleRepos.reduce(
-      (sum, repo) => sum + repo.pullRequests.length,
-      0,
-    );
-
-    const visibleCount = visibleRepos.length;
-
-    // Build flat-index-preserving groups from the FILTERED repos.
+    // Filter repos once, keeping each repo's original flat index so selection
+    // stays aligned with the unfiltered list.
     const filteredWithIndex = org.repositories
       .map((repo, idx) => {
         const matchingPrs = (treeFilter === "all" || treeFilter === "with-prs")
@@ -80,13 +67,14 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
       })
       .filter(({ repo }) => (treeFilter === "all" ? true : repo.pullRequests.length > 0));
 
-    const projectGroups = groupByProject(
-      filteredWithIndex.map(({ repo }) => repo),
+    const prCount = filteredWithIndex.reduce(
+      (sum, { repo }) => sum + repo.pullRequests.length,
+      0,
     );
-    // Re-attach original flat indices
-    const flatIndexMap = new Map<string, number>(
-      filteredWithIndex.map(({ repo, flatIndex }) => [repo.name, flatIndex]),
-    );
+
+    const visibleCount = filteredWithIndex.length;
+
+    const projectGroups = groupByProject(filteredWithIndex);
 
     if (orgIndex === 0) {
       rows.push(<Text key={`${orgKey}-space`}> </Text>);
@@ -134,16 +122,15 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
             </Box>,
           );
 
-          entries.forEach(({ repo }, entryIdx) => {
-            const originalFlatIndex = flatIndexMap.get(repo.name) ?? 0;
-            const repoSelected = orgSelected && originalFlatIndex === selectedRepoIndex;
+          entries.forEach(({ repo, flatIndex }, entryIdx) => {
+            const repoSelected = orgSelected && flatIndex === selectedRepoIndex;
             const isLastRepo = entryIdx === entries.length - 1;
             const vertPrefix = isLastProject ? "     " : `  ${glyph.vert}  `;
             const repoConnector = isLastRepo ? glyph.branchLast : glyph.branch;
 
             if (repoSelected) selectedRow = rows.length;
             rows.push(
-              <Box key={`${orgKey}-repo-${repo.name}`}>
+              <Box key={`${orgKey}-repo-${flatIndex}`}>
                 <Text color={palette.muted}>
                   {vertPrefix}{repoConnector}{" "}
                 </Text>

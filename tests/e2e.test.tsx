@@ -24,15 +24,27 @@ describe("Adotui E2E Navigation", () => {
     let frame = lastFrame();
     expect(frame).toInclude("contoso-platform");
 
+    // Under the default "My PRs" filter, navigation skips repos without the
+    // login user's PRs: adotui-core → enrollment-service → ui-observability.
     stdin.write("j");
     stdin.write("j");
-    stdin.write("j");
-    stdin.write("j");
-    
+
     await delay(50);
     frame = lastFrame();
     expect(frame).toInclude("fabrikam-engineering");
-    expect(frame).toInclude("services-gateway");
+    expect(frame).toInclude("ui-observability (1)");
+    expect(frame).not.toInclude("services-gateway");
+
+    // Two more presses cross into megacorp-holdings and land on repo-3,
+    // skipping hidden repo-2.
+    stdin.write("j");
+    stdin.write("j");
+
+    await delay(50);
+    frame = lastFrame();
+    expect(frame).toInclude("megacorp-holdings");
+    expect(frame).toInclude("project-1-repo-3 (1)");
+    expect(frame).not.toInclude("project-1-repo-2");
   });
 
   test("pane switching: l, h, and tab", async () => {

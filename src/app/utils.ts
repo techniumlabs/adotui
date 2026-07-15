@@ -86,31 +86,35 @@ export const clampPrIndex = (
   index: number,
 ): number => clamp(index, 0, Math.max(0, (repo?.pullRequests.length ?? 1) - 1));
 
+/** Name fragments (>2 chars) from the email's local part, used for fuzzy identity matching. */
+const emailNameParts = (currentUserEmail?: string): string[] =>
+  (currentUserEmail?.split("@")[0]?.toLowerCase().split(/[.\-_]/) ?? []).filter(
+    (part) => part.length > 2,
+  );
+
+/** True when a display-name/email string looks like the logged-in user. */
+export const isCurrentUser = (name: string, currentUserEmail?: string): boolean => {
+  const lower = name.toLowerCase();
+  return emailNameParts(currentUserEmail).some((part) => lower.includes(part));
+};
+
+/** True when the PR's author looks like the logged-in user. */
+export const isMyPr = (pr: PullRequest, currentUserEmail?: string): boolean =>
+  isCurrentUser(pr.author, currentUserEmail);
+
+/** True when the logged-in user is one of the PR's assigned reviewers. */
+export const isAssignedReviewer = (pr: PullRequest, currentUserEmail?: string): boolean =>
+  (pr.reviewers ?? []).some((r) =>
+    isCurrentUser(r.displayName + " " + r.uniqueName, currentUserEmail),
+  );
+
 export const matchesTreeFilter = (pr: PullRequest, filterStr: string, currentUserEmail?: string): boolean => {
   if (!filterStr || filterStr === "all" || filterStr === "with-prs") return true;
 
   if (filterStr === "me") {
-    if (!currentUserEmail) return true;
-    const emailPrefix = currentUserEmail.split('@')[0]?.toLowerCase();
-    if (!emailPrefix) return true;
-    
-    const emailParts = emailPrefix.split(/[.\-_]/);
-    const lowerAuthor = pr.author.toLowerCase();
-    
-    // Check if author matches
-    if (emailParts.some(part => part.length > 2 && lowerAuthor.includes(part))) {
-      return true;
-    }
-    
-    // Check if user is in reviewers
-    if (pr.reviewers) {
-      return pr.reviewers.some(r => {
-        const lowerName = (r.displayName + " " + r.uniqueName).toLowerCase();
-        return emailParts.some(part => part.length > 2 && lowerName.includes(part));
-      });
-    }
-    
-    return false;
+    // Can't identify the user — show everything rather than nothing.
+    if (emailNameParts(currentUserEmail).length === 0) return true;
+    return isMyPr(pr, currentUserEmail) || isAssignedReviewer(pr, currentUserEmail);
   }
 
   const parts = filterStr.split(/\s+/);

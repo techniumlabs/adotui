@@ -165,6 +165,7 @@ export const App: React.FC = () => {
                 selectedPrIndex={state.selectedPrIndex}
                 focus={state.focus}
                 maxPrs={maxPrs}
+                currentUserEmail={state.data.currentUserEmail}
               />
               {selectedPr && <PrTabs focus={state.focus} />}
               {(() => {
@@ -209,7 +210,13 @@ export const App: React.FC = () => {
                   }
                 }
 
-                return <PrDetails selectedPr={selectedPr} focus={state.focus} />;
+                return (
+                  <PrDetails
+                    selectedPr={selectedPr}
+                    focus={state.focus}
+                    currentUserEmail={state.data.currentUserEmail}
+                  />
+                );
               })()}
             </Box>
           </>

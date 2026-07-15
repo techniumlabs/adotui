@@ -12,11 +12,17 @@ import {
   statusBadge,
   truncate,
 } from "../theme";
-import { formatRelativeAge } from "../utils";
+import {
+  formatRelativeAge,
+  isAssignedReviewer,
+  isCurrentUser,
+  isMyPr,
+} from "../utils";
 
 type PrDetailsProps = {
   selectedPr?: PullRequest;
   focus: FocusArea;
+  currentUserEmail?: string;
 };
 
 const Row: React.FC<{ label: string; children: React.ReactNode }> = ({
@@ -31,8 +37,16 @@ const Row: React.FC<{ label: string; children: React.ReactNode }> = ({
   </Box>
 );
 
-export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
+export const PrDetails: React.FC<PrDetailsProps> = ({
+  selectedPr,
+  focus,
+  currentUserEmail,
+}) => {
   const active = focus === "detail";
+  const mine = selectedPr ? isMyPr(selectedPr, currentUserEmail) : false;
+  const toReview = selectedPr && !mine
+    ? isAssignedReviewer(selectedPr, currentUserEmail)
+    : false;
 
   return (
     <Box
@@ -78,13 +92,27 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
                     {glyph.draft} draft
                   </Text>
                 ) : null}
+                {mine ? (
+                  <Text color={palette.accent} bold>
+                    {" "}
+                    {glyph.mine} my pr
+                  </Text>
+                ) : toReview ? (
+                  <Text color={palette.warn} bold>
+                    {" "}
+                    {glyph.review} to review
+                  </Text>
+                ) : null}
               </Box>
 
               <Box marginTop={1} flexDirection="row" paddingLeft={2}>
                 {/* Left Column */}
                 <Box flexDirection="column" flexBasis="50%">
                   <Row label="author">
-                    <Text color={palette.text}>{selectedPr.author}</Text>
+                    <Text color={mine ? palette.accent : palette.text}>
+                      {selectedPr.author}
+                      {mine ? " (you)" : ""}
+                    </Text>
                   </Row>
                   <Row label="updated">
                     <Text color={palette.text}>
@@ -149,6 +177,39 @@ export const PrDetails: React.FC<PrDetailsProps> = ({ selectedPr, focus }) => {
                     <Text color={palette.muted}> (press l / files tab)</Text>
                   </Row>
                 </Box>
+              </Box>
+
+              {/* Reviewers full width below columns */}
+              <Box marginTop={1} flexDirection="column" paddingLeft={2}>
+                <Row label="reviewers">
+                  {selectedPr.reviewers && selectedPr.reviewers.length > 0 ? (
+                    <Box flexDirection="column">
+                      {selectedPr.reviewers.map((reviewer) => {
+                        const isYou = isCurrentUser(
+                          reviewer.displayName + " " + reviewer.uniqueName,
+                          currentUserEmail,
+                        );
+                        return (
+                          <Text key={reviewer.uniqueName}>
+                            <Text color={isYou ? palette.warn : palette.text}>
+                              {reviewer.displayName}
+                            </Text>
+                            {isYou ? (
+                              <Text color={palette.warn} bold>
+                                {" "}(you)
+                              </Text>
+                            ) : null}
+                            <Text color={palette.muted}>
+                              {" "}{glyph.bullet} {reviewer.uniqueName}
+                            </Text>
+                          </Text>
+                        );
+                      })}
+                    </Box>
+                  ) : (
+                    <Text color={palette.muted}>none</Text>
+                  )}
+                </Row>
               </Box>
 
               {/* Tags full width below columns */}
