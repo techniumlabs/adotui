@@ -56,7 +56,7 @@
   },
   "dependencies": {
     "@git-diff-view/cli": "^0.1.8",
-    "@git-diff-view/react": "^0.1.6",
+    "@git-diff-view/react": "^0.1.7",
     "@inkjs/ui": "^2.0.0",
     "git-diff-view": "^0.0.13",
     "immer": "^11.1.11",
