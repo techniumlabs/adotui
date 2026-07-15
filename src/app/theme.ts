@@ -30,6 +30,8 @@ export const glyph = {
   branchLast: "└─",
   vert: "│",
   arrow: "→",
+  up: "↑",
+  down: "↓",
   dot: "•",
   check: "✓",
   cross: "✗",

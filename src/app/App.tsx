@@ -24,10 +24,15 @@ import { SetupScreen } from "./components/SetupScreen";
 
 export const App: React.FC = () => {
   const [showSplash, setShowSplash] = React.useState(process.env.NODE_ENV !== "test");
+  // Keeps the setup screen mounted while the load it kicked off is running,
+  // so it can display fetch progress before handing over to the main UI.
+  const [setupLoading, setSetupLoading] = React.useState(false);
   const { exit } = useApp();
   const size = useTerminalSize();
   const app = useAppState(exit);
-  useAppKeyboard(app, exit);
+  // Suppress the main keyboard while the setup screen is still showing
+  // (including the load it kicked off).
+  useAppKeyboard(app, exit, setupLoading);
   usePrDetails(app.selectedPr, app.actions.updatePr);
 
   React.useEffect(() => {
@@ -42,6 +47,16 @@ export const App: React.FC = () => {
     }
   }, [app.state.loadState, showSplash]);
 
+  // Once the setup-initiated load settles, hand over to the main UI.
+  React.useEffect(() => {
+    if (
+      setupLoading &&
+      (app.state.loadState === "ready" || app.state.loadState === "error")
+    ) {
+      setSetupLoading(false);
+    }
+  }, [app.state.loadState, setupLoading]);
+
   const {
     state,
     selectedRepo,
@@ -55,13 +70,26 @@ export const App: React.FC = () => {
 
   const availableContentHeight = Math.max(10, size.rows - 15);
   const maxPrs = Math.max(5, Math.floor(availableContentHeight / 2));
+  // Rows available inside the tree pane: terminal minus header/banner/summary
+  // above, command bar/footer below, and the pane's own border + title row.
+  const treeMaxRows = Math.max(6, size.rows - 12);
 
   if (showSplash) {
     return <Splash />;
   }
 
-  if (state.loadState === "setup") {
-    return <SetupScreen onComplete={() => actions.doRefresh("initial")} />;
+  if (state.loadState === "setup" || setupLoading) {
+    return (
+      <SetupScreen
+        onComplete={() => {
+          setSetupLoading(true);
+          actions.doRefresh("initial");
+        }}
+        loading={setupLoading && state.loadState === "loading"}
+        loadingMessage={state.banner}
+        progress={state.loadProgress}
+      />
+    );
   }
 
   return (
@@ -119,6 +147,7 @@ export const App: React.FC = () => {
               selectedRepoIndex={state.selectedRepoIndex}
               focus={state.focus}
               treeFilter={state.treeFilter}
+              maxRows={treeMaxRows}
             />
 
             <Box

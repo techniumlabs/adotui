@@ -12,6 +12,8 @@ type RawPr = Omit<
 
 interface RawRepo {
   name: string;
+  /** Azure DevOps project; defaults to the repo name when omitted. */
+  project?: string;
   pullRequests: RawPr[];
 }
 
@@ -254,6 +256,73 @@ const RAW_MOCK_DATA: { organizations: RawOrg[] } = {
   ]
 };
 
+// ─── Stress-test org ─────────────────────────────────────────────────────────
+// A large generated org so mock mode exercises tree scrolling (many repos
+// across several projects) and PR title wrapping (very long titles).
+
+const STRESS_PROJECTS = Array.from({ length: 100 }, (_, i) => `project-${i + 1}`);
+
+const STRESS_TITLES = [
+  "Bump dependency versions for quarterly patch cycle",
+  "Migrate the legacy authentication middleware to the new token exchange flow and remove the deprecated session fallback handling across all gateway routes",
+  "Fix flaky retry logic in webhook dispatcher",
+  "Introduce a repository-wide feature flag configuration service with environment-specific overrides and gradual percentage-based rollout support for all downstream consumers",
+  "Refactor pagination cursors in the audit log API",
+];
+
+const STRESS_AUTHORS = ["maya", "ram", "sanjay", "nina", "lee", "ivy"];
+const STRESS_REVIEWS: ReviewState[] = ["pending", "approved", "changes-requested"];
+
+const makeStressPr = (repoName: string, seed: number, prIdx: number): RawPr => {
+  const n = seed * 7 + prIdx;
+  return {
+    id: 1000 + seed * 10 + prIdx,
+    title: STRESS_TITLES[n % STRESS_TITLES.length]!,
+    author: STRESS_AUTHORS[n % STRESS_AUTHORS.length]!,
+    draft: n % 7 === 0,
+    status: "active",
+    reviewState: STRESS_REVIEWS[n % STRESS_REVIEWS.length]!,
+    sourceBranch: `feature/change-${seed}-${prIdx}`,
+    targetBranch: "main",
+    updatedAt: new Date(Date.UTC(2026, 5, 1 + (n % 28), n % 24)).toISOString(),
+    comments: n % 5,
+    activeComments: n % 3,
+    checksPassed: 3 + (n % 3),
+    checksTotal: 5,
+    url: `https://dev.azure.com/megacorp-holdings/${repoName}/_git/${repoName}/pullrequest/${1000 + seed * 10 + prIdx}`,
+    changedFiles: [
+      {
+        path: `src/services/${repoName}/handler.ts`,
+        status: "modified",
+        additions: 5 + (n % 40),
+        deletions: n % 12,
+        diff: ["+ // updated handler", "- // old handler"],
+      },
+    ],
+    mergeStatus: n % 9 === 0 ? "conflicts" : "succeeded",
+  };
+};
+
+const STRESS_ORG: RawOrg = {
+  name: "megacorp-holdings",
+  repositories: STRESS_PROJECTS.flatMap((project, pIdx) =>
+    Array.from({ length: 20 }, (_, rIdx) => {
+      const seed = pIdx * 20 + rIdx;
+      const repoName = `${project}-repo-${rIdx + 1}`;
+      return {
+        name: repoName,
+        project,
+        // Ensure at least 1 PR per repo as requested
+        pullRequests: Array.from({ length: 1 + (seed % 3) }, (_, prIdx) =>
+          makeStressPr(repoName, seed, prIdx),
+        ),
+      };
+    }),
+  ),
+};
+
+RAW_MOCK_DATA.organizations.push(STRESS_ORG);
+
 /**
  * Derives the routing fields (organizationUrl / project / repository) onto the
  * mock tree so it satisfies the domain types. Mock mode never dispatches live
@@ -267,11 +336,11 @@ export const MOCK_DATA: AppData = {
       organizationUrl,
       repositories: org.repositories.map((repo) => ({
         name: repo.name,
-        project: repo.name,
+        project: repo.project ?? repo.name,
         pullRequests: repo.pullRequests.map((pr) => ({
           ...pr,
           organizationUrl,
-          project: repo.name,
+          project: repo.project ?? repo.name,
           repository: repo.name,
         })),
       })),

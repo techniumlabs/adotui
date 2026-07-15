@@ -11,7 +11,7 @@ import { handleFiles } from "./keyboard/filesKeyboard";
 
 type AppHandle = ReturnType<typeof useAppState>;
 
-export function useAppKeyboard(app: AppHandle, exitApp: () => void) {
+export function useAppKeyboard(app: AppHandle, exitApp: () => void, suppressed = false) {
   const { state, setState, actions } = app;
 
   useInput(
@@ -53,6 +53,6 @@ export function useAppKeyboard(app: AppHandle, exitApp: () => void) {
     if (state.focus === "files")  { handleFiles(input, key, app, exitApp); return; }
     // "comments" and "runs" — handled by their own internal components; globals guard is enough
     },
-    { isActive: state.loadState !== "setup" }
+    { isActive: state.loadState !== "setup" && !suppressed }
   );
 }

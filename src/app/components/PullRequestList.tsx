@@ -44,8 +44,8 @@ const PrRow: React.FC<{ pr: PullRequest; selected: boolean }> = ({
             {glyph.cross} conflict{" "}
           </Text>
         )}
-        <Text color={selected ? palette.textBright : palette.text} bold={selected}>
-          {truncate(pr.title, 50)}
+        <Text color={selected ? palette.textBright : palette.text} bold={selected} wrap="wrap">
+          {pr.title}
         </Text>
       </Box>
 

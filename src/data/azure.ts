@@ -492,11 +492,17 @@ export const fetchPrDetails = async (pr: PullRequest): Promise<Partial<PullReque
   };
 };
 
+/** Structured fetch progress: how many projects are done out of the total. */
+export interface LoadProgress {
+  current: number;
+  total: number;
+}
+
 export interface LoadOptions {
   /** When true, fetch per-PR file changes and policy checks (slower). */
   fetchDetails?: boolean;
   /** Callback fired to report current loading progress. */
-  onProgress?: (msg: string) => void;
+  onProgress?: (msg: string, progress?: LoadProgress) => void;
 }
 
 /**
@@ -520,11 +526,10 @@ export const loadAppData = async (
     byOrg.set(project.organization, list);
   }
 
-  const organizations: OrganizationNode[] = [];
-
+  // Phase 1: resolve the full project list for every org up-front so fetch
+  // progress can be reported against a known total.
+  const orgProjects: { organization: string; projects: AdoProjectConfig[] }[] = [];
   for (const [organization, projects] of byOrg) {
-    const repositories: RepositoryNode[] = [];
-
     const resolvedProjects: AdoProjectConfig[] = [];
     for (const project of projects) {
       if (!project.project) {
@@ -548,13 +553,25 @@ export const loadAppData = async (
         resolvedProjects.push(project);
       }
     }
+    orgProjects.push({ organization, projects: resolvedProjects });
+  }
 
-    for (const project of resolvedProjects) {
+  const totalProjects = orgProjects.reduce((acc, entry) => acc + entry.projects.length, 0);
+  let fetchedProjects = 0;
+  const progress = (): LoadProgress => ({ current: fetchedProjects, total: totalProjects });
+
+  // Phase 2: fetch repos and PRs per project, counting each finished project.
+  const organizations: OrganizationNode[] = [];
+
+  for (const { organization, projects } of orgProjects) {
+    const repositories: RepositoryNode[] = [];
+
+    for (const project of projects) {
       let repoNames = project.repositories ?? [];
 
       if (repoNames.length === 0) {
         try {
-          options.onProgress?.(`Discovering repos for ${project.project}...`);
+          options.onProgress?.(`Discovering repos for ${project.project}...`, progress());
           const discovered = await listRepositories(project);
           repoNames = discovered
             .map((repo) => repo.name)
@@ -564,6 +581,11 @@ export const loadAppData = async (
             `Could not list repos for ${project.project}: ${cause instanceof CommandError ? cause.detail : String(cause)
             }`,
           );
+          fetchedProjects += 1;
+          options.onProgress?.(
+            `Skipped ${project.project} (${fetchedProjects}/${totalProjects} projects)`,
+            progress(),
+          );
           continue;
         }
       }
@@ -571,7 +593,7 @@ export const loadAppData = async (
       const repoNodes = await Promise.all(
         repoNames.map(async (repository): Promise<RepositoryNode> => {
           try {
-            options.onProgress?.(`Fetching PRs for ${project.project}/${repository}...`);
+            options.onProgress?.(`Fetching PRs for ${project.project}/${repository}...`, progress());
             const rawPrs = await listPullRequests(config, project, repository);
             const pullRequests = await Promise.all(
               rawPrs.map((raw) =>
@@ -590,6 +612,11 @@ export const loadAppData = async (
       );
 
       repositories.push(...repoNodes);
+      fetchedProjects += 1;
+      options.onProgress?.(
+        `Loaded ${project.project} (${fetchedProjects}/${totalProjects} projects)`,
+        progress(),
+      );
     }
 
     // Label the org node by its short name (last URL segment) for readability.

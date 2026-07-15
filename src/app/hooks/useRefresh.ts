@@ -4,6 +4,7 @@ import type { AppState } from "../types";
 import { REFRESH_INTERVAL_MS } from "../constants";
 import { clamp, getVisiblePrs } from "../utils";
 import { loadInitialData, reloadData } from "../dataController";
+import { useAppStore } from "../store";
 
 type AddToast = (msg: string, type?: "info" | "success" | "error") => void;
 
@@ -13,15 +14,24 @@ export function useRefresh(
   addToast: AddToast,
 ) {
   const isRefreshingRef = useRef(false);
+  const pendingReasonRef = useRef<"manual" | "initial" | null>(null);
 
   const doRefresh = useCallback((reason: "manual" | "auto" | "initial") => {
-    if (isRefreshingRef.current) return;
+    // The setup screen owns the app while it's open — background auto-refresh
+    // would collide with the load kicked off by "Save & Load Configuration".
+    if (reason === "auto" && useAppStore.getState().loadState === "setup") return;
+    if (isRefreshingRef.current) {
+      // Never drop a user-initiated refresh: run it after the current one.
+      if (reason !== "auto") pendingReasonRef.current = reason;
+      return;
+    }
     isRefreshingRef.current = true;
 
     if (reason !== "auto") {
       setState((current) => ({
         ...current,
         loadState: "loading",
+        loadProgress: null,
         banner:
           reason === "initial"
             ? "Loading pull requests from Azure DevOps..."
@@ -29,8 +39,12 @@ export function useRefresh(
       }));
     }
 
-    const onProgress = (msg: string) => {
-      setState((current) => ({ ...current, banner: msg }));
+    const onProgress = (msg: string, progress?: { current: number; total: number }) => {
+      setState((current) => ({
+        ...current,
+        banner: msg,
+        ...(progress ? { loadProgress: progress } : {}),
+      }));
     };
 
     const load = () =>
@@ -58,6 +72,7 @@ export function useRefresh(
 
           return {
             ...current,
+            loadProgress: null,
             data: result.data,
             selectedOrgIndex: nextOrgIndex,
             selectedRepoIndex: nextRepoIndex,
@@ -78,6 +93,9 @@ export function useRefresh(
       })
       .finally(() => {
         isRefreshingRef.current = false;
+        const pending = pendingReasonRef.current;
+        pendingReasonRef.current = null;
+        if (pending) doRefresh(pending);
       });
   }, [setState, addToast]);
 

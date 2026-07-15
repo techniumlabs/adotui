@@ -2,6 +2,7 @@ import { loadConfig } from "../data/config";
 import {
   checkAzAvailable,
   loadAppData,
+  type LoadProgress,
   type PrRef,
 } from "../data/azure";
 import { MOCK_DATA } from "../data/mock";
@@ -28,7 +29,9 @@ import { readAppCache, writeAppCache } from "../data/cache";
  * Resolves config and loads live data from Azure DevOps. Falls back to mock
  * data when ADOTUI_MOCK is set. Never throws — errors are returned as banners.
  */
-export const loadInitialData = async (allowCache = false, onProgress?: (msg: string) => void): Promise<LoadResult> => {
+export type LoadProgressHandler = (msg: string, progress?: LoadProgress) => void;
+
+export const loadInitialData = async (allowCache = false, onProgress?: LoadProgressHandler): Promise<LoadResult> => {
   if (isMockMode()) {
     return {
       data: MOCK_DATA,
@@ -106,7 +109,7 @@ export const loadInitialData = async (allowCache = false, onProgress?: (msg: str
 };
 
 /** Reloads live data (used by manual/auto refresh). */
-export const reloadData = async (onProgress?: (msg: string) => void): Promise<LoadResult> => loadInitialData(false, onProgress);
+export const reloadData = async (onProgress?: LoadProgressHandler): Promise<LoadResult> => loadInitialData(false, onProgress);
 
 /**
  * Builds a PrRef from explicit routing parts. Returns null in mock mode (no

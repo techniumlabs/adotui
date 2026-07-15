@@ -35,6 +35,7 @@ export const INITIAL_STATE: AppState = {
   fileFilter: "",
   commentInputActive: false,
   loadState: "loading",
+  loadProgress: null,
   pendingConfirm: null,
   fileScrollStates: {},
   toasts: [],

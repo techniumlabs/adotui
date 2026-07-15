@@ -39,3 +39,5 @@ adotui.config.json
 debug.log
 
 adotui.config*
+
+.tokensave

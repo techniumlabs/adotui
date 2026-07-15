@@ -71,6 +71,8 @@ export type AppState = {
    */
   commentInputActive: boolean;
   loadState: LoadState;
+  /** Project fetch progress while loading (null when idle or total unknown). */
+  loadProgress: { current: number; total: number } | null;
   pendingConfirm: PendingConfirm;
   fileScrollStates: Record<string, { offset: number; row: number }>;
   toasts: { id: string; message: string; type: "info" | "success" | "error" }[];

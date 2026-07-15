@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import { palette, glyph } from "../theme";
+import Spinner from "ink-spinner";
+import { ProgressBar } from "@inkjs/ui";
+import { palette, glyph, truncate } from "../theme";
 import { writeConfig, loadConfig } from "../../data/config";
 import type { AdoProjectConfig } from "../../data/config";
 
 interface SetupScreenProps {
   onComplete: () => void;
+  /** True while the load kicked off by "Save & Load Configuration" is running. */
+  loading?: boolean;
+  /** Current progress message from the loader (e.g. which project is fetching). */
+  loadingMessage?: string;
+  /** Projects fetched so far out of the total, once discovery has resolved. */
+  progress?: { current: number; total: number } | null;
 }
 
 type ScreenMode = "list" | "add" | "pat" | "help";
@@ -21,7 +29,12 @@ interface SetupMenuItem {
 const addFields: AddField[] = ["org", "project", "repos", "submit", "cancel"];
 const patFields: PatField[] = ["input", "submit", "cancel"];
 
-export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
+export const SetupScreen: React.FC<SetupScreenProps> = ({
+  onComplete,
+  loading = false,
+  loadingMessage,
+  progress,
+}) => {
   const [mode, setMode] = useState<ScreenMode>("list");
   const [projects, setProjects] = useState<AdoProjectConfig[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -82,7 +95,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
         process.exit(0);
       }
 
-      if (isSubmitting) return;
+      if (isSubmitting || loading) return;
 
       if (mode === "help") {
         setMode("list");
@@ -657,8 +670,47 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
     );
   };
 
+  const renderLoadingMode = () => {
+    const pct =
+      progress && progress.total > 0
+        ? Math.round((progress.current / progress.total) * 100)
+        : null;
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Box justifyContent="center" marginBottom={1}>
+          <Text color={palette.accent} bold>
+            LOADING PROJECT DATA
+          </Text>
+        </Box>
+        <Box justifyContent="center" marginBottom={1}>
+          <Text color={palette.muted}>
+            <Spinner type="dots" />{" "}
+            {truncate(loadingMessage ?? "Connecting to Azure DevOps...", 56)}
+          </Text>
+        </Box>
+        {pct !== null && progress ? (
+          <Box flexDirection="row" gap={1} alignItems="center">
+            <Box flexGrow={1}>
+              <ProgressBar value={pct} />
+            </Box>
+            <Text color={palette.text}>
+              {progress.current}/{progress.total} projects
+            </Text>
+          </Box>
+        ) : (
+          <Box justifyContent="center">
+            <Text color={palette.muted}>Discovering projects...</Text>
+          </Box>
+        )}
+      </Box>
+    );
+  };
+
   // Helper to build instructions for footer dynamically
   const getInstructions = () => {
+    if (loading) {
+      return "Loading project data — please wait";
+    }
     if (mode === "help") {
       return "Press any key to return to the menu";
     }
@@ -673,6 +725,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
   };
 
   const renderContent = () => {
+    if (loading) return renderLoadingMode();
     if (mode === "list") return renderListMode();
     if (mode === "add") return renderAddMode();
     if (mode === "help") return renderHelpMode();
@@ -750,7 +803,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onComplete }) => {
         )}
 
         {/* Submitting state */}
-        {isSubmitting && (
+        {isSubmitting && !loading && (
           <Box justifyContent="center" marginTop={1}>
             <Text color={palette.ok}>Creating config file and loading...</Text>
           </Box>
