@@ -1,10 +1,13 @@
 import { expect, test, describe, mock } from "bun:test";
 
 // Mock the command module before importing anything that uses it
+const recordedCalls: string[][] = [];
+
 mock.module("../src/data/command", () => {
   return {
     run: mock(async () => ({ stdout: "", stderr: "", exitCode: 0 })),
     runJson: mock(async (_cmd: string, args: string[]) => {
+      recordedCalls.push(args);
       // Mock `az repos pr list`
       if (args.includes("pr") && args.includes("list")) {
         return [
@@ -113,5 +116,34 @@ describe("Azure Platform Integration", () => {
     expect(repo.name).toBe("services-gateway");
     expect(repo.project).toBe("test-project");
     expect(repo.pullRequests).toHaveLength(1);
+  });
+
+  test("loadAppData issues a single project-wide PR listing per project", async () => {
+    const fakeConfig: AdoConfig = {
+      projects: [
+        {
+          organization: "https://dev.azure.com/test-org",
+          project: "test-project",
+        }
+      ]
+    };
+
+    const before = recordedCalls.length;
+    const { data: appData } = await loadAppData(fakeConfig, { fetchDetails: false });
+    const prListCalls = recordedCalls
+      .slice(before)
+      .filter(
+        (args) =>
+          args.includes("pr") &&
+          args.includes("list") &&
+          !args.includes("policy") &&
+          !args.includes("work-item"),
+      );
+
+    expect(prListCalls).toHaveLength(1);
+    expect(prListCalls[0]).not.toContain("--repository");
+    expect(prListCalls[0]).toContain("--project");
+    // Grouping still lands the PR in its repository node.
+    expect(appData.organizations[0]!.repositories[0]!.pullRequests).toHaveLength(1);
   });
 });

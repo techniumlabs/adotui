@@ -197,11 +197,11 @@ const listRepositories = async (
   return repos.filter((repo) => repo.isDisabled !== true && !!repo.name);
 };
 
-/** Lists PRs for a repository in a project. */
+/** Lists PRs for a whole project, or one repository when `repository` is given. */
 const listPullRequests = async (
   config: AdoConfig,
   project: AdoProjectConfig,
-  repository: string,
+  repository?: string,
 ): Promise<AzurePullRequest[]> => {
   const args = [
     "repos",
@@ -210,8 +210,6 @@ const listPullRequests = async (
     ...orgArgs(project.organization),
     "--project",
     project.project!,
-    "--repository",
-    repository,
     "--status",
     config.status ?? "active",
     "--top",
@@ -219,6 +217,9 @@ const listPullRequests = async (
     ...jsonOutput,
   ];
 
+  if (repository) {
+    args.push("--repository", repository);
+  }
   if (config.reviewer) {
     args.push("--reviewer", config.reviewer);
   }
@@ -505,11 +506,67 @@ export interface LoadOptions {
   onProgress?: (msg: string, progress?: LoadProgress) => void;
 }
 
+const describeError = (cause: unknown): string =>
+  cause instanceof CommandError ? cause.detail : String(cause);
+
+/**
+ * Maximum number of projects fetched concurrently. Each project issues up to
+ * two `az` invocations in parallel (repo discovery + PR listing), so the
+ * process ceiling is roughly twice this number.
+ */
+const PROJECT_FETCH_CONCURRENCY = 4;
+
+/**
+ * Runs `fn` over `items` with at most `limit` tasks in flight, preserving
+ * input order in the returned array.
+ */
+export const mapWithConcurrency = async <T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> => {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    for (let i = next++; i < items.length; i = next++) {
+      results[i] = await fn(items[i]!, i);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker),
+  );
+  return results;
+};
+
+/**
+ * Groups a project-wide PR listing by repository name. Keys are lower-cased
+ * so lookups tolerate casing differences between configured repo names and
+ * the names Azure DevOps reports on the PR payload.
+ */
+export const groupPrsByRepository = (
+  rawPrs: AzurePullRequest[],
+): Map<string, AzurePullRequest[]> => {
+  const groups = new Map<string, AzurePullRequest[]>();
+  for (const raw of rawPrs) {
+    const repoName = raw.repository?.name?.toLowerCase();
+    if (!repoName) continue;
+    const group = groups.get(repoName);
+    if (group) {
+      group.push(raw);
+    } else {
+      groups.set(repoName, [raw]);
+    }
+  }
+  return groups;
+};
+
 /**
  * Loads the full AppData tree across every configured org/project, discovering
- * repositories when not explicitly listed. Repos and projects are fetched
- * concurrently; a failure in one repo/project is captured and surfaced as an
- * empty node rather than aborting the whole load.
+ * repositories when not explicitly listed. Projects are fetched with bounded
+ * concurrency, and each project issues a single project-wide PR listing
+ * (grouped client-side by repository) instead of one `az` call per repo. A
+ * failure in one repo/project is captured and surfaced as an empty node
+ * rather than aborting the whole load.
  */
 export const loadAppData = async (
   config: AdoConfig,
@@ -527,99 +584,121 @@ export const loadAppData = async (
   }
 
   // Phase 1: resolve the full project list for every org up-front so fetch
-  // progress can be reported against a known total.
-  const orgProjects: { organization: string; projects: AdoProjectConfig[] }[] = [];
-  for (const [organization, projects] of byOrg) {
-    const resolvedProjects: AdoProjectConfig[] = [];
-    for (const project of projects) {
-      if (!project.project) {
-        try {
-          options.onProgress?.(`Discovering projects in ${orgLabel(organization)}...`);
-          const discovered = await listProjects(organization);
-          for (const dp of discovered) {
-            resolvedProjects.push({
-              organization: project.organization,
-              project: dp.name,
-              repositories: project.repositories,
-            });
+  // progress can be reported against a known total. Discovery runs across
+  // orgs concurrently (bounded) — each is an independent az call.
+  const orgProjects = await mapWithConcurrency(
+    [...byOrg.entries()],
+    PROJECT_FETCH_CONCURRENCY,
+    async ([organization, projects]) => {
+      const resolvedProjects: AdoProjectConfig[] = [];
+      for (const project of projects) {
+        if (!project.project) {
+          try {
+            options.onProgress?.(`Discovering projects in ${orgLabel(organization)}...`);
+            const discovered = await listProjects(organization);
+            for (const dp of discovered) {
+              resolvedProjects.push({
+                organization: project.organization,
+                project: dp.name,
+                repositories: project.repositories,
+              });
+            }
+          } catch (cause) {
+            warnings.push(
+              `Could not list projects for ${organization}: ${describeError(cause)}`,
+            );
           }
-        } catch (cause) {
-          warnings.push(
-            `Could not list projects for ${organization}: ${cause instanceof CommandError ? cause.detail : String(cause)
-            }`,
-          );
+        } else {
+          resolvedProjects.push(project);
         }
-      } else {
-        resolvedProjects.push(project);
       }
-    }
-    orgProjects.push({ organization, projects: resolvedProjects });
-  }
+      return { organization, projects: resolvedProjects };
+    },
+  );
 
   const totalProjects = orgProjects.reduce((acc, entry) => acc + entry.projects.length, 0);
   let fetchedProjects = 0;
   const progress = (): LoadProgress => ({ current: fetchedProjects, total: totalProjects });
 
-  // Phase 2: fetch repos and PRs per project, counting each finished project.
-  const organizations: OrganizationNode[] = [];
+  // Phase 2: fetch repos and PRs per project, with bounded concurrency across
+  // ALL projects (previously projects loaded strictly one after another).
+  // Each project needs only two az calls, issued in parallel: repo discovery
+  // and one project-wide PR listing grouped by repository.
+  const projectTasks = orgProjects.flatMap((entry) =>
+    entry.projects.map((project) => project),
+  );
 
-  for (const { organization, projects } of orgProjects) {
-    const repositories: RepositoryNode[] = [];
+  const taskResults = await mapWithConcurrency(
+    projectTasks,
+    PROJECT_FETCH_CONCURRENCY,
+    async (project): Promise<RepositoryNode[]> => {
+      options.onProgress?.(`Fetching PRs for ${project.project}...`, progress());
 
-    for (const project of projects) {
-      let repoNames = project.repositories ?? [];
+      const explicitRepos = project.repositories ?? [];
+      const [repoNamesResult, prListResult] = await Promise.allSettled([
+        explicitRepos.length > 0
+          ? Promise.resolve(explicitRepos)
+          : listRepositories(project).then((repos) =>
+              repos
+                .map((repo) => repo.name)
+                .filter((name): name is string => !!name),
+            ),
+        listPullRequests(config, project),
+      ]);
 
-      if (repoNames.length === 0) {
-        try {
-          options.onProgress?.(`Discovering repos for ${project.project}...`, progress());
-          const discovered = await listRepositories(project);
-          repoNames = discovered
-            .map((repo) => repo.name)
-            .filter((name): name is string => !!name);
-        } catch (cause) {
-          warnings.push(
-            `Could not list repos for ${project.project}: ${cause instanceof CommandError ? cause.detail : String(cause)
-            }`,
-          );
-          fetchedProjects += 1;
-          options.onProgress?.(
-            `Skipped ${project.project} (${fetchedProjects}/${totalProjects} projects)`,
-            progress(),
-          );
-          continue;
-        }
+      const done = (label: string): void => {
+        fetchedProjects += 1;
+        options.onProgress?.(
+          `${label} ${project.project} (${fetchedProjects}/${totalProjects} projects)`,
+          progress(),
+        );
+      };
+
+      if (repoNamesResult.status === "rejected") {
+        warnings.push(
+          `Could not list repos for ${project.project}: ${describeError(repoNamesResult.reason)}`,
+        );
+        done("Skipped");
+        return [];
+      }
+      const repoNames = repoNamesResult.value;
+
+      let prGroups = new Map<string, AzurePullRequest[]>();
+      if (prListResult.status === "rejected") {
+        warnings.push(
+          `Could not list PRs for ${project.project}: ${describeError(prListResult.reason)}`,
+        );
+      } else {
+        prGroups = groupPrsByRepository(prListResult.value);
       }
 
       const repoNodes = await Promise.all(
         repoNames.map(async (repository): Promise<RepositoryNode> => {
-          try {
-            options.onProgress?.(`Fetching PRs for ${project.project}/${repository}...`, progress());
-            const rawPrs = await listPullRequests(config, project, repository);
-            const pullRequests = await Promise.all(
-              rawPrs.map((raw) =>
-                hydratePullRequest(project, repository, raw, { fetchDetails }),
-              ),
-            );
-            return { name: repository, project: project.project!, pullRequests };
-          } catch (cause) {
-            warnings.push(
-              `Could not list PRs for ${project.project}/${repository}: ${cause instanceof CommandError ? cause.detail : String(cause)
-              }`,
-            );
-            return { name: repository, project: project.project!, pullRequests: [] };
-          }
+          const rawPrs = prGroups.get(repository.toLowerCase()) ?? [];
+          const pullRequests = await Promise.all(
+            rawPrs.map((raw) =>
+              hydratePullRequest(project, repository, raw, { fetchDetails }),
+            ),
+          );
+          return { name: repository, project: project.project!, pullRequests };
         }),
       );
 
-      repositories.push(...repoNodes);
-      fetchedProjects += 1;
-      options.onProgress?.(
-        `Loaded ${project.project} (${fetchedProjects}/${totalProjects} projects)`,
-        progress(),
-      );
-    }
+      done("Loaded");
+      return repoNodes;
+    },
+  );
 
-    // Label the org node by its short name (last URL segment) for readability.
+  // Reassemble per-org nodes preserving configuration order (task results are
+  // index-aligned with projectTasks, which was built in org/project order).
+  const organizations: OrganizationNode[] = [];
+  let taskIndex = 0;
+  for (const { organization, projects } of orgProjects) {
+    const repositories: RepositoryNode[] = [];
+    for (let i = 0; i < projects.length; i += 1) {
+      repositories.push(...(taskResults[taskIndex] ?? []));
+      taskIndex += 1;
+    }
     organizations.push({
       name: orgLabel(organization),
       organizationUrl: organization,
@@ -629,6 +708,7 @@ export const loadAppData = async (
 
   return { data: { organizations }, warnings };
 };
+
 
 // --- PR actions ------------------------------------------------------------
 
