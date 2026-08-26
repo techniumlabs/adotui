@@ -3,7 +3,7 @@ console.log("Building adotui CLI...");
 
 const result = await Bun.build({
   entrypoints: ["src/main.tsx"],
-  external: ["ink", "react", "ink-spinner", "@git-diff-view/react", "@git-diff-view/cli", "git-diff-view"],
+  external: ["ink", "react"],
   format: "esm",
   outdir: "dist",
   target: "node", // Targeting Node for maximum cross-platform compatibility

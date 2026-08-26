@@ -429,7 +429,7 @@ export const buildFileTree = (
   return root;
 };
 
-export const debugLog = (...args: any[]) => {
+export const debugLog = (...args: unknown[]) => {
   if (process.env.NODE_ENV == 'debug') {
     const msg = args
       .map((arg) => (typeof arg === "object" ? JSON.stringify(arg, null, 2) : String(arg)))

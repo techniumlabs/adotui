@@ -123,7 +123,7 @@ Example (`adotui.config.example.json`):
 ```
 
 Optional top-level fields: `status` (`active` | `completed` | `abandoned` | `all`,
-default `active`), `top` (max PRs per repo, default `50`), `reviewer` and
+default `active`), `top` (optional cap on PRs kept per repo; all PRs are kept when unset), `reviewer` and
 `creator` (filter by user).
 
 ## Run

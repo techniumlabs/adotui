@@ -303,7 +303,9 @@ const listPrWorkItems = async (
   prId: number,
 ): Promise<PullRequestWorkItem[]> => {
   try {
-    const rawItems = await runJson<any[]>(AZ, [
+    const rawItems = await runJson<
+      { id?: number; fields?: Record<string, string>; url?: string }[]
+    >(AZ, [
       "repos",
       "pr",
       "work-item",
@@ -314,13 +316,15 @@ const listPrWorkItems = async (
       ...jsonOutput,
     ]);
 
-    return rawItems.map((raw) => ({
-      id: raw.id,
-      title: raw.fields?.["System.Title"] ?? "Unknown Work Item",
-      state: raw.fields?.["System.State"] ?? "Unknown",
-      type: raw.fields?.["System.WorkItemType"] ?? "Unknown",
-      url: raw.url,
-    }));
+    return rawItems
+      .filter((raw): raw is typeof raw & { id: number } => typeof raw.id === "number")
+      .map((raw) => ({
+        id: raw.id,
+        title: raw.fields?.["System.Title"] ?? "Unknown Work Item",
+        state: raw.fields?.["System.State"] ?? "Unknown",
+        type: raw.fields?.["System.WorkItemType"] ?? "Unknown",
+        url: raw.url ?? "",
+      }));
   } catch {
     return [];
   }

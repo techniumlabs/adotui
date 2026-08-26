@@ -328,8 +328,17 @@ export const FilesView: React.FC<FilesViewProps> = ({
           setSubmitting(true);
           const repoId = selectedPr.repositoryId ?? selectedPr.repository;
 
-          let threadContext = { filePath: selectedFile.path } as any;
-          let pullRequestThreadContext: any = undefined;
+          interface FilePosition { line: number; offset: number }
+          let threadContext: {
+            filePath: string;
+            rightFileStart?: FilePosition;
+            rightFileEnd?: FilePosition;
+            leftFileStart?: FilePosition;
+            leftFileEnd?: FilePosition;
+          } = { filePath: selectedFile.path };
+          let pullRequestThreadContext:
+            | { changeTrackingId: number; iterationContext: { firstComparingIteration: number; secondComparingIteration: number } }
+            | undefined = undefined;
 
           if (diffRows.length > 0 && diffSelectedRow >= 0 && diffSelectedRow < diffRows.length) {
             const rowInfo = diffRows[diffSelectedRow];

@@ -78,7 +78,7 @@ export const readAppCache = async (): Promise<AppData | null> => {
 export const writeAppCache = async (data: AppData): Promise<void> => {
   try {
     await fs.mkdir(APP_CACHE_DIR, { recursive: true });
-    await fs.writeFile(APP_CACHE_FILE, JSON.stringify(data, null, 2), "utf-8");
+    await fs.writeFile(APP_CACHE_FILE, JSON.stringify(data), "utf-8");
   } catch (_err) {
     // Silently ignore cache write errors
   }
