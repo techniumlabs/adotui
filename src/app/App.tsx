@@ -9,6 +9,7 @@ import { PipelineRunsView } from "./components/PipelineRunsView";
 import { PrDetails } from "./components/PrDetails";
 import { PrTabs } from "./components/PrTabs";
 import { PullRequestList } from "./components/PullRequestList";
+import { StatusLoader } from "./components/StatusLoader";
 import { SummaryBar } from "./components/SummaryBar";
 import { ToastContainer } from "./components/ToastContainer";
 import { formatRelativeAge } from "./utils";
@@ -124,8 +125,9 @@ export const App: React.FC = () => {
                   : palette.text
           }
         >
-          {state.loadState === "loading" ? `${glyph.clock} ` : ""}
-          {state.banner}
+          {state.loadState === "loading"
+            ? "Loading pull requests from Azure DevOps..."
+            : state.banner}
         </Text>
       </Box>
 
@@ -235,7 +237,11 @@ export const App: React.FC = () => {
         pendingConfirm={state.pendingConfirm}
       />
 
-      {/* Unified Footer */}
+      {/* Unified Footer — swaps to the bottom-line loader during loads so
+          the animation only ever rewrites the last row of the frame. */}
+      {state.loadState === "loading" ? (
+        <StatusLoader message={state.banner} progress={state.loadProgress} />
+      ) : (
       <Box
         flexShrink={0}
         borderStyle="single"
@@ -267,6 +273,7 @@ export const App: React.FC = () => {
           <Text color={palette.accent} bold>q</Text> quit
         </Text>
       </Box>
+      )}
 
       <CompletionEditor state={state} />
     </Box>

@@ -46,7 +46,7 @@ export function useRefresh(
     const onProgress = (msg: string, progress?: { current: number; total: number }) => {
       const now = Date.now();
       const isFinal = progress !== undefined && progress.current >= progress.total;
-      if (!isFinal && now - lastProgressAt < 150) {
+      if (!isFinal && now - lastProgressAt < 250) {
         return;
       }
       lastProgressAt = now;
@@ -57,8 +57,11 @@ export function useRefresh(
       }));
     };
 
+    // Auto refreshes run silently: progress updates would tick the banner
+    // (and force repaints) while the user is working.
+    const progressHandler = reason === "auto" ? undefined : onProgress;
     const load = () =>
-      reason === "initial" ? loadInitialData(true, onProgress) : reloadData(onProgress);
+      reason === "initial" ? loadInitialData(true, progressHandler) : reloadData(progressHandler);
 
     void load()
       .then((result) => {
