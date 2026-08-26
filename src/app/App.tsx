@@ -70,9 +70,15 @@ export const App: React.FC = () => {
 
   const availableContentHeight = Math.max(10, size.rows - 15);
   const maxPrs = Math.max(5, Math.floor(availableContentHeight / 2));
-  // Rows available inside the tree pane: terminal minus header/banner/summary
-  // above, command bar/footer below, and the pane's own border + title row.
-  const treeMaxRows = Math.max(6, size.rows - 12);
+  // Fixed chrome rows around the main panes: header (1), banner (2),
+  // summary (1), command bar (2), footer (2). The frame stays one row short
+  // of the terminal so Ink can diff-render in place; when the output reaches
+  // the terminal height Ink clears and repaints the whole screen on every
+  // render, which showed up as constant flicker while loading.
+  const chromeRows = 8;
+  const frameHeight = Math.max(14, size.rows - 1);
+  const paneHeight = Math.max(6, frameHeight - chromeRows);
+  const treeMaxRows = paneHeight;
 
   if (showSplash) {
     return <Splash />;
@@ -93,10 +99,10 @@ export const App: React.FC = () => {
   }
 
   return (
-    <Box flexDirection="column" height={size.rows} width="100%">
+    <Box flexDirection="column" height={frameHeight} width="100%">
       <ToastContainer toasts={state.toasts || []} />
       {/* Header */}
-      <Box paddingX={1} justifyContent="space-between">
+      <Box paddingX={1} justifyContent="space-between" flexShrink={0}>
         <Text color={palette.accent} bold>
           {glyph.dot} ADOTUI
         </Text>
@@ -106,8 +112,9 @@ export const App: React.FC = () => {
       </Box>
 
       {/* Banner / Status line */}
-      <Box paddingX={1} borderStyle="single" borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} borderColor={palette.border}>
+      <Box paddingX={1} flexShrink={0} borderStyle="single" borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} borderColor={palette.border}>
         <Text
+          wrap="truncate-end"
           color={
             state.loadState === "error"
               ? palette.danger
@@ -124,7 +131,7 @@ export const App: React.FC = () => {
         </Text>
       </Box>
 
-      <Box paddingX={1}>
+      <Box paddingX={1} flexShrink={0}>
         <SummaryBar
           activePrs={activePrs}
           totalPrs={totalPrs}
@@ -136,7 +143,7 @@ export const App: React.FC = () => {
         />
       </Box>
 
-      <Box flexGrow={1} flexDirection="row" overflow="hidden">
+      <Box height={paneHeight} flexShrink={0} flexDirection="row" overflow="hidden">
         {state.focus === "help" ? (
           <HelpView />
         ) : (
@@ -154,6 +161,7 @@ export const App: React.FC = () => {
               flexGrow={1}
               marginLeft={1}
               flexDirection="column"
+              overflow="hidden"
               borderStyle="round"
               borderColor={state.focus !== "tree" ? palette.accent : palette.border}
               width={size.columns - 20}
@@ -231,6 +239,7 @@ export const App: React.FC = () => {
 
       {/* Unified Footer */}
       <Box
+        flexShrink={0}
         borderStyle="single"
         borderTop={true}
         borderLeft={false}
@@ -239,7 +248,7 @@ export const App: React.FC = () => {
         borderColor={palette.border}
         paddingX={2}
       >
-        <Text color={palette.muted}>
+        <Text color={palette.muted} wrap="truncate-end">
           <Text color={palette.accent} bold>/</Text> filter{"   "}
           <Text color={palette.accent} bold>j/k</Text> move{"   "}
           <Text color={palette.accent} bold>1-4</Text> switch view tab{"   "}

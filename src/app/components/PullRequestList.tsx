@@ -111,6 +111,7 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
   return (
     <Box
       paddingX={1}
+      flexShrink={0}
       flexDirection="column"
       borderStyle="single"
       borderBottom={true}
