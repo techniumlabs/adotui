@@ -310,16 +310,27 @@ const cleanup = async (options: Options): Promise<void> => {
     log(`no ${options.prefix}* projects found — nothing to clean up`);
     return;
   }
+  let failed = 0;
   for (const proj of targets) {
     log(`deleting project ${proj.name} (${proj.id})`);
-    await run(AZ, [
-      "devops", "project", "delete",
-      "--id", proj.id,
-      "--organization", options.org,
-      "--yes",
-    ], { timeoutMs: 60_000 });
+    try {
+      await withRetry(`delete ${proj.name}`, () =>
+        run(AZ, [
+          "devops", "project", "delete",
+          "--id", proj.id,
+          "--organization", options.org,
+          "--yes",
+        ], { timeoutMs: 60_000 }),
+      );
+    } catch (cause) {
+      failed += 1;
+      log(`WARN: could not delete ${proj.name}: ${cause instanceof CommandError ? cause.detail : String(cause)}`);
+    }
   }
-  log(`DONE: removed ${targets.length} project(s)`);
+  log(`DONE: removed ${targets.length - failed}/${targets.length} project(s)`);
+  if (failed > 0) {
+    process.exitCode = 1;
+  }
 };
 
 const { command, options } = parseArgs();
