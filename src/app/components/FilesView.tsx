@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import Spinner from "ink-spinner";
 import type { PullRequest } from "../../domain/types";
 import type { DiffViewMode, FocusArea } from "../types";
 import { fileChangeBadge, glyph, palette, truncate } from "../theme";
@@ -560,7 +559,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
 
           {selectedFile.loadingDiff ? (
             <Box marginY={1} marginLeft={2}>
-              <Text color={palette.accent}><Spinner type="dots" /> Loading diff...</Text>
+              <Text color={palette.accent}>{glyph.clock} Loading diff...</Text>
             </Box>
           ) : hasDiff ? (
             <Box flexDirection="column">
@@ -581,7 +580,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
             </Box>
           ) : isLoading ? (
             <Text color={palette.muted}>
-              <Spinner type="dots" /> Loading diff...
+              {glyph.clock} Loading diff...
             </Text>
           ) : (
             <Text color={palette.muted}>

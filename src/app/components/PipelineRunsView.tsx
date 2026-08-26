@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import Spinner from "ink-spinner";
 import type { PipelineRun, PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
 import { glyph, palette, truncate } from "../theme";
@@ -150,7 +149,7 @@ export const PipelineRunsView: React.FC<PipelineRunsViewProps> = ({
         <Text color={palette.muted}>
           {loading ? (
             <Text color={palette.muted}>
-              <Spinner type="dots" /> loading…
+              {glyph.clock} loading…
             </Text>
           ) : (
             `${runs.length} runs`

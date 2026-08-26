@@ -39,7 +39,17 @@ export function useRefresh(
       }));
     }
 
+    // Throttle progress updates: with many projects these fire far faster
+    // than the terminal can comfortably repaint, and each one re-renders the
+    // whole frame. Final (current === total) updates always pass through.
+    let lastProgressAt = 0;
     const onProgress = (msg: string, progress?: { current: number; total: number }) => {
+      const now = Date.now();
+      const isFinal = progress !== undefined && progress.current >= progress.total;
+      if (!isFinal && now - lastProgressAt < 150) {
+        return;
+      }
+      lastProgressAt = now;
       setState((current) => ({
         ...current,
         banner: msg,

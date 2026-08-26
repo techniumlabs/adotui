@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import Spinner from "ink-spinner";
 import { ProgressBar } from "@inkjs/ui";
 import { palette, glyph, truncate } from "../theme";
 import { writeConfig, loadConfig } from "../../data/config";
@@ -684,7 +683,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
         </Box>
         <Box justifyContent="center" marginBottom={1}>
           <Text color={palette.muted}>
-            <Spinner type="dots" />{" "}
+            {glyph.clock}{" "}
             {truncate(loadingMessage ?? "Connecting to Azure DevOps...", 56)}
           </Text>
         </Box>

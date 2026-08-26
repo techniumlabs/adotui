@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import Spinner from "ink-spinner";
 import type { PrCommentThread, PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
 import { glyph, palette, truncate } from "../theme";
@@ -412,7 +411,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         <Box>
           {loading ? (
             <Text color={palette.muted}>
-              <Spinner type="dots" /> loading…
+              {glyph.clock} loading…
             </Text>
           ) : (
             <Text color={palette.muted}>
@@ -430,7 +429,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
           </Text>
         ) : submitting ? (
           <Text color={palette.accent}>
-            <Spinner type="dots" /> processing...
+            {glyph.clock} processing...
           </Text>
         ) : null}
       </Box>
@@ -446,7 +445,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
       {selectedPr && loading && threads.length === 0 && (
         <Box height={viewportH} justifyContent="center" alignItems="center" flexDirection="column">
           <Text color={palette.accent}>
-            <Spinner type="dots" /> Loading comments...
+            {glyph.clock} Loading comments...
           </Text>
         </Box>
       )}
