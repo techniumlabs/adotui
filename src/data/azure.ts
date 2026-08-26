@@ -197,11 +197,24 @@ const listRepositories = async (
   return repos.filter((repo) => repo.isDisabled !== true && !!repo.name);
 };
 
-/** Lists PRs for a whole project, or one repository when `repository` is given. */
+/** Default per-repository PR cap when `top` is not set in the config. */
+const DEFAULT_PER_REPO_TOP = 50;
+
+interface PrListPage {
+  top: number;
+  skip: number;
+}
+
+/**
+ * Lists PRs for a whole project, or one repository when `repository` is
+ * given. `page` overrides the fetch window (used by the project-wide pager);
+ * without it the window falls back to the configured per-repo `top`.
+ */
 const listPullRequests = async (
   config: AdoConfig,
   project: AdoProjectConfig,
   repository?: string,
+  page?: PrListPage,
 ): Promise<AzurePullRequest[]> => {
   const args = [
     "repos",
@@ -213,10 +226,13 @@ const listPullRequests = async (
     "--status",
     config.status ?? "active",
     "--top",
-    String(config.top ?? 50),
+    String(page?.top ?? config.top ?? DEFAULT_PER_REPO_TOP),
     ...jsonOutput,
   ];
 
+  if (page && page.skip > 0) {
+    args.push("--skip", String(page.skip));
+  }
   if (repository) {
     args.push("--repository", repository);
   }
@@ -228,6 +244,33 @@ const listPullRequests = async (
   }
 
   return await runJson<AzurePullRequest[]>(AZ, args);
+};
+
+/** Page size for the project-wide PR listing. */
+const PR_LIST_PAGE_SIZE = 100;
+/** Safety valve: at most this many pages (2000 PRs) per project. */
+const PR_LIST_MAX_PAGES = 20;
+
+/**
+ * Fetches every PR in a project by paging through `az repos pr list`, so a
+ * project with more PRs than one `--top` window is not silently truncated.
+ */
+const listAllProjectPullRequests = async (
+  config: AdoConfig,
+  project: AdoProjectConfig,
+): Promise<AzurePullRequest[]> => {
+  const all: AzurePullRequest[] = [];
+  for (let pageIndex = 0; pageIndex < PR_LIST_MAX_PAGES; pageIndex += 1) {
+    const batch = await listPullRequests(config, project, undefined, {
+      top: PR_LIST_PAGE_SIZE,
+      skip: pageIndex * PR_LIST_PAGE_SIZE,
+    });
+    all.push(...batch);
+    if (batch.length < PR_LIST_PAGE_SIZE) {
+      break;
+    }
+  }
+  return all;
 };
 
 /** Fetches blocking policy evaluations for a PR (check rollup). */
@@ -563,8 +606,9 @@ export const groupPrsByRepository = (
 /**
  * Loads the full AppData tree across every configured org/project, discovering
  * repositories when not explicitly listed. Projects are fetched with bounded
- * concurrency, and each project issues a single project-wide PR listing
- * (grouped client-side by repository) instead of one `az` call per repo. A
+ * concurrency, and each project pages through one project-wide PR listing
+ * (grouped client-side by repository, capped at `top` per repo) instead of
+ * one `az` call per repo. A
  * failure in one repo/project is captured and surfaced as an empty node
  * rather than aborting the whole load.
  */
@@ -643,7 +687,7 @@ export const loadAppData = async (
                 .map((repo) => repo.name)
                 .filter((name): name is string => !!name),
             ),
-        listPullRequests(config, project),
+        listAllProjectPullRequests(config, project),
       ]);
 
       const done = (label: string): void => {
@@ -674,7 +718,12 @@ export const loadAppData = async (
 
       const repoNodes = await Promise.all(
         repoNames.map(async (repository): Promise<RepositoryNode> => {
-          const rawPrs = prGroups.get(repository.toLowerCase()) ?? [];
+          // `top` keeps its original meaning: a per-repository cap. The
+          // project listing is paged in full, then capped per repo here.
+          const rawPrs = (prGroups.get(repository.toLowerCase()) ?? []).slice(
+            0,
+            config.top ?? DEFAULT_PER_REPO_TOP,
+          );
           const pullRequests = await Promise.all(
             rawPrs.map((raw) =>
               hydratePullRequest(project, repository, raw, { fetchDetails }),
