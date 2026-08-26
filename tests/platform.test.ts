@@ -155,8 +155,7 @@ describe("Azure Platform Integration", () => {
     expect(appData.organizations[0]!.repositories[0]!.pullRequests).toHaveLength(1);
   });
 
-  test("loadAppData pages the project PR listing and caps per repository", async () => {
-    const makePr = (id: number): Record<string, unknown> => ({
+  const makePr = (id: number): Record<string, unknown> => ({
       pullRequestId: id,
       title: `PR ${id}`,
       status: "active",
@@ -167,7 +166,9 @@ describe("Azure Platform Integration", () => {
       sourceRefName: "refs/heads/fix",
       targetRefName: "refs/heads/main",
       url: `https://dev.azure.com/test-org/test-project/_git/services-gateway/pullrequest/${id}`,
-    });
+  });
+
+  test("loadAppData pages the project PR listing and caps per repository", async () => {
     // Page 1 is full (100 PRs), so the loader must fetch page 2.
     prListPages = [
       Array.from({ length: 100 }, (_, i) => makePr(i + 1)),
@@ -197,6 +198,29 @@ describe("Azure Platform Integration", () => {
       expect(prListCalls[1]![skipIdx + 1]).toBe("100");
       // All 103 PRs land in one repo; the per-repo `top` cap (5) applies.
       expect(appData.organizations[0]!.repositories[0]!.pullRequests).toHaveLength(5);
+    } finally {
+      prListPages = null;
+    }
+  });
+
+  test("loadAppData keeps every PR when top is not configured", async () => {
+    prListPages = [
+      Array.from({ length: 100 }, (_, i) => makePr(i + 1)),
+      Array.from({ length: 3 }, (_, i) => makePr(101 + i)),
+    ];
+
+    const fakeConfig: AdoConfig = {
+      projects: [
+        {
+          organization: "https://dev.azure.com/test-org",
+          project: "test-project",
+        }
+      ]
+    };
+
+    try {
+      const { data: appData } = await loadAppData(fakeConfig, { fetchDetails: false });
+      expect(appData.organizations[0]!.repositories[0]!.pullRequests).toHaveLength(103);
     } finally {
       prListPages = null;
     }

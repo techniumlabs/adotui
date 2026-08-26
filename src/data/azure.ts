@@ -197,9 +197,6 @@ const listRepositories = async (
   return repos.filter((repo) => repo.isDisabled !== true && !!repo.name);
 };
 
-/** Default per-repository PR cap when `top` is not set in the config. */
-const DEFAULT_PER_REPO_TOP = 50;
-
 interface PrListPage {
   top: number;
   skip: number;
@@ -225,11 +222,13 @@ const listPullRequests = async (
     project.project!,
     "--status",
     config.status ?? "active",
-    "--top",
-    String(page?.top ?? config.top ?? DEFAULT_PER_REPO_TOP),
     ...jsonOutput,
   ];
 
+  const top = page?.top ?? config.top;
+  if (top) {
+    args.push("--top", String(top));
+  }
   if (page && page.skip > 0) {
     args.push("--skip", String(page.skip));
   }
@@ -718,12 +717,10 @@ export const loadAppData = async (
 
       const repoNodes = await Promise.all(
         repoNames.map(async (repository): Promise<RepositoryNode> => {
-          // `top` keeps its original meaning: a per-repository cap. The
-          // project listing is paged in full, then capped per repo here.
-          const rawPrs = (prGroups.get(repository.toLowerCase()) ?? []).slice(
-            0,
-            config.top ?? DEFAULT_PER_REPO_TOP,
-          );
+          // `top`, when configured, caps PRs per repository. The project
+          // listing is paged in full, so no cap means every PR is kept.
+          const grouped = prGroups.get(repository.toLowerCase()) ?? [];
+          const rawPrs = config.top ? grouped.slice(0, config.top) : grouped;
           const pullRequests = await Promise.all(
             rawPrs.map((raw) =>
               hydratePullRequest(project, repository, raw, { fetchDetails }),

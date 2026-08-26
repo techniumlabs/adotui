@@ -169,15 +169,16 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
       ? record.status
       : "active";
 
+  // `top` is an optional per-repository cap; when omitted, every PR is kept.
   const top =
-    typeof record.top === "number" && Number.isFinite(record.top)
+    typeof record.top === "number" && Number.isFinite(record.top) && record.top > 0
       ? record.top
-      : 50;
+      : undefined;
 
   const config: AdoConfig = {
     projects,
     status,
-    top,
+    ...(top !== undefined ? { top } : {}),
     ...(typeof record.reviewer === "string" ? { reviewer: record.reviewer } : {}),
     ...(typeof record.creator === "string" ? { creator: record.creator } : {}),
     ...(typeof record.pat === "string" ? { pat: record.pat } : {}),
