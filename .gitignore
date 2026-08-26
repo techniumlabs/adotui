@@ -41,3 +41,6 @@ debug.log
 adotui.config*
 
 .tokensave
+# stale tooling output
+lint-output.json
+package-lock.json
