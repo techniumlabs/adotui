@@ -102,3 +102,33 @@ describe("OrganizationTree with duplicate repo names across projects", () => {
     expect(frame).not.toInclude("(0)");
   });
 });
+
+describe("tree header filter hint", () => {
+  const headerOf = (treeFilter: string): string => {
+    const { lastFrame } = render(
+      <OrganizationTree
+        data={data}
+        selectedOrgIndex={0}
+        selectedRepoIndex={0}
+        focus="tree"
+        treeFilter={treeFilter}
+        maxRows={20}
+      />,
+    );
+    return (lastFrame() ?? "").split("\n")[1] ?? "";
+  };
+
+  test("shows the v key next to the current view for every preset", () => {
+    expect(headerOf("me")).toContain("v My PRs");
+    expect(headerOf("with-prs")).toContain("v PRs only");
+    expect(headerOf("all")).toContain("v All");
+  });
+
+  test("a custom filter keeps the hint and never pushes the title off the row", () => {
+    const header = headerOf("author:maya merge:conflict");
+    expect(header).toContain("Organizations");
+    expect(header).toContain("v author:maya");
+    // The panel is a fixed width; the header must not spill past it.
+    expect(header.length).toBe(36);
+  });
+});

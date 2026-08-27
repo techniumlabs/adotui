@@ -46,6 +46,18 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
   const active = focus === "tree";
   const filteringByPrs = treeFilter === "with-prs";
   const isCustomFilter = treeFilter !== "all" && treeFilter !== "with-prs";
+  // The header is "<title> v <badge>" inside a fixed 36-wide panel, which
+  // leaves ~15 columns for the badge. A custom filter is shown verbatim
+  // (its warn colour already marks it as a filter) and truncated to fit,
+  // rather than spending 8 of those columns on a "Filter:" prefix that
+  // would push the title off the row.
+  const filterLabel = filteringByPrs
+    ? "PRs only"
+    : treeFilter === "all"
+      ? "All"
+      : treeFilter === "me"
+        ? "My PRs"
+        : truncate(treeFilter, 15);
 
   // Build one element per terminal line so the pane can be windowed to the
   // available height, scrolling to keep the selection visible.
@@ -179,19 +191,16 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
       flexDirection="column"
       overflow="hidden"
     >
-      {/* Header row: title + filter badge */}
+      {/* Header row: title + filter badge, prefixed with the key that cycles it */}
       <Box justifyContent="space-between">
         <Text color={active ? palette.accent : palette.muted} bold>
           {glyph.files} Organizations
         </Text>
-        <Text color={filteringByPrs || isCustomFilter ? palette.warn : palette.muted}>
-          {filteringByPrs
-            ? "PRs only"
-            : treeFilter === "all"
-              ? "All"
-              : treeFilter === "me"
-                ? "My PRs"
-                : `Filter: ${treeFilter}`}
+        <Text wrap="truncate-end">
+          <Text color={palette.accentDim}>v </Text>
+          <Text color={filteringByPrs || isCustomFilter ? palette.warn : palette.muted}>
+            {filterLabel}
+          </Text>
         </Text>
       </Box>
 
