@@ -44,3 +44,7 @@ adotui.config*
 # stale tooling output
 lint-output.json
 package-lock.json
+
+# local agent tooling
+.claude/
+.serena/
