@@ -56,7 +56,7 @@ export const KEYMAP: KeymapSection[] = [
   {
     title: "Diff (2)",
     bindings: [
-      { keys: "[ ] or ←/→", description: "Prev / next file" },
+      { keys: "←/→", description: "Prev / next file" },
       { keys: "j/k ↑/↓", description: "Move row selection" },
       { keys: "g / G", description: "Top / bottom" },
       { keys: "PgUp/PgDn", description: "Scroll a viewport" },
@@ -67,7 +67,7 @@ export const KEYMAP: KeymapSection[] = [
     title: "Comments (3)",
     bindings: [
       { keys: "j/k ↑/↓", description: "Move between threads" },
-      { keys: "[/] ←/→", description: "Select root / replies" },
+      { keys: "←/→", description: "Select root / replies" },
       { keys: "n / r / e", description: "New / reply / edit" },
       { keys: "d", description: "Delete own comment (y/n)" },
       { keys: "s", description: "Toggle resolved" },

@@ -164,7 +164,7 @@ for the full reference. The canonical table lives in `src/app/keymap.ts`.
 - `r`: refresh · `R` inside Comments/Pipelines: reload that view
 - `a` / `x` / `b` / `c`: approve / reject / abandon / complete the selected PR
 - `o`: open the selected PR in the browser
-- Diff: `[` `]` or `←`/`→` switch files · `g`/`G` top/bottom · `n` comment on a line
+- Diff: `←`/`→` switch files · `g`/`G` top/bottom · `n` comment on a line
 - Comments: `n` new · `r` reply · `e` edit · `d` delete · `s` resolve
 - `?`: help view · `q`: quit
 

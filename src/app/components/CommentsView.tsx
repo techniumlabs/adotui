@@ -159,9 +159,9 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         setSelectedThread(last);
         setSelectedCommentIndex(-1);
         setThreadScrollOffset(Math.max(0, last - maxVis + 1));
-      } else if (input === "[" || key.leftArrow) {
+      } else if (key.leftArrow) {
         setSelectedCommentIndex((i) => Math.max(i - 1, -1));
-      } else if (input === "]" || key.rightArrow) {
+      } else if (key.rightArrow) {
         const thread = stateRef.current.threads[stateRef.current.selectedThread];
         if (thread) {
           // -1 is root comment, 0 is 1st reply, etc.
@@ -338,7 +338,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         {active && inputMode === "none" && (
           <Text color={palette.muted}>
             <Text color={palette.accentDim}>j/k</Text> navigate{"  "}
-            <Text color={palette.accentDim}>[/]</Text> select comment{"  "}
+            <Text color={palette.accentDim}>←/→</Text> select comment{"  "}
             <Text color={palette.accentDim}>n</Text> new{"  "}
             <Text color={palette.accentDim}>r</Text> reply{"  "}
             <Text color={palette.accentDim}>e</Text> edit{"  "}

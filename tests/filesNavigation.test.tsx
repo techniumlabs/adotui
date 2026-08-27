@@ -17,7 +17,7 @@ describe("diff view file switching", () => {
     useAppStore.setState({ ...INITIAL_STATE });
   });
 
-  test("] and arrows switch files; left arrow no longer exits the view", async () => {
+  test("arrows switch files without leaving the view", async () => {
     const { stdin } = render(<App />);
     await delay(100);
 
@@ -27,7 +27,7 @@ describe("diff view file switching", () => {
     const fileCount = selectSelectedPr(useAppStore.getState())?.changedFiles.length ?? 0;
     const second = fileCount > 1 ? 1 : 0;
 
-    stdin.write("]");
+    stdin.write(ARROW_RIGHT);
     await delay(50);
     expect(useAppStore.getState().selectedFileIndex).toBe(second);
 
