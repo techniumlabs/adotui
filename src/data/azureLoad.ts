@@ -438,11 +438,40 @@ export interface LoadProgress {
   total: number;
 }
 
+/**
+ * A slice of the tree that is ready before the whole load finishes. One is
+ * emitted per organization as soon as its projects are known (with no
+ * repositories yet), then one per project as its repos land.
+ */
+export interface LoadPartial {
+  /** Echoes LoadOptions.requestId so stale loads can be discarded. */
+  requestId: number;
+  organizationUrl: string;
+  organizationName: string;
+  /** null for the org placeholder emitted right after discovery. */
+  project: string | null;
+  /** This project's repositories, ready to append (empty when it failed). */
+  repositories: RepositoryNode[];
+  /** Warnings raised by this project's task. */
+  warnings: string[];
+  progress: LoadProgress;
+  /** Filled in downstream by dataController; the loader does not know it. */
+  currentUserEmail?: string;
+}
+
 export interface LoadOptions {
   /** When true, fetch per-PR file changes and policy checks (slower). */
   fetchDetails?: boolean;
   /** Callback fired to report current loading progress. */
   onProgress?: (msg: string, progress?: LoadProgress) => void;
+  /**
+   * Streaming callback: fired as each slice of the tree becomes available so
+   * the UI can render progressively instead of waiting for the whole load.
+   * The resolved return value is unchanged and still config-ordered.
+   */
+  onPartial?: (partial: LoadPartial) => void;
+  /** Identifies this load; echoed back on every partial. */
+  requestId?: number;
 }
 
 const describeError = (cause: unknown): string =>
@@ -561,6 +590,30 @@ export const loadAppData = async (
   let fetchedProjects = 0;
   const progress = (): LoadProgress => ({ current: fetchedProjects, total: totalProjects });
 
+  const requestId = options.requestId ?? 0;
+  const emitPartial = (
+    organization: string,
+    project: string | null,
+    repositories: RepositoryNode[],
+    partialWarnings: string[],
+  ): void => {
+    options.onPartial?.({
+      requestId,
+      organizationUrl: organization,
+      organizationName: orgLabel(organization),
+      project,
+      repositories,
+      warnings: partialWarnings,
+      progress: progress(),
+    });
+  };
+
+  // Announce the organizations first so their rows appear immediately, then
+  // fill each one in as its projects resolve.
+  for (const { organization } of orgProjects) {
+    emitPartial(organization, null, [], []);
+  }
+
   // Phase 2: fetch repos and PRs per project, with bounded concurrency across
   // ALL projects. Each project needs only two requests, issued in parallel:
   // repo discovery and one project-wide PR listing grouped by repository.
@@ -573,6 +626,14 @@ export const loadAppData = async (
     PROJECT_FETCH_CONCURRENCY,
     async (project): Promise<RepositoryNode[]> => {
       options.onProgress?.(`Fetching PRs for ${project.project}...`, progress());
+
+      // Warnings are collected per task as well as globally so a partial can
+      // carry the problems that affected exactly its slice.
+      const taskWarnings: string[] = [];
+      const warn = (message: string): void => {
+        taskWarnings.push(message);
+        warnings.push(message);
+      };
 
       const explicitRepos = project.repositories ?? [];
       const [repoNamesResult, prListResult] = await Promise.allSettled([
@@ -595,19 +656,16 @@ export const loadAppData = async (
       };
 
       if (repoNamesResult.status === "rejected") {
-        warnings.push(
-          `Could not list repos for ${project.project}: ${describeError(repoNamesResult.reason)}`,
-        );
+        warn(`Could not list repos for ${project.project}: ${describeError(repoNamesResult.reason)}`);
         done("Skipped");
+        emitPartial(project.organization, project.project!, [], taskWarnings);
         return [];
       }
       const repoNames = repoNamesResult.value;
 
       let prGroups = new Map<string, AzurePullRequest[]>();
       if (prListResult.status === "rejected") {
-        warnings.push(
-          `Could not list PRs for ${project.project}: ${describeError(prListResult.reason)}`,
-        );
+        warn(`Could not list PRs for ${project.project}: ${describeError(prListResult.reason)}`);
       } else {
         prGroups = groupPrsByRepository(prListResult.value);
       }
@@ -628,6 +686,7 @@ export const loadAppData = async (
       );
 
       done("Loaded");
+      emitPartial(project.organization, project.project!, repoNodes, taskWarnings);
       return repoNodes;
     },
   );

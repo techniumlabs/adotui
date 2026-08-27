@@ -16,6 +16,7 @@ export {
   groupPrsByRepository,
   loadAppData,
   mapWithConcurrency,
+  type LoadPartial,
   type LoadProgress,
 } from "./azureLoad";
 export {

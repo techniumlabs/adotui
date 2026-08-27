@@ -36,17 +36,32 @@ export const App: React.FC = () => {
   useAppKeyboard(app, exit, setupLoading);
   usePrDetails(app.selectedPr, app.actions.updatePr);
 
+  // The load streams in, so the tree can be shown the moment real
+  // repositories land. Dismissing on the first ORGANIZATION would swap the
+  // splash for an empty tree, which is worse than the splash itself.
+  const hasRepositories = React.useMemo(
+    () => app.state.data.organizations.some((org) => org.repositories.length > 0),
+    [app.state.data],
+  );
+
   React.useEffect(() => {
     if (app.state.loadState === "setup") {
       setShowSplash(false);
       return;
     }
-    // If we've finished the initial load, wait a short moment and dismiss splash
-    if (app.state.loadState !== "loading" && showSplash) {
-      const t = setTimeout(() => setShowSplash(false), 2000);
+    if (!showSplash) return;
+    if (hasRepositories) {
+      setShowSplash(false);
+      return;
+    }
+    // Nothing arrived at all (empty config, or an error): dismiss shortly
+    // after the load settles rather than holding a splash over a finished
+    // screen.
+    if (app.state.loadState !== "loading") {
+      const t = setTimeout(() => setShowSplash(false), 600);
       return () => clearTimeout(t);
     }
-  }, [app.state.loadState, showSplash]);
+  }, [app.state.loadState, hasRepositories, showSplash]);
 
   // Once the setup-initiated load settles, hand over to the main UI.
   React.useEffect(() => {
