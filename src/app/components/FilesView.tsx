@@ -7,6 +7,7 @@ import { buildDiffRows } from "./diff/diffRender";
 import { handleDiffNavigation } from "./diff/diffKeyboard";
 import { useDiffComment } from "../hooks/useDiffComment";
 import { useLazyFileDiff } from "../hooks/useLazyFileDiff";
+import { computeScrollWindow } from "../utils";
 
 type FilesViewProps = {
   selectedPr?: PullRequest;
@@ -144,10 +145,8 @@ export const FilesView: React.FC<FilesViewProps> = ({
   const terminalHeight = process.stdout.rows ?? 40;
   const viewportH = Math.max(5, terminalHeight - 27);
   const total = diffRows.length;
-  const clampedOffset = Math.min(diffScrollOffset, Math.max(0, total - viewportH));
+  const { offset: clampedOffset, canScrollUp, canScrollDown } = computeScrollWindow(total, viewportH, diffScrollOffset);
   const visibleRows = diffRows.slice(clampedOffset, clampedOffset + viewportH).map(r => r.element);
-  const canScrollDown = clampedOffset + viewportH < total;
-  const canScrollUp = clampedOffset > 0;
 
   return (
     <Box

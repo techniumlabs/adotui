@@ -8,3 +8,4 @@ export * from "./prFilters";
 export * from "./completionOptions";
 export * from "./browser";
 export * from "./debugLog";
+export * from "./scrollWindow";

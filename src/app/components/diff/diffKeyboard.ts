@@ -1,4 +1,5 @@
 import type { Key } from "ink";
+import { followSelection } from "../../utils";
 
 export type DiffNavContext = {
   rowCount: number;
@@ -23,17 +24,15 @@ export function handleDiffNavigation(input: string, key: Key, ctx: DiffNavContex
   if (input === "j" || key.downArrow) {
     const nextRow = Math.min(selectedRow + 1, rowCount - 1);
     onSelectedRowChange(nextRow);
-    if (nextRow >= scrollOffset + viewportH) {
-      onScrollOffsetChange(nextRow - viewportH + 1);
-    }
+    const nextOffset = followSelection(nextRow, scrollOffset, viewportH);
+    if (nextOffset !== scrollOffset) onScrollOffsetChange(nextOffset);
     return true;
   }
   if (input === "k" || key.upArrow) {
     const nextRow = Math.max(selectedRow - 1, 0);
     onSelectedRowChange(nextRow);
-    if (nextRow < scrollOffset) {
-      onScrollOffsetChange(nextRow);
-    }
+    const nextOffset = followSelection(nextRow, scrollOffset, viewportH);
+    if (nextOffset !== scrollOffset) onScrollOffsetChange(nextOffset);
     return true;
   }
   if (input === "g") {

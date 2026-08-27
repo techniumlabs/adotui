@@ -10,6 +10,7 @@ import {
   type CommentInputMode,
 } from "../hooks/usePrComments";
 import { ThreadCard } from "./comments/ThreadCard";
+import { computeScrollWindow, followSelection } from "../utils";
 
 type CommentsViewProps = {
   selectedPr?: PullRequest;
@@ -109,19 +110,14 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         setSelectedThread((i) => {
           const next = Math.min(i + 1, stateRef.current.threads.length - 1);
           if (next !== i) setSelectedCommentIndex(-1);
-          const maxVis = maxVisibleThreads();
-          if (next >= stateRef.current.threadScrollOffset + maxVis) {
-            setThreadScrollOffset(next - maxVis + 1);
-          }
+          setThreadScrollOffset(followSelection(next, stateRef.current.threadScrollOffset, maxVisibleThreads()));
           return next;
         });
       } else if (input === "k" || key.upArrow) {
         setSelectedThread((i) => {
           const next = Math.max(i - 1, 0);
           if (next !== i) setSelectedCommentIndex(-1);
-          if (next < stateRef.current.threadScrollOffset) {
-            setThreadScrollOffset(next);
-          }
+          setThreadScrollOffset(followSelection(next, stateRef.current.threadScrollOffset, maxVisibleThreads()));
           return next;
         });
       } else if (key.pageDown) {
@@ -139,9 +135,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
           const maxVis = maxVisibleThreads();
           const next = Math.max(i - maxVis, 0);
           setSelectedCommentIndex(-1);
-          if (next < stateRef.current.threadScrollOffset) {
-            setThreadScrollOffset(Math.max(next, 0));
-          }
+          setThreadScrollOffset(followSelection(next, stateRef.current.threadScrollOffset, maxVis));
           return next;
         });
       } else if (input === "g") {
@@ -268,13 +262,10 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         const maxVis = Math.max(4, Math.floor(viewportH / 5));
 
         const total = threads.length;
-        const clampedOffset = Math.max(0, Math.min(threadScrollOffset, total - maxVis));
+        const { offset: clampedOffset, canScrollUp, canScrollDown } = computeScrollWindow(total, maxVis, threadScrollOffset);
         const visibleThreads = threads.slice(clampedOffset, clampedOffset + maxVis);
 
         if (total === 0) return null;
-
-        const canScrollUp = clampedOffset > 0;
-        const canScrollDown = clampedOffset + maxVis < total;
 
         return (
           <Box flexDirection="column">
