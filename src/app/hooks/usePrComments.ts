@@ -61,15 +61,19 @@ export function usePrComments(
         selectedPr.id,
       );
 
+      // Cache hit: show it immediately, then revalidate in the background so
+      // comments added elsewhere (web UI, another session) appear without
+      // waiting out the cache TTL.
+      let background = false;
       if (!force) {
         const cached = getCommentCache(key);
         if (cached) {
           setThreads(cached);
-          return;
+          background = true;
         }
       }
 
-      setLoading(true);
+      if (!background) setLoading(true);
       setError(null);
       try {
         const data = await fetchPrComments(
@@ -78,13 +82,19 @@ export function usePrComments(
           repoId,
           selectedPr.id,
         );
+        if (data === null) {
+          // Transient az failure — keep whatever is shown, never cache it,
+          // and only surface an error when there is nothing on screen.
+          if (!background) setError("Could not load comments — press R to retry.");
+          return;
+        }
         setCommentCache(key, data);
         setThreads(data);
         onFreshLoadRef.current?.();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load comments.");
       } finally {
-        setLoading(false);
+        if (!background) setLoading(false);
       }
     },
     [selectedPr],

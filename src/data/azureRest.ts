@@ -205,12 +205,17 @@ export const normalizeThreads = (rawThreads: RawThread[]): PrCommentThread[] =>
     }))
     .filter((t) => t.comments.length > 0);
 
+/**
+ * Fetches PR comment threads. Returns null when the fetch fails (transient
+ * az/auth error) so callers can distinguish "could not load" from "no
+ * comments" — a silent [] used to get cached and shown as empty.
+ */
 export const fetchPrComments = async (
   organizationUrl: string,
   project: string,
   repositoryId: string,
   prId: number,
-): Promise<PrCommentThread[]> => {
+): Promise<PrCommentThread[] | null> => {
   if (process.env.ADOTUI_MOCK) {
     const { getMockComments } = await import("./mock");
     return getMockComments(prId);
@@ -229,12 +234,12 @@ export const fetchPrComments = async (
         `pullRequestId=${prId}`,
       ],
     );
-    if (!data?.value) return [];
+    if (!data?.value) return null;
 
     return normalizeThreads(data.value);
   } catch (e) {
     debugLog("fetchPrComments error", e);
-    return [];
+    return null;
   }
 };
 

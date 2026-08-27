@@ -312,8 +312,9 @@ const hydratePullRequest = async (
     checksPassed = checks.passed;
     checksTotal = checks.total;
     workItems = items;
-    commentCount = threads.reduce((acc, t) => acc + t.comments.length, 0);
-    activeCommentCount = threads.reduce(
+    const threadList = threads ?? [];
+    commentCount = threadList.reduce((acc, t) => acc + t.comments.length, 0);
+    activeCommentCount = threadList.reduce(
       (acc, t) => acc + (t.status === "active" || t.status === "pending" ? t.comments.length : 0),
       0
     );
@@ -355,6 +356,7 @@ export const fetchPrDetails = async (pr: PullRequest): Promise<Partial<PullReque
   ]);
 
   const checks = summarizeChecks(policies);
+  const threadList = threads ?? [];
 
   return {
     changedFiles: fileRes.files,
@@ -363,8 +365,8 @@ export const fetchPrDetails = async (pr: PullRequest): Promise<Partial<PullReque
     checksPassed: checks.passed,
     checksTotal: checks.total,
     workItems: items,
-    comments: threads.reduce((acc, t) => acc + t.comments.length, 0),
-    activeComments: threads.reduce(
+    comments: threadList.reduce((acc, t) => acc + t.comments.length, 0),
+    activeComments: threadList.reduce(
       (acc, t) => acc + (t.status === "active" || t.status === "pending" ? t.comments.length : 0),
       0
     ),
