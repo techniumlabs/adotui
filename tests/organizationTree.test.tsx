@@ -103,8 +103,8 @@ describe("OrganizationTree with duplicate repo names across projects", () => {
   });
 });
 
-describe("tree header filter hint", () => {
-  const headerOf = (treeFilter: string): string => {
+describe("tree view badge and switch hint", () => {
+  const frameOf = (treeFilter: string): string[] => {
     const { lastFrame } = render(
       <OrganizationTree
         data={data}
@@ -115,20 +115,77 @@ describe("tree header filter hint", () => {
         maxRows={20}
       />,
     );
-    return (lastFrame() ?? "").split("\n")[1] ?? "";
+    return (lastFrame() ?? "").split("\n");
   };
 
-  test("shows the v key next to the current view for every preset", () => {
-    expect(headerOf("me")).toContain("v My PRs");
-    expect(headerOf("with-prs")).toContain("v PRs only");
-    expect(headerOf("all")).toContain("v All");
+  test("names the current view", () => {
+    expect(frameOf("me")[1]).toContain("My PRs");
+    expect(frameOf("with-prs")[1]).toContain("PRs only");
+    expect(frameOf("all")[1]).toContain("All");
   });
 
-  test("a custom filter keeps the hint and never pushes the title off the row", () => {
-    const header = headerOf("author:maya merge:conflict");
+  test("labels the key that switches it", () => {
+    const hint = frameOf("me").find((line) => line.includes("switch view"));
+    expect(hint).toBeDefined();
+    expect(hint).toContain("v switch view");
+  });
+
+  test("a custom filter keeps the title on its own fixed-width row", () => {
+    const header = frameOf("author:maya merge:conflict")[1]!;
     expect(header).toContain("Organizations");
-    expect(header).toContain("v author:maya");
-    // The panel is a fixed width; the header must not spill past it.
+    expect(header).toContain("author:maya");
+    // Overflowing this row makes Ink composite it over the tree below.
     expect(header.length).toBe(36);
+  });
+
+  test("the hint survives an organization long enough to fill the panel", () => {
+    const long = {
+      ...data,
+      organizations: [
+        {
+          ...data.organizations[0]!,
+          repositories: Array.from({ length: 40 }, (_, i) => ({
+            name: `repo-${i}`,
+            project: "core",
+            pullRequests: data.organizations[0]!.repositories[1]!.pullRequests,
+          })),
+        },
+      ],
+    };
+    const { lastFrame } = render(
+      <OrganizationTree
+        data={long}
+        selectedOrgIndex={0}
+        selectedRepoIndex={0}
+        focus="tree"
+        treeFilter="all"
+        maxRows={12}
+      />,
+    );
+    const lines = (lastFrame() ?? "").split("\n");
+    expect(lines.some((l) => l.includes("v switch view"))).toBe(true);
+    // Panel must not grow past the height it is given.
+    expect(lines.length).toBe(12);
+  });
+});
+
+describe("selected repository is visibly marked", () => {
+  test("the selected repo carries the pointer, unselected ones keep a connector", () => {
+    const { lastFrame } = render(
+      <OrganizationTree
+        data={data}
+        selectedOrgIndex={0}
+        selectedRepoIndex={1}
+        focus="tree"
+        treeFilter="all"
+        maxRows={20}
+      />,
+    );
+    const lines = (lastFrame() ?? "").split("\n");
+    // repositories[1] is the svc-dup under project "edge"
+    const selected = lines.find((line) => line.includes("svc-dup") && line.includes("\u25b8"));
+    expect(selected).toBeDefined();
+    // Exactly one repo row is pointed at.
+    expect(lines.filter((line) => line.includes("svc-dup") && line.includes("\u25b8"))).toHaveLength(1);
   });
 });

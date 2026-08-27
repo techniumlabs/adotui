@@ -1,6 +1,6 @@
 import type { AppData, OrganizationNode, PullRequest, RepositoryNode } from "../domain/types";
 import type { AppState } from "./types";
-import { clamp, getVisiblePrs } from "./utils";
+import { clamp, getVisiblePrs, matchesTreeFilter } from "./utils";
 
 /**
  * Pure derivation helpers over AppState. Used by module-level actions (via
@@ -30,6 +30,23 @@ export const selectSelectedPr = (state: AppState): PullRequest | undefined =>
  * out-of-range index is harmless (selectors optional-chain, the tree renders
  * "No repos with PRs." and moveTreeSelection recovers on the next keypress).
  */
+/**
+ * Mirrors OrganizationTree's row predicate: a repo is drawn only when the
+ * active filter leaves it with at least one pull request.
+ */
+const isRepoVisible = (
+  repo: RepositoryNode,
+  treeFilter: string,
+  currentUserEmail: string | undefined,
+): boolean => {
+  if (treeFilter === "all") return true;
+  const matching =
+    treeFilter === "with-prs"
+      ? repo.pullRequests
+      : repo.pullRequests.filter((pr) => matchesTreeFilter(pr, treeFilter, currentUserEmail));
+  return matching.length > 0;
+};
+
 export const clampSelection = (
   current: AppState,
   data: AppData,
@@ -38,8 +55,23 @@ export const clampSelection = (
   const selectedOrgIndex = clamp(current.selectedOrgIndex, 0, Math.max(0, orgCount - 1));
   const org = data.organizations[selectedOrgIndex];
   const repoCount = org?.repositories.length ?? 0;
-  const selectedRepoIndex =
+  let selectedRepoIndex =
     repoCount > 0 ? clamp(current.selectedRepoIndex, 0, repoCount - 1) : current.selectedRepoIndex;
+
+  // Selection indexes the UNFILTERED repo list, so index 0 (the launch
+  // default) or a stale index can point at a repo the filter hides - the
+  // tree then highlights nothing while the PR pane shows that repo. Snap to
+  // the first repo the tree actually draws.
+  if (org && repoCount > 0) {
+    const selectedRepo = org.repositories[selectedRepoIndex];
+    if (!selectedRepo || !isRepoVisible(selectedRepo, current.treeFilter, data.currentUserEmail)) {
+      const firstVisible = org.repositories.findIndex((repo) =>
+        isRepoVisible(repo, current.treeFilter, data.currentUserEmail),
+      );
+      if (firstVisible !== -1) selectedRepoIndex = firstVisible;
+    }
+  }
+
   const visible = getVisiblePrs(
     org?.repositories[selectedRepoIndex],
     current.treeFilter,

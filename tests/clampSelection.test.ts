@@ -60,3 +60,39 @@ describe("clampSelection", () => {
     expect(result.selectedPrIndex).toBe(0);
   });
 });
+
+describe("clampSelection snaps onto a visible repository", () => {
+  const mine = (author: string): PullRequest =>
+    ({ id: 1, author, reviewers: [], title: "t", status: "active" }) as unknown as PullRequest;
+
+  const mixed: AppData = {
+    currentUserEmail: "maya@example.com",
+    organizations: [
+      {
+        name: "acme",
+        organizationUrl: "https://dev.azure.com/acme",
+        repositories: [
+          { name: "hidden", project: "core", pullRequests: [mine("ram")] },
+          { name: "visible", project: "core", pullRequests: [mine("maya")] },
+        ],
+      },
+    ],
+  };
+
+  test("the launch default (index 0) moves off a filtered-out repo", () => {
+    // Under "me" the first repo has no PRs of the user, so the tree draws
+    // nothing for it and the highlight would be invisible.
+    const result = clampSelection(state({ treeFilter: "me", selectedRepoIndex: 0 }), mixed);
+    expect(result.selectedRepoIndex).toBe(1);
+  });
+
+  test("a repo the filter shows is left alone", () => {
+    const result = clampSelection(state({ treeFilter: "me", selectedRepoIndex: 1 }), mixed);
+    expect(result.selectedRepoIndex).toBe(1);
+  });
+
+  test("with no visible repos at all the index is untouched", () => {
+    const result = clampSelection(state({ treeFilter: "author:nobody", selectedRepoIndex: 0 }), mixed);
+    expect(result.selectedRepoIndex).toBe(0);
+  });
+});
