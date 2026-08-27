@@ -154,7 +154,7 @@ const invokeDelete = async <T>(
 
 // ─── PR Comment types ─────────────────────────────────────────────────────────
 
-interface RawThread {
+export interface RawThread {
   id: number;
   status?: string;
   isDeleted?: boolean;
@@ -165,7 +165,7 @@ interface RawThread {
   comments?: RawComment[];
 }
 
-interface RawComment {
+export interface RawComment {
   id: number;
   author?: { displayName?: string; uniqueName?: string };
   content?: string;
@@ -176,6 +176,37 @@ interface RawComment {
 }
 
 // ─── PR Comments ──────────────────────────────────────────────────────────────
+
+/**
+ * Normalizes raw pullRequestThreads payloads: drops deleted threads and
+ * comments, filters system comments, and removes threads left empty.
+ * Exported for tests.
+ */
+export const normalizeThreads = (rawThreads: RawThread[]): PrCommentThread[] =>
+  rawThreads
+    .filter((thread) => !thread.isDeleted)
+    .map((thread) => ({
+      id: thread.id,
+      status: (thread.status ?? "unknown") as PrCommentThread["status"],
+      filePath: thread.threadContext?.filePath ?? null,
+      lineNumber: thread.threadContext?.rightFileStart?.line ?? null,
+      comments: (thread.comments ?? [])
+        .filter((c) => !c.isDeleted && c.commentType !== "system")
+        .map(
+          (c): import("../domain/types").PrComment => ({
+            id: c.id,
+            threadId: thread.id,
+            author: c.author?.displayName ?? "Unknown",
+            authorEmail: c.author?.uniqueName,
+            content: c.content ?? "",
+            publishedDate: c.publishedDate ?? "",
+            lastUpdatedDate: c.lastUpdatedDate ?? "",
+            commentType: (c.commentType ?? "text") as CommentType,
+            isDeleted: false,
+          }),
+        ),
+    }))
+    .filter((t) => t.comments.length > 0);
 
 export const fetchPrComments = async (
   organizationUrl: string,
@@ -201,33 +232,9 @@ export const fetchPrComments = async (
         `pullRequestId=${prId}`,
       ],
     );
-    // debugLog("fetchPrComments", data);
     if (!data?.value) return [];
 
-    return data.value
-      .filter((thread) => !thread.isDeleted)
-      .map((thread) => ({
-        id: thread.id,
-        status: (thread.status ?? "unknown") as PrCommentThread["status"],
-        filePath: thread.threadContext?.filePath ?? null,
-        lineNumber: thread.threadContext?.rightFileStart?.line ?? null,
-        comments: (thread.comments ?? [])
-          .filter((c) => !c.isDeleted && c.commentType !== "system")
-          .map(
-            (c): import("../domain/types").PrComment => ({
-              id: c.id,
-              threadId: thread.id,
-              author: c.author?.displayName ?? "Unknown",
-              authorEmail: c.author?.uniqueName,
-              content: c.content ?? "",
-              publishedDate: c.publishedDate ?? "",
-              lastUpdatedDate: c.lastUpdatedDate ?? "",
-              commentType: (c.commentType ?? "text") as CommentType,
-              isDeleted: false,
-            }),
-          ),
-      }))
-      .filter((t) => t.comments.length > 0);
+    return normalizeThreads(data.value);
   } catch (e) {
     debugLog("fetchPrComments error", e);
     return [];
@@ -429,7 +436,7 @@ export const fetchPipelineRuns = async (
   );
 };
 
-const mapRunState = (status?: string): RunState => {
+export const mapRunState = (status?: string): RunState => {
   switch (status?.toLowerCase()) {
     case "inprogress":
     case "in_progress":
@@ -447,7 +454,7 @@ const mapRunState = (status?: string): RunState => {
   }
 };
 
-const mapRunResult = (result?: string): RunResult | null => {
+export const mapRunResult = (result?: string): RunResult | null => {
   if (!result) return null;
   switch (result.toLowerCase()) {
     case "succeeded":
