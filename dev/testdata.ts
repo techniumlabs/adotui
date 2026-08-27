@@ -13,10 +13,8 @@
  *   bun dev/testdata.ts create  --org <url> [--projects 2] [--repos 3] [--prs 2]
  *   bun dev/testdata.ts cleanup --org <url>
  */
-import { unlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { CommandError, run, runJson } from "../src/data/command";
+import { withTempFile } from "../src/data/tempFile";
 import { mapWithConcurrency } from "../src/data/azure";
 
 const DEFAULT_PREFIX = "adotui-loadtest-";
@@ -93,33 +91,28 @@ const withRetry = async <T>(
 };
 
 /** POST a server-side git push (commit + ref update) via az devops invoke. */
-const invokePush = async (
+const invokePush = (
   org: string,
   project: string,
   repositoryId: string,
   body: unknown,
-): Promise<{ commits?: { commitId?: string }[] }> => {
-  const tmpPath = join(
-    tmpdir(),
-    `adotui_testdata_${Date.now()}_${Math.random().toString(36).slice(2)}.json`,
+): Promise<{ commits?: { commitId?: string }[] }> =>
+  withTempFile(
+    JSON.stringify(body),
+    (tmpPath) =>
+      runJson(AZ, [
+        "devops", "invoke",
+        "--area", "git",
+        "--resource", "pushes",
+        "--route-parameters", `project=${project}`, `repositoryId=${repositoryId}`,
+        "--http-method", "POST",
+        "--in-file", tmpPath,
+        "--api-version", "7.1",
+        "--organization", org,
+        "--output", "json",
+      ], { timeoutMs: 30_000 }),
+    { prefix: "adotui-testdata", suffix: ".json" },
   );
-  await writeFile(tmpPath, JSON.stringify(body), "utf-8");
-  try {
-    return await runJson(AZ, [
-      "devops", "invoke",
-      "--area", "git",
-      "--resource", "pushes",
-      "--route-parameters", `project=${project}`, `repositoryId=${repositoryId}`,
-      "--http-method", "POST",
-      "--in-file", tmpPath,
-      "--api-version", "7.1",
-      "--organization", org,
-      "--output", "json",
-    ], { timeoutMs: 30_000 });
-  } finally {
-    await unlink(tmpPath).catch(() => {});
-  }
-};
 
 const addFile = (path: string, content: string): Record<string, unknown> => ({
   changeType: "add",

@@ -3,10 +3,8 @@
  * commits from the Azure DevOps git items REST API (the only direct REST
  * usage in adotui — see azureAuth.ts) and diffs them with the system `diff`.
  */
-import { unlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { spawn } from "node:child_process";
+import { withTempFile } from "./tempFile";
 import type { PullRequestFileChange } from "../domain/types";
 import { getAdoAuthHeader } from "./azureAuth";
 
@@ -52,41 +50,35 @@ const buildUnifiedDiff = async (
   filePath: string,
   oldContent: string,
   newContent: string,
-): Promise<{ rawDiff: string; additions: number; deletions: number }> => {
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const oldPath = join(tmpdir(), `adotui-a-${id}`);
-  const newPath = join(tmpdir(), `adotui-b-${id}`);
-  await writeFile(oldPath, oldContent);
-  await writeFile(newPath, newContent);
+): Promise<{ rawDiff: string; additions: number; deletions: number }> =>
+  withTempFile(oldContent, (oldPath) =>
+    withTempFile(newContent, async (newPath) => {
+      const proc = spawn("diff", [
+        "-u",
+        "-L", `a/${filePath}`,
+        "-L", `b/${filePath}`,
+        oldPath, newPath,
+      ], {
+        stdio: ["ignore", "pipe", "ignore"],
+      });
 
-  const proc = spawn("diff", [
-    "-u",
-    "-L", `a/${filePath}`,
-    "-L", `b/${filePath}`,
-    oldPath, newPath,
-  ], {
-    stdio: ["ignore", "pipe", "ignore"],
-  });
+      const rawDiff = await new Promise<string>((resolve) => {
+        let out = "";
+        proc.stdout.on("data", (chunk) => { out += chunk; });
+        proc.on("close", () => resolve(out));
+      });
 
-  const rawDiff = await new Promise<string>((resolve) => {
-    let out = "";
-    proc.stdout.on("data", (chunk) => { out += chunk; });
-    proc.on("close", () => resolve(out));
-  });
+      const lines = rawDiff.split("\n");
+      const additions = lines.filter(
+        (l) => l.startsWith("+") && !l.startsWith("+++"),
+      ).length;
+      const deletions = lines.filter(
+        (l) => l.startsWith("-") && !l.startsWith("---"),
+      ).length;
 
-  await unlink(oldPath).catch(() => { });
-  await unlink(newPath).catch(() => { });
-
-  const lines = rawDiff.split("\n");
-  const additions = lines.filter(
-    (l) => l.startsWith("+") && !l.startsWith("+++"),
-  ).length;
-  const deletions = lines.filter(
-    (l) => l.startsWith("-") && !l.startsWith("---"),
-  ).length;
-
-  return { rawDiff, additions, deletions };
-};
+      return { rawDiff, additions, deletions };
+    }, { prefix: "adotui-b" }),
+  { prefix: "adotui-a" });
 
 /**
  * Fetches the raw diff for a single file on-demand to avoid rate-limiting.

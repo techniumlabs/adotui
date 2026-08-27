@@ -6,9 +6,7 @@
  * rendering) is azureDiff.ts, authenticated via azureAuth.ts.
  */
 
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { writeFile } from "node:fs/promises";
+import { withTempFile } from "./tempFile";
 import type {
   CommentType,
   PipelineRun,
@@ -71,32 +69,31 @@ const invokeMutate = async <T>(
   body: unknown,
   queryParameters: string[] = [],
 ): Promise<T | null> => {
-  const tmpPath = join(tmpdir(), `adotui_invoke_${Date.now()}_${Math.random().toString(36).slice(2)}.json`);
   try {
-    await writeFile(tmpPath, JSON.stringify(body), "utf-8");
-    const args: string[] = [
-      "devops", "invoke",
-      "--area", area,
-      "--resource", resource,
-      "--route-parameters", ...routeParameters,
-      "--http-method", method,
-      "--in-file", tmpPath,
-      "--media-type", "application/json",
-      "--api-version", "7.1",
-      "--output", "json",
-      ...orgArgs(organization),
-    ];
-    if (queryParameters.length > 0) {
-      args.push("--query-parameters", ...queryParameters);
-    }
-    return await runJson<T>(AZ, args, { timeoutMs: 20_000 });
+    return await withTempFile(
+      JSON.stringify(body),
+      (tmpPath) => {
+        const args: string[] = [
+          "devops", "invoke",
+          "--area", area,
+          "--resource", resource,
+          "--route-parameters", ...routeParameters,
+          "--http-method", method,
+          "--in-file", tmpPath,
+          "--media-type", "application/json",
+          "--api-version", "7.1",
+          "--output", "json",
+          ...orgArgs(organization),
+        ];
+        if (queryParameters.length > 0) {
+          args.push("--query-parameters", ...queryParameters);
+        }
+        return runJson<T>(AZ, args, { timeoutMs: 20_000 });
+      },
+      { prefix: "adotui-invoke", suffix: ".json" },
+    );
   } catch {
     return null;
-  } finally {
-    try {
-      const { unlink } = await import("node:fs/promises");
-      await unlink(tmpPath);
-    } catch { /* ignore */ }
   }
 };
 
