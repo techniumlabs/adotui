@@ -1,6 +1,7 @@
-import { expect, test, describe } from "bun:test";
-import { useSelection } from "../src/app/hooks/useSelection";
-import type { AppState } from "../src/app/types";
+import { expect, test, describe, beforeEach } from "bun:test";
+import { moveTreeSelection } from "../src/app/actions/selectionActions";
+import { useAppStore } from "../src/app/store";
+import { INITIAL_STATE } from "../src/app/constants";
 import type { AppData, PullRequest } from "../src/domain/types";
 
 const makePr = (author: string): PullRequest => ({
@@ -42,37 +43,20 @@ const data: AppData = {
   ],
 };
 
-const makeState = (): AppState =>
-  ({
-    data,
-    treeFilter: "me",
-    selectedOrgIndex: 0,
-    selectedRepoIndex: 0,
-    selectedPrIndex: 0,
-    fileFilter: "",
-    banner: "",
-  }) as unknown as AppState;
-
 describe("moveTreeSelection under the 'me' tree filter", () => {
-  test("skips repos hidden by the filter when moving down", () => {
-    let state = makeState();
-    const { moveTreeSelection } = useSelection((updater) => {
-      state = typeof updater === "function" ? updater(state) : updater;
-    });
+  beforeEach(() => {
+    useAppStore.setState({ ...INITIAL_STATE, data, treeFilter: "me" });
+  });
 
+  test("skips repos hidden by the filter when moving down", () => {
     moveTreeSelection(0, 1);
     // repo-2 has no PRs of the logged-in user — selection must jump to repo-3.
-    expect(state.selectedRepoIndex).toBe(2);
+    expect(useAppStore.getState().selectedRepoIndex).toBe(2);
   });
 
   test("skips hidden repos when moving back up", () => {
-    let state = makeState();
-    state = { ...state, selectedRepoIndex: 2 };
-    const { moveTreeSelection } = useSelection((updater) => {
-      state = typeof updater === "function" ? updater(state) : updater;
-    });
-
+    useAppStore.setState({ selectedRepoIndex: 2 });
     moveTreeSelection(0, -1);
-    expect(state.selectedRepoIndex).toBe(0);
+    expect(useAppStore.getState().selectedRepoIndex).toBe(0);
   });
 });

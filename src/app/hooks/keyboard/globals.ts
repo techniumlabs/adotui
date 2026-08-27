@@ -2,6 +2,7 @@ import type { Key } from "ink";
 import type { AppHandle } from "../useAppState";
 import { FOCUS_ORDER, DEFAULT_COMPLETION_OPTIONS } from "../../constants";
 import { openInBrowser } from "../../utils";
+import { patchState, updateState } from "../../store";
 
 /** Handles shortcuts that work in any non-special focus (after confirm gate and commentInputActive guard). */
 export function handleGlobals(
@@ -10,10 +11,10 @@ export function handleGlobals(
   app: AppHandle,
   exitApp: () => void,
 ): boolean {
-  const { state, setState, selectedPr, actions } = app;
+  const { state, selectedPr, actions } = app;
 
   if (key.tab) {
-    setState((current) => {
+    updateState((current) => {
       let nextIndex = (FOCUS_ORDER.indexOf(current.focus) + 1) % FOCUS_ORDER.length;
       let nextFocus = FOCUS_ORDER[nextIndex] ?? "tree";
       if (nextFocus === "runs" && process.env.NODE_ENV !== "debug") {
@@ -22,46 +23,46 @@ export function handleGlobals(
       }
       const resolved = nextFocus === "command" ? "tree" : nextFocus;
       const fileFilter = current.focus === "files" && resolved !== "files" ? "" : current.fileFilter;
-      return { ...current, focus: resolved, fileFilter, banner: `Focus: ${resolved}` };
+      return { focus: resolved, fileFilter, banner: `Focus: ${resolved}` };
     });
     return true;
   }
 
   if (selectedPr) {
-    if (input === "1") { setState((c) => ({ ...c, focus: "detail", fileFilter: "", banner: "Focus: Overview" })); return true; }
-    if (input === "2") { setState((c) => ({ ...c, focus: "files", selectedFileIndex: 0, diffScrollOffset: 0, banner: "Focus: Diff" })); return true; }
-    if (input === "3") { setState((c) => ({ ...c, focus: "comments", fileFilter: "", banner: "Focus: Comments" })); return true; }
+    if (input === "1") { patchState({ focus: "detail", fileFilter: "", banner: "Focus: Overview" }); return true; }
+    if (input === "2") { patchState({ focus: "files", selectedFileIndex: 0, diffScrollOffset: 0, banner: "Focus: Diff" }); return true; }
+    if (input === "3") { patchState({ focus: "comments", fileFilter: "", banner: "Focus: Comments" }); return true; }
     if (input === "4") {
       if (process.env.NODE_ENV === "debug") {
-        setState((c) => ({ ...c, focus: "runs", fileFilter: "", banner: "Focus: Pipelines" }));
+        patchState({ focus: "runs", fileFilter: "", banner: "Focus: Pipelines" });
       }
       return true;
     }
 
     if (input === "h" && ["detail", "files", "comments", "runs"].includes(state.focus)) {
-      setState((c) => ({ ...c, focus: "list", fileFilter: "", banner: "Focus: list" })); return true;
+      patchState({ focus: "list", fileFilter: "", banner: "Focus: list" }); return true;
     }
     if (key.leftArrow && ["detail", "files", "runs"].includes(state.focus)) {
-      setState((c) => ({ ...c, focus: "list", fileFilter: "", banner: "Focus: list" })); return true;
+      patchState({ focus: "list", fileFilter: "", banner: "Focus: list" }); return true;
     }
   }
 
   if (input === "?") {
-    setState((c) => ({ ...c, previousFocus: c.focus, focus: "help", banner: "Help view" }));
+    updateState((c) => ({ previousFocus: c.focus, focus: "help", banner: "Help view" }));
     return true;
   }
   if (input === "q") { exitApp(); process.exit(0); return true; }
   if (input === "/") {
-    setState((c) => ({ ...c, previousFocus: c.focus, focus: "command", commandText: "", banner: "Command mode." }));
+    updateState((c) => ({ previousFocus: c.focus, focus: "command", commandText: "", banner: "Command mode." }));
     return true;
   }
   if (input === "v" || input === "V") {
-    setState((c) => {
+    updateState((c) => {
       const filters = ["me", "with-prs", "all"];
       const currentIndex = filters.indexOf(c.treeFilter);
       const nextIndex = (currentIndex + 1) % filters.length;
       const nextFilter = filters[nextIndex] ?? "me";
-      return { ...c, treeFilter: nextFilter, selectedOrgIndex: 0, selectedRepoIndex: 0, selectedPrIndex: 0, banner: `Filter changed to: ${nextFilter}` };
+      return { treeFilter: nextFilter, selectedOrgIndex: 0, selectedRepoIndex: 0, selectedPrIndex: 0, banner: `Filter changed to: ${nextFilter}` };
     });
     return true;
   }

@@ -29,7 +29,7 @@ export const App: React.FC = () => {
   const [setupLoading, setSetupLoading] = React.useState(false);
   const { exit } = useApp();
   const size = useTerminalSize();
-  const app = useAppState(exit);
+  const app = useAppState();
   // Suppress the main keyboard while the setup screen is still showing
   // (including the load it kicked off).
   useAppKeyboard(app, exit, setupLoading);
