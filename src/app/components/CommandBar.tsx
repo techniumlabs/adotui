@@ -71,7 +71,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
             </>
           )
         ) : (
-          "Press / to filter or run commands"
+          "Press : for commands (filter, approve, complete…)"
         )}
       </Text>
     </Box>

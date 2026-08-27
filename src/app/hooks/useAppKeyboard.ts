@@ -20,7 +20,9 @@ export function useAppKeyboard(app: AppHandle, exitApp: () => void, suppressed =
 
       // 2. Confirmation gate — awaiting y/n for a destructive action
       if (state.pendingConfirm) {
-        const confirmed = input === "y" || key.return;
+        // A literal y is required: Enter no longer confirms, so an
+        // Enter-Enter from the completion editor cannot merge a PR.
+        const confirmed = input === "y" || input === "Y";
         const pending = state.pendingConfirm;
         updateState((c) => ({
           pendingConfirm: null,

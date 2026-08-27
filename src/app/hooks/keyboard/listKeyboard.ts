@@ -20,7 +20,7 @@ export function handleList(input: string, key: Key, app: AppHandle, _exitApp: ()
     patchState({ focus: "comments", banner: "Comments view. n=new comment  r=reply  h=back" });
     return;
   }
-  if (input === "p") {
-    patchState({ focus: "runs", banner: "Pipeline runs. j/k=navigate  o=open  h=back" });
+  if (input === "p" && process.env.NODE_ENV === "debug") {
+    patchState({ focus: "runs", banner: "Pipeline runs. j/k=navigate  o=open  R=reload  h=back" });
   }
 }

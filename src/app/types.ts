@@ -4,8 +4,6 @@ export type FocusArea = "tree" | "list" | "detail" | "command" | "completion" | 
 
 export type MergeStrategy = "noFastForward" | "squash" | "rebase" | "rebaseMerge";
 
-export type DiffViewMode = "unified" | "split";
-
 export type TreeFilter = string;
 
 export type LoadState = "loading" | "ready" | "error" | "setup";
@@ -59,7 +57,6 @@ export type AppState = {
   banner: string;
   autoRefresh: boolean;
   lastRefreshISO: string;
-  diffViewMode: DiffViewMode;
   diffScrollOffset: number;
   diffSelectedRow: number;
   treeFilter: TreeFilter;

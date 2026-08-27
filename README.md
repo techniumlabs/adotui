@@ -150,33 +150,36 @@ Skip Azure and show sample data:
 
 ## Keybindings
 
-The footer permanently lists available shortcuts based on your context.
+The footer lists the shortcuts for your current context; press `?` in the app
+for the full reference. The canonical table lives in `src/app/keymap.ts`.
 
-- `tab`: switch pane focus between Tree (left) and Content (right)
+- `tab` / `shift+tab`: cycle pane focus forward / backward
 - `j` / `k` or arrows: navigate items in the focused pane
-- `enter`: open selected PR or file
-- `/`: enter command mode (e.g., `:filter <query>`, `:help`, `:refresh`)
-- `1`-`4`: switch tabs in the PR detail view (Overview, Diff, Comments, Pipelines)
-- `r`: manual refresh (re-fetch from Azure DevOps)
-- `a`: approve selected PR
-- `x`: reject selected PR / request changes
-- `c`: complete selected PR (opens completion editor)
-- `o`: open selected PR in browser
-- `?`: toggle full-screen help view (or type `:help`)
-- `q`: quit the application
+- `1`-`3`: PR tabs — Overview, Diff, Comments (`4` Pipelines in debug builds)
+- `h` / `←`: back to the PR list from a PR tab
+- `enter`: tree → focus the PR list · list → open the PR overview
+- `v`: cycle the tree filter (me → with-prs → all)
+- `:` or `/`: command mode (`filter <query>`, `find <query>`, `refresh`, `help`…)
+- `r`: refresh · `R` inside Comments/Pipelines: reload that view
+- `a` / `x` / `b` / `c`: approve / reject / abandon / complete the selected PR
+- `o`: open the selected PR in the browser
+- Diff: `[` `]` switch files · `g`/`G` top/bottom · `n` comment on a line
+- Comments: `n` new · `r` reply · `e` edit · `d` delete · `s` resolve
+- `?`: help view · `q`: quit
 
-All mutating actions (approve, reject, abandon, complete/merge) require an explicit `y/n` confirmation.
+All mutating actions (approve, reject, abandon, complete/merge, comment
+delete) require an explicit `y` confirmation — Enter does not confirm.
 
 ## How it works
 
 - `src/data/config.ts` — loads and validates the multi-org/project config.
-- `src/data/command.ts` — CLI-agnostic `Bun.spawn` wrapper (run / runJson).
+- `src/data/command.ts` — CLI-agnostic process runner on `node:child_process` (run / runJson).
 - `src/data/azureCommon.ts` — shared Azure CLI status, organization, and JSON flags.
 - `src/data/azure.ts` / `azureRest.ts` — Azure DevOps command catalogs. Replaces `/tmp` with `os.tmpdir()` for Windows safety.
 - `src/data/azureNormalize.ts` — maps Azure DevOps JSON to the domain model.
 - `src/app/dataController.ts` — orchestrates loading, refresh, and mock fallback.
-- `src/app/hooks/useAppState.ts` — main react state container, composed of modular sub-hooks:
-  - `useToast`, `useRefresh`, `useSelection`, `useConfirmAction`, `useCompletionEditor`, and `useCommandDispatch`.
+- `src/app/store.ts` + `src/app/actions/` — module-global Zustand store with stable, module-level action functions (toasts, refresh, selection, confirm pipeline, completion editor, command dispatch).
+- `src/app/hooks/useAppState.ts` — subscribes to the store, derives the current selection, and owns the lifecycle effects.
 - `src/app/hooks/useAppKeyboard.ts` — routes keyboard events to dedicated handlers under `src/app/hooks/keyboard/` (`globals.ts`, `filesKeyboard.ts`, etc.) using a central dispatch table.
 
 ## Azure CLI commands used

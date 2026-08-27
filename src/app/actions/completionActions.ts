@@ -1,14 +1,16 @@
 import type { CompletionOptions } from "../types";
-import { getState, patchState } from "../store";
+import { getState, patchState, updateState } from "../store";
 import { armConfirm } from "./confirmActions";
 
 export const openCompletionEditor = (prefill: CompletionOptions): void => {
-  patchState({
+  updateState((current) => ({
+    // When opened via a typed command, fall back past "command" itself.
+    previousFocus: current.focus === "command" ? (current.previousFocus ?? "list") : current.focus,
     focus: "completion",
     completionOptions: prefill,
     completionCursor: 0,
     banner: "Choose completion options, then press Enter on Complete PR.",
-  });
+  }));
 };
 
 export const submitCompletion = (): void => {

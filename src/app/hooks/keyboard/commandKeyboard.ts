@@ -1,12 +1,12 @@
 import type { Key } from "ink";
 import type { AppHandle } from "../useAppState";
-import { patchState, updateState } from "../../store";
+import { updateState } from "../../store";
 
 export function handleCommand(input: string, key: Key, app: AppHandle, exitApp: () => void): void {
   const { actions } = app;
 
   if (key.escape) {
-    patchState({ commandText: "", focus: "tree" });
+    updateState((c) => ({ commandText: "", focus: c.previousFocus ?? "tree" }));
     actions.addToast("Command cancelled.", "info");
     return;
   }

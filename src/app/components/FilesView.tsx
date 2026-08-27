@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import type { PullRequest } from "../../domain/types";
-import type { DiffViewMode, FocusArea } from "../types";
+import type { FocusArea } from "../types";
 import { fileChangeBadge, glyph, palette, truncate } from "../theme";
 import { buildDiffRows } from "./diff/diffRender";
 import { handleDiffNavigation } from "./diff/diffKeyboard";
@@ -17,7 +17,6 @@ type FilesViewProps = {
   diffSelectedRow: number;
   onSelectedRowChange: (row: number) => void;
   focus: FocusArea;
-  diffViewMode: DiffViewMode;
   onInputModeChange: (active: boolean) => void;
   isLoading?: boolean;
   fileFilter?: string;
@@ -35,7 +34,6 @@ export const FilesView: React.FC<FilesViewProps> = ({
   diffSelectedRow,
   onSelectedRowChange,
   focus,
-  diffViewMode,
   onInputModeChange,
   isLoading,
   fileFilter,
@@ -167,7 +165,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
           {fileFilter && (
             <Text color={palette.accentDim}> Filtered: "{fileFilter}" </Text>
           )}
-          {selectedFileIndex + 1}/{flatFiles.length} {glyph.bullet} {diffViewMode}
+          {selectedFileIndex + 1}/{flatFiles.length}
         </Text>
       </Box>
 

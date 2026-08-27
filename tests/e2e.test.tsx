@@ -68,7 +68,6 @@ describe("Adotui E2E Navigation", () => {
     await delay(50);
     let frame = lastFrame();
     expect(frame).toInclude("Files");
-    expect(frame).toInclude("unified");
 
     stdin.write("3");
     await delay(50);

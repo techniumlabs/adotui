@@ -30,7 +30,7 @@
 - `useAppState.ts` subscribes to the store, derives the current selection, owns lifecycle effects (initial load, auto-refresh interval), and returns `{ state, ..., actions }`; `AppHandle` is its return type.
 - Presentational components invoke actions via named helper methods on the `actions` return from `useAppState`. Direct store mutation is hidden from components.
 - View-local data fetching lives in dedicated hooks (`usePrComments`, `usePipelineRuns`, `useDiffComment`, `useLazyFileDiff`); components keep only UI state (selection, scroll, input mode).
-- Keyboard bindings are two-tier: app-level focus routing lives in per-focus files under `src/app/hooks/keyboard/` (e.g. `globals.ts`, `filesKeyboard.ts`, `completionKeyboard.ts`), dispatched by `useAppKeyboard.ts`; self-contained views (diff rows, comments, pipeline runs, setup wizard) own their keys via `useInput(..., { isActive })` — every key must be handled by exactly one tier (see `src/app/components/diff/diffKeyboard.ts`).
+- Keyboard bindings are two-tier: app-level focus routing lives in per-focus files under `src/app/hooks/keyboard/` (e.g. `globals.ts`, `filesKeyboard.ts`, `completionKeyboard.ts`), dispatched by `useAppKeyboard.ts`; self-contained views (diff rows, comments, pipeline runs, setup wizard) own their keys via `useInput(..., { isActive })` — every key must be handled by exactly one tier (see `src/app/components/diff/diffKeyboard.ts`). Documented shortcuts render from `src/app/keymap.ts` (HelpView + footer) — update that table whenever a binding changes.
 
 ## Testing
 Use `bun test` to run tests.

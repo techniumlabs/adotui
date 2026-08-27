@@ -28,7 +28,6 @@ export const INITIAL_STATE: AppState = {
   banner: "Loading pull requests from Azure DevOps...",
   autoRefresh: true,
   lastRefreshISO: new Date().toISOString(),
-  diffViewMode: "unified",
   diffScrollOffset: 0,
   diffSelectedRow: 0,
   treeFilter: "me" satisfies TreeFilter,

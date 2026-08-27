@@ -14,16 +14,19 @@ export function handleGlobals(
   const { state, selectedPr, actions } = app;
 
   if (key.tab) {
+    const delta = key.shift ? -1 : 1;
     updateState((current) => {
-      let nextIndex = (FOCUS_ORDER.indexOf(current.focus) + 1) % FOCUS_ORDER.length;
+      const len = FOCUS_ORDER.length;
+      let nextIndex = (FOCUS_ORDER.indexOf(current.focus) + delta + len) % len;
       let nextFocus = FOCUS_ORDER[nextIndex] ?? "tree";
-      if (nextFocus === "runs" && process.env.NODE_ENV !== "debug") {
-        nextIndex = (nextIndex + 1) % FOCUS_ORDER.length;
+      // Skip panes that are not cycle targets: command mode always, and the
+      // pipelines pane outside debug builds.
+      while (nextFocus === "command" || (nextFocus === "runs" && process.env.NODE_ENV !== "debug")) {
+        nextIndex = (nextIndex + delta + len) % len;
         nextFocus = FOCUS_ORDER[nextIndex] ?? "tree";
       }
-      const resolved = nextFocus === "command" ? "tree" : nextFocus;
-      const fileFilter = current.focus === "files" && resolved !== "files" ? "" : current.fileFilter;
-      return { focus: resolved, fileFilter, banner: `Focus: ${resolved}` };
+      const fileFilter = current.focus === "files" && nextFocus !== "files" ? "" : current.fileFilter;
+      return { focus: nextFocus, fileFilter, banner: `Focus: ${nextFocus}` };
     });
     return true;
   }
@@ -52,7 +55,7 @@ export function handleGlobals(
     return true;
   }
   if (input === "q") { exitApp(); process.exit(0); return true; }
-  if (input === "/") {
+  if (input === ":" || input === "/") {
     updateState((c) => ({ previousFocus: c.focus, focus: "command", commandText: "", banner: "Command mode." }));
     return true;
   }

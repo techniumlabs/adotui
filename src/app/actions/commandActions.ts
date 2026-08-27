@@ -9,7 +9,7 @@ export const executeCommand = (rawCommand: string, exitApp: () => void): void =>
   const command = rawCommand.trim().toLowerCase();
 
   if (!command) {
-    patchState({ focus: "list", commandText: "", banner: "Command cancelled." });
+    updateState((c) => ({ focus: c.previousFocus ?? "list", commandText: "", banner: "Command cancelled." }));
     return;
   }
   if (command === "help") {

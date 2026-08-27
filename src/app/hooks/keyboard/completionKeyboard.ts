@@ -2,13 +2,13 @@ import type { Key } from "ink";
 import type { AppHandle } from "../useAppState";
 import { COMPLETION_FIELD_COUNT, COMPLETION_CURSOR } from "../../constants";
 import { clamp, cycleMergeStrategy } from "../../utils";
-import { patchState, updateState } from "../../store";
+import { updateState } from "../../store";
 
 export function handleCompletion(input: string, key: Key, app: AppHandle, _exitApp: () => void): void {
   const { state, actions } = app;
 
   if (key.escape) {
-    patchState({ focus: "list", banner: "Completion cancelled." });
+    updateState((c) => ({ focus: c.previousFocus ?? "list", banner: "Completion cancelled." }));
     return;
   }
 

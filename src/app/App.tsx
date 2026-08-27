@@ -15,6 +15,7 @@ import { ToastContainer } from "./components/ToastContainer";
 import { formatRelativeAge } from "./utils";
 import { glyph, palette } from "./theme";
 import { useAppState } from "./hooks/useAppState";
+import { footerHints } from "./keymap";
 import { useAppKeyboard } from "./hooks/useAppKeyboard";
 import { usePrDetails } from "./hooks/usePrDetails";
 import { useTerminalSize } from "./hooks/useTerminalSize";
@@ -191,7 +192,6 @@ export const App: React.FC = () => {
                       diffSelectedRow={state.diffSelectedRow}
                       onSelectedRowChange={actions.setDiffSelectedRow}
                       focus={state.focus}
-                      diffViewMode={state.diffViewMode}
                       onInputModeChange={actions.setCommentInputActive}
                       isLoading={state.loadState === "loading"}
                       fileFilter={state.fileFilter}
@@ -253,24 +253,12 @@ export const App: React.FC = () => {
         paddingX={2}
       >
         <Text color={palette.muted} wrap="truncate-end">
-          <Text color={palette.accent} bold>/</Text> filter{"   "}
-          <Text color={palette.accent} bold>j/k</Text> move{"   "}
-          <Text color={palette.accent} bold>1-4</Text> switch view tab{"   "}
-          <Text color={palette.accent} bold>tab</Text> focus{"   "}
-          {selectedPr ? (
-            <>
-              <Text color={palette.accent} bold>a</Text> approve{"   "}
-              <Text color={palette.accent} bold>x</Text> reject{"   "}
-              <Text color={palette.accent} bold>b</Text> abandon{"   "}
-              <Text color={palette.accent} bold>c</Text> complete{"   "}
-            </>
-          ) : (
-            <>
-              <Text color={palette.accent} bold>enter</Text> open pr{"   "}
-            </>
-          )}
-          <Text color={palette.accent} bold>?</Text> help{"   "}
-          <Text color={palette.accent} bold>q</Text> quit
+          {footerHints(!!selectedPr).map((hint, index) => (
+            <Text key={hint.keys}>
+              {index > 0 ? "   " : ""}
+              <Text color={palette.accent} bold>{hint.keys}</Text> {hint.label}
+            </Text>
+          ))}
         </Text>
       </Box>
       )}

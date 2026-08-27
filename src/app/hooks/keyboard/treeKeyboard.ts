@@ -1,6 +1,6 @@
 import type { Key } from "ink";
 import type { AppHandle } from "../useAppState";
-import { patchState, updateState } from "../../store";
+import { patchState } from "../../store";
 
 export function handleTree(input: string, key: Key, app: AppHandle, _exitApp: () => void): void {
   const { actions } = app;
@@ -12,15 +12,6 @@ export function handleTree(input: string, key: Key, app: AppHandle, _exitApp: ()
   if (input === "l" || key.rightArrow || key.return) {
     actions.moveTreeSelection(1, 0, "Organization changed.");
     if (key.return) patchState({ focus: "list", banner: "Focus: list" });
-    return;
   }
-  if (input === "v") {
-    updateState((c) => {
-      const next = c.treeFilter === "all" ? "with-prs" : "all";
-      return {
-        treeFilter: next,
-        banner: next === "with-prs" ? "Filter: showing repos with PRs only." : "Filter: showing all repos.",
-      };
-    });
-  }
+  // NOTE: "v" (tree filter cycling) is global — see globals.ts.
 }

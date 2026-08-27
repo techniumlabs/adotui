@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import type { PullRequest } from "../../domain/types";
+import type { PrCommentThread, PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
 import { glyph, palette } from "../theme";
 import { usePasteHandler } from "../hooks/usePasteHandler";
@@ -8,6 +8,7 @@ import {
   usePrComments,
   resolveTargetComment,
   type CommentInputMode,
+  type PrComment,
 } from "../hooks/usePrComments";
 import { ThreadCard } from "./comments/ThreadCard";
 import { computeScrollWindow, followSelection } from "../utils";
@@ -39,6 +40,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
   const [threadScrollOffset, setThreadScrollOffset] = useState(0);
   const [inputMode, setInputMode] = useState<CommentInputMode>("none");
   const [inputText, setInputText] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<{ thread: PrCommentThread; comment: PrComment } | null>(null);
 
   const {
     threads,
@@ -102,6 +104,15 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         if (!key.ctrl && !key.meta && input) {
           setInputText((t) => t + input);
         }
+        return;
+      }
+
+      // Pending comment-delete confirmation gate
+      if (pendingDelete) {
+        if (input === "y" || input === "Y") {
+          deleteComment(pendingDelete.thread, pendingDelete.comment);
+        }
+        setPendingDelete(null);
         return;
       }
 
@@ -170,7 +181,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         const commentToDelete = resolveTargetComment(thread, stateRef.current.selectedCommentIndex);
         if (commentToDelete) {
           if (!canModifyComment(commentToDelete, "delete")) return;
-          deleteComment(thread, commentToDelete);
+          setPendingDelete({ thread, comment: commentToDelete });
         }
       } else if (input === "n" && !key.ctrl) {
         setInputMode("new");
@@ -178,7 +189,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
       } else if (input === "r" && !key.ctrl && stateRef.current.threads[stateRef.current.selectedThread]) {
         setInputMode("reply");
         setInputText("");
-      } else if (input === "r" && key.ctrl) {
+      } else if (input === "R") {
         void loadComments(true);
       } else if (input === "s" && !key.ctrl && stateRef.current.threads[stateRef.current.selectedThread]) {
         const thread = stateRef.current.threads[stateRef.current.selectedThread]!;
@@ -224,7 +235,11 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
 
       {/* Status / error */}
       <Box height={1}>
-        {(statusMsg ?? error) ? (
+        {pendingDelete ? (
+          <Text color={palette.warn}>
+            Delete comment by {pendingDelete.comment.author}? (y/n)
+          </Text>
+        ) : (statusMsg ?? error) ? (
           <Text color={error ? palette.danger : palette.warn}>
             {statusMsg ?? error}
           </Text>
@@ -329,7 +344,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
             <Text color={palette.accentDim}>e</Text> edit{"  "}
             <Text color={palette.accentDim}>d</Text> delete{"  "}
             <Text color={palette.accentDim}>s</Text> resolve{"  "}
-            <Text color={palette.accentDim}>Ctrl+R</Text> refresh{"  "}
+            <Text color={palette.accentDim}>R</Text> refresh{"  "}
             <Text color={palette.accentDim}>h</Text> back
           </Text>
         )}
