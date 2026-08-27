@@ -75,6 +75,9 @@ export function usePrComments(
 
       if (!background) setLoading(true);
       setError(null);
+      // A forced reload (R) is otherwise invisible when nothing changed —
+      // say so explicitly instead of flashing the spinner and stopping.
+      if (force) setStatusMsg("Reloading comments…");
       try {
         const data = await fetchPrComments(
           selectedPr.organizationUrl,
@@ -85,12 +88,20 @@ export function usePrComments(
         if (data === null) {
           // Transient az failure — keep whatever is shown, never cache it,
           // and only surface an error when there is nothing on screen.
+          setStatusMsg(null);
           if (!background) setError("Could not load comments — press R to retry.");
           return;
         }
         setCommentCache(key, data);
         setThreads(data);
-        onFreshLoadRef.current?.();
+        if (force) {
+          // Keep the reader where they were; only a first load resets to the
+          // top (onFreshLoad).
+          setStatusMsg(`Reloaded — ${data.length} thread${data.length === 1 ? "" : "s"}.`);
+          setTimeout(() => setStatusMsg(null), 2000);
+        } else {
+          onFreshLoadRef.current?.();
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load comments.");
       } finally {

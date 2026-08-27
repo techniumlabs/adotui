@@ -66,6 +66,11 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputMode]);
 
+  // A reload can shrink the list under the cursor — keep the selection valid.
+  useEffect(() => {
+    setSelectedThread((i) => moveSelection(i, 0, threads.length));
+  }, [threads.length]);
+
   // ── Keyboard ───────────────────────────────────────────────────────────────
 
   const stateRef = useRef({ threads, selectedThread, selectedCommentIndex, threadScrollOffset });
