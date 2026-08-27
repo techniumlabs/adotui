@@ -1,7 +1,9 @@
 /**
  * Azure DevOps helpers for PR comments and pipeline runs — implemented
- * entirely via the Azure CLI (`az devops invoke` / `az pipelines runs list`).
- * No direct HTTP/REST calls, no PAT handling — the CLI manages auth.
+ * entirely via the Azure CLI (`az devops invoke` / `az pipelines runs list`),
+ * so this module performs no direct HTTP calls and needs no PAT handling.
+ * The one place adotui talks REST directly (raw file content for diff
+ * rendering) is azureDiff.ts, authenticated via azureAuth.ts.
  */
 
 import { tmpdir } from "node:os";
