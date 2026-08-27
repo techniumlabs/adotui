@@ -59,8 +59,6 @@ export const COMPLETION_FIELD_LABELS = [
 
 export const COMPLETION_FIELD_COUNT = 9;
 
-/** Sentinel value for scrolling to the end of a diff. */
-export const SCROLL_TO_END = Number.MAX_SAFE_INTEGER;
 
 /** Named indices for the completion editor cursor. Avoids magic numbers in keyboard handlers. */
 export const COMPLETION_CURSOR = {

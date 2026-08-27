@@ -24,15 +24,12 @@
 - **Tables**: Use fixed-width columns inside flex rows for aligning tabular data (like the Pull Request list). Use the `truncate` utility to cap strings and prevent table explosion on small terminals.
 
 ## State Management
-- Complex UI state is managed centrally by composing sub-hooks in `useAppState.ts`:
-  - `useToast.ts` (toasts with UUID IDs)
-  - `useRefresh.ts` (automatic & manual fetching)
-  - `useSelection.ts` (flat tree, PR list, & diff select/scroll tracking)
-  - `useConfirmAction.ts` (y/n confirmation pipeline for destructive actions)
-  - `useCompletionEditor.ts` (merging & autocompletion strategy inputs)
-  - `useCommandDispatch.ts` (dispatching console `:` commands)
-- Presentational components invoke actions via named helper methods on the `actions` return from `useAppState`. Direct `setState` invocation is hidden.
-- Keyboard bindings are decentralized into per-focus files under `src/app/hooks/keyboard/` (e.g. `globals.ts`, `filesKeyboard.ts`, `completionKeyboard.ts`), loaded with a unified state handler table in `useAppKeyboard.ts`. All handlers share the exported type `AppHandle`.
+- App state lives in a module-global Zustand store (`src/app/store.ts`). Updates use Zustand's partial merge via `patchState(partial)` / `updateState(fn)` — supply only the keys that change, never spread the whole state.
+- Mutations are stable module-level action functions under `src/app/actions/` (toasts, refresh, selection, confirm pipeline, completion editor, command dispatch, PR data patches), assembled into the `appActions` object in `actions/index.ts`. Derivations shared by actions and rendering live in `src/app/selectors.ts`.
+- `useAppState.ts` subscribes to the store, derives the current selection, owns lifecycle effects (initial load, auto-refresh interval), and returns `{ state, ..., actions }`; `AppHandle` is its return type.
+- Presentational components invoke actions via named helper methods on the `actions` return from `useAppState`. Direct store mutation is hidden from components.
+- View-local data fetching lives in dedicated hooks (`usePrComments`, `usePipelineRuns`, `useDiffComment`, `useLazyFileDiff`); components keep only UI state (selection, scroll, input mode).
+- Keyboard bindings are two-tier: app-level focus routing lives in per-focus files under `src/app/hooks/keyboard/` (e.g. `globals.ts`, `filesKeyboard.ts`, `completionKeyboard.ts`), dispatched by `useAppKeyboard.ts`; self-contained views (diff rows, comments, pipeline runs, setup wizard) own their keys via `useInput(..., { isActive })` — every key must be handled by exactly one tier (see `src/app/components/diff/diffKeyboard.ts`).
 
 ## Testing
 Use `bun test` to run tests.

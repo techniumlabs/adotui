@@ -1,11 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import type { PipelineRun, PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
 import { glyph, palette, truncate } from "../theme";
 import { formatRelativeAge, openInBrowser } from "../utils";
-import { fetchPipelineRuns } from "../../data/azureRest";
-import { getRunsCache, runsCacheKey, setRunsCache } from "../../data/cache";
+import { usePipelineRuns } from "../hooks/usePipelineRuns";
 
 type PipelineRunsViewProps = {
   selectedPr?: PullRequest;
@@ -53,53 +52,8 @@ export const PipelineRunsView: React.FC<PipelineRunsViewProps> = ({
 }) => {
   const active = focus === "runs";
 
-  const [runs, setRuns] = useState<PipelineRun[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedIdx, setSelectedIdx] = useState(0);
-
-  // ── Data loading ───────────────────────────────────────────────────────────
-
-  const loadRuns = useCallback(
-    async (force = false) => {
-      if (!selectedPr) return;
-      const key = runsCacheKey(selectedPr.organizationUrl, selectedPr.project);
-
-      if (!force) {
-        const cached = getRunsCache(key);
-        if (cached) {
-          setRuns(cached);
-          return;
-        }
-      }
-
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await fetchPipelineRuns(
-          selectedPr.organizationUrl,
-          selectedPr.project,
-        );
-        setRunsCache(key, data);
-        setRuns(data);
-        setSelectedIdx(0);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load pipeline runs.");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [selectedPr],
-  );
-
-  useEffect(() => {
-    if (selectedPr) {
-      void loadRuns();
-    } else {
-      setRuns([]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPr?.id]);
+  const { runs, loading, error, loadRuns } = usePipelineRuns(selectedPr, () => setSelectedIdx(0));
 
   // ── Keyboard ───────────────────────────────────────────────────────────────
 
