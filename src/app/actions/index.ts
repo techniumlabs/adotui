@@ -35,5 +35,3 @@ export const appActions = {
   setFileLoading,
   updatePr,
 } as const;
-
-export type AppActions = typeof appActions;

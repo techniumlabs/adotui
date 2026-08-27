@@ -231,8 +231,6 @@ export const loadConfig = async (): Promise<ConfigResult> => {
   };
 };
 
-export const configSearchPathsForHelp = (): string[] => configSearchPaths();
-
 export const writeConfig = async (config: AdoConfig): Promise<void> => {
   const path = join(process.cwd(), "adotui.config.json");
   await Bun.write(path, JSON.stringify(config, null, 2));

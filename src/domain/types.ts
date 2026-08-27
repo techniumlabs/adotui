@@ -101,6 +101,8 @@ export interface PullRequest {
   repository: string;
   /** The repository's internal Azure DevOps ID (used for API calls). */
   repositoryId?: string;
+  /** The project's internal Azure DevOps id (needed for policy artifact ids). */
+  projectId?: string;
   iterSourceCommit?: string;
   iterTargetCommit?: string;
   detailsLoaded?: boolean;

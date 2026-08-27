@@ -1,12 +1,9 @@
 /**
- * Azure DevOps helpers for PR comments and pipeline runs — implemented
- * entirely via the Azure CLI (`az devops invoke` / `az pipelines runs list`),
- * so this module performs no direct HTTP calls and needs no PAT handling.
- * The one place adotui talks REST directly (raw file content for diff
- * rendering) is azureDiff.ts, authenticated via azureAuth.ts.
+ * PR comment threads and pipeline runs over the Azure DevOps REST API
+ * (see adoFetch.ts). Mutations return a boolean so the UI can report a
+ * failure without unwinding; read failures return null so callers can tell
+ * "could not load" from "nothing there".
  */
-
-import { withTempFile } from "./tempFile";
 import type {
   CommentType,
   PipelineRun,
@@ -14,140 +11,8 @@ import type {
   RunResult,
   RunState,
 } from "../domain/types";
-import { run, runJson } from "./command";
-import { AZ, orgArgs } from "./azureCommon";
+import { adoDelete, adoGet, adoPatch, adoPost, seg, type AdoList } from "./adoFetch";
 import { debugLog } from "../app/utils";
-
-// ─── az devops invoke helpers ─────────────────────────────────────────────────
-
-/**
- * GET via `az devops invoke --area git --resource pullRequestThreads`.
- * Returns parsed JSON or null on any failure (no org configured, no auth, etc.)
- */
-const invokeGet = async <T>(
-  organization: string,
-  area: string,
-  resource: string,
-  routeParameters: string[],
-  queryParameters: string[] = [],
-): Promise<T | null> => {
-  const args: string[] = [
-    "devops",
-    "invoke",
-    "--area",
-    area,
-    "--resource",
-    resource,
-    "--route-parameters",
-    ...routeParameters,
-    "--api-version",
-    "7.1",
-    "--output",
-    "json",
-    ...orgArgs(organization),
-  ];
-
-  if (queryParameters.length > 0) {
-    args.push("--query-parameters", ...queryParameters);
-  }
-
-  try {
-    debugLog("invokeGet");
-    return await runJson<T>(AZ, args, { timeoutMs: 20_000 });
-  } catch {
-    return null;
-  }
-};
-
-/** Shared helper for POST and PATCH mutations via az devops invoke. */
-const invokeMutate = async <T>(
-  method: "POST" | "PATCH",
-  organization: string,
-  area: string,
-  resource: string,
-  routeParameters: string[],
-  body: unknown,
-  queryParameters: string[] = [],
-): Promise<T | null> => {
-  try {
-    return await withTempFile(
-      JSON.stringify(body),
-      (tmpPath) => {
-        const args: string[] = [
-          "devops", "invoke",
-          "--area", area,
-          "--resource", resource,
-          "--route-parameters", ...routeParameters,
-          "--http-method", method,
-          "--in-file", tmpPath,
-          "--media-type", "application/json",
-          "--api-version", "7.1",
-          "--output", "json",
-          ...orgArgs(organization),
-        ];
-        if (queryParameters.length > 0) {
-          args.push("--query-parameters", ...queryParameters);
-        }
-        return runJson<T>(AZ, args, { timeoutMs: 20_000 });
-      },
-      { prefix: "adotui-invoke", suffix: ".json" },
-    );
-  } catch {
-    return null;
-  }
-};
-
-const invokePost = <T>(
-  organization: string, area: string, resource: string,
-  routeParameters: string[], body: unknown, queryParameters?: string[],
-): Promise<T | null> =>
-  invokeMutate<T>("POST", organization, area, resource, routeParameters, body, queryParameters);
-
-const invokePatch = <T>(
-  organization: string, area: string, resource: string,
-  routeParameters: string[], body: unknown, queryParameters?: string[],
-): Promise<T | null> =>
-  invokeMutate<T>("PATCH", organization, area, resource, routeParameters, body, queryParameters);
-
-const invokeDelete = async <T>(
-  organization: string,
-  area: string,
-  resource: string,
-  routeParameters: string[],
-  queryParameters: string[] = [],
-): Promise<T | null> => {
-  const args: string[] = [
-    "devops",
-    "invoke",
-    "--area",
-    area,
-    "--resource",
-    resource,
-    "--route-parameters",
-    ...routeParameters,
-    "--http-method",
-    "DELETE",
-    "--api-version",
-    "7.1",
-    "--output",
-    "json",
-    ...orgArgs(organization),
-  ];
-
-  if (queryParameters.length > 0) {
-    args.push("--query-parameters", ...queryParameters);
-  }
-
-  try {
-    const result = await run(AZ, args, { timeoutMs: 20_000 });
-    if (!result.stdout.trim()) {
-      return {} as T;
-    }
-    return JSON.parse(result.stdout) as T;
-  } catch {
-    return null;
-  }
-};
 
 // ─── PR Comment types ─────────────────────────────────────────────────────────
 
@@ -171,8 +36,6 @@ export interface RawComment {
   commentType?: string;
   isDeleted?: boolean;
 }
-
-// ─── PR Comments ──────────────────────────────────────────────────────────────
 
 /**
  * Normalizes raw pullRequestThreads payloads: drops deleted threads and
@@ -205,9 +68,15 @@ export const normalizeThreads = (rawThreads: RawThread[]): PrCommentThread[] =>
     }))
     .filter((t) => t.comments.length > 0);
 
+/** `.../pullRequests/{id}/threads` for a repo (id or name both resolve). */
+const threadsPath = (project: string, repositoryId: string, prId: number): string =>
+  `${seg(project)}/_apis/git/repositories/${seg(repositoryId)}/pullRequests/${prId}/threads`;
+
+// ─── PR Comments ──────────────────────────────────────────────────────────────
+
 /**
  * Fetches PR comment threads. Returns null when the fetch fails (transient
- * az/auth error) so callers can distinguish "could not load" from "no
+ * network/auth error) so callers can distinguish "could not load" from "no
  * comments" — a silent [] used to get cached and shown as empty.
  */
 export const fetchPrComments = async (
@@ -221,21 +90,12 @@ export const fetchPrComments = async (
     return getMockComments(prId);
   }
 
-  // az devops invoke --area git --resource pullRequestThreads
-  //   --route-parameters project=<p> repositoryId=<r> pullRequestId=<id>
   try {
-    const data = await invokeGet<{ value?: RawThread[] }>(
+    const data = await adoGet<AdoList<RawThread>>(
       organizationUrl,
-      "git",
-      "pullRequestThreads",
-      [
-        `project=${project}`,
-        `repositoryId=${repositoryId}`,
-        `pullRequestId=${prId}`,
-      ],
+      threadsPath(project, repositoryId, prId),
     );
     if (!data?.value) return null;
-
     return normalizeThreads(data.value);
   } catch (e) {
     debugLog("fetchPrComments error", e);
@@ -259,19 +119,13 @@ export const postPrComment = async (
     ...(pullRequestThreadContext ? { pullRequestThreadContext } : {}),
   };
 
-  const result = await invokePost<{ id: number }>(
-    organizationUrl,
-    "git",
-    "pullRequestThreads",
-    [
-      `project=${project}`,
-      `repositoryId=${repositoryId}`,
-      `pullRequestId=${prId}`,
-    ],
-    body,
-  );
-
-  return result !== null;
+  try {
+    await adoPost(organizationUrl, threadsPath(project, repositoryId, prId), body);
+    return true;
+  } catch (e) {
+    debugLog("postPrComment error", e);
+    return false;
+  }
 };
 
 export const replyToPrThread = async (
@@ -283,22 +137,17 @@ export const replyToPrThread = async (
   parentCommentId: number,
   content: string,
 ): Promise<boolean> => {
-  const body = { parentCommentId, content, commentType: 1 };
-
-  const result = await invokePost<{ id: number }>(
-    organizationUrl,
-    "git",
-    "pullRequestThreadComments",
-    [
-      `project=${project}`,
-      `repositoryId=${repositoryId}`,
-      `pullRequestId=${prId}`,
-      `threadId=${threadId}`,
-    ],
-    body,
-  );
-
-  return result !== null;
+  try {
+    await adoPost(
+      organizationUrl,
+      `${threadsPath(project, repositoryId, prId)}/${threadId}/comments`,
+      { parentCommentId, content, commentType: 1 },
+    );
+    return true;
+  } catch (e) {
+    debugLog("replyToPrThread error", e);
+    return false;
+  }
 };
 
 export const updatePrThreadStatus = async (
@@ -309,22 +158,17 @@ export const updatePrThreadStatus = async (
   threadId: number,
   statusId: number, // 1: Active, 2: Fixed, 3: WontFix, 4: Closed, 5: ByDesign, 6: Pending
 ): Promise<boolean> => {
-  const body = { status: statusId };
-
-  const result = await invokePatch<{ id: number }>(
-    organizationUrl,
-    "git",
-    "pullRequestThreads",
-    [
-      `project=${project}`,
-      `repositoryId=${repositoryId}`,
-      `pullRequestId=${prId}`,
-      `threadId=${threadId}`,
-    ],
-    body,
-  );
-
-  return result !== null;
+  try {
+    await adoPatch(
+      organizationUrl,
+      `${threadsPath(project, repositoryId, prId)}/${threadId}`,
+      { status: statusId },
+    );
+    return true;
+  } catch (e) {
+    debugLog("updatePrThreadStatus error", e);
+    return false;
+  }
 };
 
 export const editPrComment = async (
@@ -336,23 +180,17 @@ export const editPrComment = async (
   commentId: number,
   content: string,
 ): Promise<boolean> => {
-  const body = { content };
-
-  const result = await invokePatch<{ id: number }>(
-    organizationUrl,
-    "git",
-    "pullRequestThreadComments",
-    [
-      `project=${project}`,
-      `repositoryId=${repositoryId}`,
-      `pullRequestId=${prId}`,
-      `threadId=${threadId}`,
-      `commentId=${commentId}`,
-    ],
-    body,
-  );
-
-  return result !== null;
+  try {
+    await adoPatch(
+      organizationUrl,
+      `${threadsPath(project, repositoryId, prId)}/${threadId}/comments/${commentId}`,
+      { content },
+    );
+    return true;
+  } catch (e) {
+    debugLog("editPrComment error", e);
+    return false;
+  }
 };
 
 export const deletePrComment = async (
@@ -363,20 +201,16 @@ export const deletePrComment = async (
   threadId: number,
   commentId: number,
 ): Promise<boolean> => {
-  const result = await invokeDelete<unknown>(
-    organizationUrl,
-    "git",
-    "pullRequestThreadComments",
-    [
-      `project=${project}`,
-      `repositoryId=${repositoryId}`,
-      `pullRequestId=${prId}`,
-      `threadId=${threadId}`,
-      `commentId=${commentId}`,
-    ],
-  );
-
-  return result !== null;
+  try {
+    await adoDelete(
+      organizationUrl,
+      `${threadsPath(project, repositoryId, prId)}/${threadId}/comments/${commentId}`,
+    );
+    return true;
+  } catch (e) {
+    debugLog("deletePrComment error", e);
+    return false;
+  }
 };
 
 // ─── Pipeline Runs ────────────────────────────────────────────────────────────
@@ -400,26 +234,15 @@ export const fetchPipelineRuns = async (
   let rows: RawRun[];
 
   try {
-    rows = await runJson<RawRun[]>(
-      AZ,
-      [
-        "pipelines",
-        "runs",
-        "list",
-        "--top",
-        "30",
-        "--query-order",
-        "QueueTimeDesc",
-        "--project",
-        project,
-        "--output",
-        "json",
-        ...orgArgs(organizationUrl),
-      ],
-      { timeoutMs: 25_000 },
+    const data = await adoGet<AdoList<RawRun>>(
+      organizationUrl,
+      `${seg(project)}/_apis/build/builds`,
+      { query: { "$top": 30, queryOrder: "queueTimeDescending" }, timeoutMs: 25_000 },
     );
-  } catch {
-    // If pipelines extension isn't installed or project has no pipelines, return empty.
+    rows = data.value ?? [];
+  } catch (e) {
+    // No build service access or no pipelines in the project: show nothing.
+    debugLog("fetchPipelineRuns error", e);
     return [];
   }
 
@@ -428,7 +251,6 @@ export const fetchPipelineRuns = async (
       id: r.id ?? 0,
       name: r.buildNumber ?? `Run #${r.id ?? 0}`,
       pipelineName: r.definition?.name ?? "Unknown Pipeline",
-      // `az pipelines runs list` uses "inProgress"/"completed" etc.
       state: mapRunState(r.status),
       result: mapRunResult(r.result),
       startTime: r.startTime ?? r.queueTime ?? null,

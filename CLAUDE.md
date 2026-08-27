@@ -4,7 +4,7 @@
 - **Runtime**: Bun (default to using Bun instead of Node.js)
 - **UI Framework**: React + Ink (Terminal UI)
 - **Language**: TypeScript
-- **Backend API**: Azure CLI (`az`) spawned via Bun's `Bun.spawn`
+- **Backend API**: Azure DevOps REST API via `src/data/adoFetch.ts` (auth header cached in `azureAuth.ts`). The `az` CLI is still used for credentials (`az account get-access-token`), the availability check, and PR mutations — reads must not spawn `az`, a process costs ~400-1200ms before the request starts.
 
 ## Bun Conventions
 - Use `bun <file>` instead of `node <file>`

@@ -196,5 +196,9 @@ export const normalizePullRequest = (
     organizationUrl: context.organization,
     project: context.project,
     repository: context.repository,
+    // Ids are carried so later calls can address the PR without re-resolving
+    // names (policy evaluations need the project id in particular).
+    repositoryId: pr.repository?.id,
+    projectId: pr.repository?.project?.id,
   };
 };

@@ -1,6 +1,7 @@
 /**
- * Project/repo/PR discovery and hydration: builds the full AppData tree via
- * the az CLI, with bounded concurrency and per-project PR paging.
+ * Project/repo/PR discovery and hydration over the Azure DevOps REST API
+ * (see adoFetch.ts): builds the full AppData tree with bounded concurrency
+ * and per-project PR paging.
  */
 import type {
   AppData,
@@ -10,9 +11,9 @@ import type {
   PullRequestWorkItem,
   RepositoryNode,
 } from "../domain/types";
-import { CommandError, runJson } from "./command";
 import type { AdoConfig, AdoProjectConfig } from "./config";
 import type {
+  AzureIdentityRef,
   AzureIteration,
   AzureIterationChanges,
   AzureIterationList,
@@ -27,7 +28,8 @@ import {
   summarizeChecks,
 } from "./azureNormalize";
 import { fetchPrComments } from "./azureRest";
-import { AZ, orgArgs, jsonOutput } from "./azureCommon";
+import { adoGet, adoGetFrom, AdoHttpError, seg, type AdoList } from "./adoFetch";
+import { debugLog } from "../app/utils";
 
 interface AzureProject {
   id: string;
@@ -39,29 +41,86 @@ interface AzureProject {
 const listProjects = async (
   organization: string,
 ): Promise<AzureProject[]> => {
-  const result = await runJson<{ value: AzureProject[] }>(AZ, [
-    "devops",
-    "project",
-    "list",
-    ...orgArgs(organization),
-    ...jsonOutput,
-  ]);
-  return result.value.filter((proj) => proj.state === "wellFormed" && !!proj.name);
+  const result = await adoGet<AdoList<AzureProject>>(organization, "_apis/projects", {
+    query: { "$top": 1000 },
+  });
+  return (result.value ?? []).filter((proj) => proj.state === "wellFormed" && !!proj.name);
 };
 
 /** Lists repositories in a project (auto-discovery). */
 const listRepositories = async (
   project: AdoProjectConfig,
 ): Promise<AzureRepository[]> => {
-  const repos = await runJson<AzureRepository[]>(AZ, [
-    "repos",
-    "list",
-    ...orgArgs(project.organization),
-    "--project",
-    project.project!,
-    ...jsonOutput,
-  ]);
-  return repos.filter((repo) => repo.isDisabled !== true && !!repo.name);
+  const repos = await adoGet<AdoList<AzureRepository>>(
+    project.organization,
+    `${seg(project.project!)}/_apis/git/repositories`,
+  );
+  return (repos.value ?? []).filter((repo) => repo.isDisabled !== true && !!repo.name);
+};
+
+// ─── reviewer/creator filters ────────────────────────────────────────────────
+
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const identityCache = new Map<string, string | null>();
+
+/**
+ * Resolves an email/UPN to an Azure DevOps identity id so reviewer/creator
+ * filters can be applied server-side. Returns null when it cannot be
+ * resolved; callers then fall back to client-side matching.
+ */
+const resolveIdentityId = async (
+  organization: string,
+  value: string,
+): Promise<string | null> => {
+  if (GUID.test(value)) return value;
+  const cacheKey = `${organization}|${value.toLowerCase()}`;
+  const cached = identityCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  let resolved: string | null = null;
+  try {
+    const result = await adoGetFrom<AdoList<{ id?: string }>>(
+      `https://vssps.dev.azure.com/${seg(orgLabel(organization))}`,
+      "_apis/identities",
+      { query: { searchFilter: "General", filterValue: value }, apiVersion: "7.1-preview.1" },
+    );
+    resolved = result.value?.[0]?.id ?? null;
+  } catch (cause) {
+    debugLog("identity resolution failed for", value, cause);
+  }
+  identityCache.set(cacheKey, resolved);
+  return resolved;
+};
+
+const identityMatches = (identity: AzureIdentityRef | undefined, value: string): boolean => {
+  const needle = value.toLowerCase();
+  return (
+    (identity?.uniqueName ?? "").toLowerCase().includes(needle) ||
+    (identity?.displayName ?? "").toLowerCase().includes(needle)
+  );
+};
+
+interface PrFilters {
+  reviewerId?: string;
+  creatorId?: string;
+  /** Set when the identity could not be resolved and must be matched locally. */
+  clientReviewer?: string;
+  clientCreator?: string;
+}
+
+const resolveFilters = async (config: AdoConfig, organization: string): Promise<PrFilters> => {
+  const filters: PrFilters = {};
+  if (config.reviewer) {
+    const id = await resolveIdentityId(organization, config.reviewer);
+    if (id) filters.reviewerId = id;
+    else filters.clientReviewer = config.reviewer;
+  }
+  if (config.creator) {
+    const id = await resolveIdentityId(organization, config.creator);
+    if (id) filters.creatorId = id;
+    else filters.clientCreator = config.creator;
+  }
+  return filters;
 };
 
 interface PrListPage {
@@ -70,46 +129,31 @@ interface PrListPage {
 }
 
 /**
- * Lists PRs for a whole project, or one repository when `repository` is
- * given. `page` overrides the fetch window (used by the project-wide pager);
- * without it the window falls back to the configured per-repo `top`.
+ * Lists PRs for a project. `page` overrides the fetch window (used by the
+ * project-wide pager); without it the window falls back to the configured
+ * per-repo `top`.
  */
 const listPullRequests = async (
   config: AdoConfig,
   project: AdoProjectConfig,
-  repository?: string,
+  filters: PrFilters,
   page?: PrListPage,
 ): Promise<AzurePullRequest[]> => {
-  const args = [
-    "repos",
-    "pr",
-    "list",
-    ...orgArgs(project.organization),
-    "--project",
-    project.project!,
-    "--status",
-    config.status ?? "active",
-    ...jsonOutput,
-  ];
-
   const top = page?.top ?? config.top;
-  if (top) {
-    args.push("--top", String(top));
-  }
-  if (page && page.skip > 0) {
-    args.push("--skip", String(page.skip));
-  }
-  if (repository) {
-    args.push("--repository", repository);
-  }
-  if (config.reviewer) {
-    args.push("--reviewer", config.reviewer);
-  }
-  if (config.creator) {
-    args.push("--creator", config.creator);
-  }
-
-  return await runJson<AzurePullRequest[]>(AZ, args);
+  const result = await adoGet<AdoList<AzurePullRequest>>(
+    project.organization,
+    `${seg(project.project!)}/_apis/git/pullrequests`,
+    {
+      query: {
+        "searchCriteria.status": config.status ?? "active",
+        ...(top ? { "$top": top } : {}),
+        ...(page && page.skip > 0 ? { "$skip": page.skip } : {}),
+        ...(filters.reviewerId ? { "searchCriteria.reviewerId": filters.reviewerId } : {}),
+        ...(filters.creatorId ? { "searchCriteria.creatorId": filters.creatorId } : {}),
+      },
+    },
+  );
+  return result.value ?? [];
 };
 
 /** Page size for the project-wide PR listing. */
@@ -118,16 +162,17 @@ const PR_LIST_PAGE_SIZE = 100;
 const PR_LIST_MAX_PAGES = 20;
 
 /**
- * Fetches every PR in a project by paging through `az repos pr list`, so a
- * project with more PRs than one `--top` window is not silently truncated.
+ * Fetches every PR in a project by paging, so a project with more PRs than
+ * one window is not silently truncated.
  */
 const listAllProjectPullRequests = async (
   config: AdoConfig,
   project: AdoProjectConfig,
 ): Promise<AzurePullRequest[]> => {
+  const filters = await resolveFilters(config, project.organization);
   const all: AzurePullRequest[] = [];
   for (let pageIndex = 0; pageIndex < PR_LIST_MAX_PAGES; pageIndex += 1) {
-    const batch = await listPullRequests(config, project, undefined, {
+    const batch = await listPullRequests(config, project, filters, {
       top: PR_LIST_PAGE_SIZE,
       skip: pageIndex * PR_LIST_PAGE_SIZE,
     });
@@ -136,54 +181,94 @@ const listAllProjectPullRequests = async (
       break;
     }
   }
-  return all;
+
+  // Filters whose identity could not be resolved are applied locally so the
+  // configured intent still holds.
+  let filtered = all;
+  if (filters.clientCreator) {
+    filtered = filtered.filter((pr) => identityMatches(pr.createdBy, filters.clientCreator!));
+  }
+  if (filters.clientReviewer) {
+    filtered = filtered.filter((pr) =>
+      (pr.reviewers ?? []).some((r) => identityMatches(r, filters.clientReviewer!)),
+    );
+  }
+  return filtered;
+};
+
+// ─── per-PR detail fetches ───────────────────────────────────────────────────
+
+const projectIdCache = new Map<string, string>();
+
+/** Resolves a project name to its id (needed for policy artifact ids). */
+const resolveProjectId = async (
+  organization: string,
+  project: string,
+): Promise<string | undefined> => {
+  const cacheKey = `${organization}|${project}`;
+  const cached = projectIdCache.get(cacheKey);
+  if (cached) return cached;
+  try {
+    const result = await adoGet<{ id?: string }>(organization, `_apis/projects/${seg(project)}`);
+    if (result.id) {
+      projectIdCache.set(cacheKey, result.id);
+      return result.id;
+    }
+  } catch (cause) {
+    debugLog("project id resolution failed for", project, cause);
+  }
+  return undefined;
 };
 
 /** Fetches blocking policy evaluations for a PR (check rollup). */
 const listPrPolicies = async (
   organization: string,
   project: string,
+  projectId: string | undefined,
   prId: number,
 ): Promise<AzurePolicyEvaluation[]> => {
+  if (!projectId) return [];
   try {
-    return await runJson<AzurePolicyEvaluation[]>(AZ, [
-      "repos",
-      "pr",
-      "policy",
-      "list",
-      "--id",
-      String(prId),
-      ...orgArgs(organization),
-      "--project",
-      project,
-      ...jsonOutput,
-    ]);
+    const result = await adoGet<AdoList<AzurePolicyEvaluation>>(
+      organization,
+      `${seg(project)}/_apis/policy/evaluations`,
+      {
+        // The evaluations endpoint is preview-only, even under api-version 7.1.
+        query: { artifactId: `vstfs:///CodeReview/CodeReviewId/${projectId}/${prId}` },
+        apiVersion: "7.1-preview.1",
+      },
+    );
+    return result.value ?? [];
   } catch {
     // Policies may be unavailable; treat as no checks rather than failing.
     return [];
   }
 };
 
-/** Fetches work items linked to a PR. */
+/** Fetches work items linked to a PR (refs, then one batch hydration call). */
 const listPrWorkItems = async (
   organization: string,
+  project: string,
+  repositoryId: string,
   prId: number,
 ): Promise<PullRequestWorkItem[]> => {
   try {
-    const rawItems = await runJson<
-      { id?: number; fields?: Record<string, string>; url?: string }[]
-    >(AZ, [
-      "repos",
-      "pr",
-      "work-item",
-      "list",
-      "--id",
-      String(prId),
-      ...orgArgs(organization),
-      ...jsonOutput,
-    ]);
+    const refs = await adoGet<AdoList<{ id?: string | number }>>(
+      organization,
+      `${seg(project)}/_apis/git/repositories/${seg(repositoryId)}/pullRequests/${prId}/workitems`,
+    );
+    const ids = (refs.value ?? [])
+      .map((ref) => Number(ref.id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    if (ids.length === 0) return [];
 
-    return rawItems
+    const batch = await adoGet<
+      AdoList<{ id?: number; fields?: Record<string, string>; url?: string }>
+    >(organization, "_apis/wit/workitems", {
+      query: { ids: ids.join(","), fields: "System.Title,System.State,System.WorkItemType" },
+    });
+
+    return (batch.value ?? [])
       .filter((raw): raw is typeof raw & { id: number } => typeof raw.id === "number")
       .map((raw) => ({
         id: raw.id,
@@ -198,10 +283,8 @@ const listPrWorkItems = async (
 };
 
 /**
- * Fetches changed files for a PR via the REST changes endpoint.
- * Uses the latest iteration. When source and target commit SHAs are provided,
- * fetches actual file content from the Azure DevOps git items API and computes
- * a unified diff for each file so the diff pane has real content to render.
+ * Fetches changed files for a PR from the latest iteration, along with the
+ * commit pair the diff view needs to fetch file contents lazily.
  */
 const listPrFileChanges = async (
   organization: string,
@@ -211,23 +294,9 @@ const listPrFileChanges = async (
   sourceCommit: string | undefined,
   targetCommit: string | undefined,
 ): Promise<{ files: PullRequestFileChange[]; iterSourceCommit?: string; iterTargetCommit?: string }> => {
+  const prPath = `${seg(project)}/_apis/git/repositories/${seg(repositoryId)}/pullRequests/${prId}`;
   try {
-    const iterations = await runJson<AzureIterationList>(AZ, [
-      "devops",
-      "invoke",
-      "--area",
-      "git",
-      "--resource",
-      "pullRequestIterations",
-      "--route-parameters",
-      `project=${project}`,
-      `repositoryId=${repositoryId}`,
-      `pullRequestId=${prId}`,
-      ...orgArgs(organization),
-      "--api-version",
-      "7.1",
-      ...jsonOutput,
-    ]);
+    const iterations = await adoGet<AzureIterationList>(organization, `${prPath}/iterations`);
 
     const latestIter = (iterations.value ?? []).reduce(
       (max, it) => ((it.id ?? 0) > (max.id ?? 0) ? it : max),
@@ -241,30 +310,17 @@ const listPrFileChanges = async (
     const iterSourceCommit = sourceCommit ?? latestIter.sourceRefCommit?.commitId;
     const iterTargetCommit = targetCommit ?? latestIter.commonRefCommit?.commitId ?? latestIter.targetRefCommit?.commitId;
 
-    const changes = await runJson<AzureIterationChanges>(AZ, [
-      "devops",
-      "invoke",
-      "--area",
-      "git",
-      "--resource",
-      "pullRequestIterationChanges",
-      "--route-parameters",
-      `project=${project}`,
-      `repositoryId=${repositoryId}`,
-      `pullRequestId=${prId}`,
-      `iterationId=${latest}`,
-      ...orgArgs(organization),
-      "--api-version",
-      "7.1",
-      "--query-parameters",
-      "$top=10000",
-      ...jsonOutput,
-    ]);
+    const changes = await adoGet<AzureIterationChanges>(
+      organization,
+      `${prPath}/iterations/${latest}/changes`,
+      { query: { "$top": 10000 } },
+    );
 
     const files = normalizeFileChanges(changes.changeEntries ?? []);
 
     return { files, iterSourceCommit, iterTargetCommit };
-  } catch {
+  } catch (cause) {
+    debugLog("listPrFileChanges failed", prId, cause);
     return { files: [] };
   }
 };
@@ -301,8 +357,8 @@ const hydratePullRequest = async (
         sourceCommit,
         targetCommit,
       ),
-      listPrPolicies(project.organization, projectStr, prId),
-      listPrWorkItems(project.organization, prId),
+      listPrPolicies(project.organization, projectStr, raw.repository?.project?.id, prId),
+      listPrWorkItems(project.organization, projectStr, repositoryId, prId),
       fetchPrComments(project.organization, projectStr, repositoryId, prId),
     ]);
     changedFiles = fileRes.files;
@@ -340,6 +396,8 @@ const hydratePullRequest = async (
 
 export const fetchPrDetails = async (pr: PullRequest): Promise<Partial<PullRequest>> => {
   const repositoryId = pr.repositoryId ?? pr.repository;
+  // PRs restored from an older cache may predate the stored project id.
+  const projectId = pr.projectId ?? (await resolveProjectId(pr.organizationUrl, pr.project));
 
   const [fileRes, policies, items, threads] = await Promise.all([
     listPrFileChanges(
@@ -350,8 +408,8 @@ export const fetchPrDetails = async (pr: PullRequest): Promise<Partial<PullReque
       undefined,
       undefined,
     ),
-    listPrPolicies(pr.organizationUrl, pr.project, pr.id),
-    listPrWorkItems(pr.organizationUrl, pr.id),
+    listPrPolicies(pr.organizationUrl, pr.project, projectId, pr.id),
+    listPrWorkItems(pr.organizationUrl, pr.project, repositoryId, pr.id),
     fetchPrComments(pr.organizationUrl, pr.project, repositoryId, pr.id),
   ]);
 
@@ -388,12 +446,15 @@ export interface LoadOptions {
 }
 
 const describeError = (cause: unknown): string =>
-  cause instanceof CommandError ? cause.detail : String(cause);
+  cause instanceof AdoHttpError
+    ? cause.detail
+    : cause instanceof Error
+      ? cause.message
+      : String(cause);
 
 /**
- * Maximum number of projects fetched concurrently. Each project issues up to
- * two `az` invocations in parallel (repo discovery + PR listing), so the
- * process ceiling is roughly twice this number.
+ * Maximum number of projects fetched concurrently. Each project issues two
+ * requests in parallel (repo discovery + PR listing).
  */
 const PROJECT_FETCH_CONCURRENCY = 4;
 
@@ -446,9 +507,8 @@ export const groupPrsByRepository = (
  * repositories when not explicitly listed. Projects are fetched with bounded
  * concurrency, and each project pages through one project-wide PR listing
  * (grouped client-side by repository, capped at `top` per repo) instead of
- * one `az` call per repo. A
- * failure in one repo/project is captured and surfaced as an empty node
- * rather than aborting the whole load.
+ * one request per repo. A failure in one repo/project is captured and
+ * surfaced as an empty node rather than aborting the whole load.
  */
 export const loadAppData = async (
   config: AdoConfig,
@@ -466,8 +526,7 @@ export const loadAppData = async (
   }
 
   // Phase 1: resolve the full project list for every org up-front so fetch
-  // progress can be reported against a known total. Discovery runs across
-  // orgs concurrently (bounded) — each is an independent az call.
+  // progress can be reported against a known total.
   const orgProjects = await mapWithConcurrency(
     [...byOrg.entries()],
     PROJECT_FETCH_CONCURRENCY,
@@ -503,9 +562,8 @@ export const loadAppData = async (
   const progress = (): LoadProgress => ({ current: fetchedProjects, total: totalProjects });
 
   // Phase 2: fetch repos and PRs per project, with bounded concurrency across
-  // ALL projects (previously projects loaded strictly one after another).
-  // Each project needs only two az calls, issued in parallel: repo discovery
-  // and one project-wide PR listing grouped by repository.
+  // ALL projects. Each project needs only two requests, issued in parallel:
+  // repo discovery and one project-wide PR listing grouped by repository.
   const projectTasks = orgProjects.flatMap((entry) =>
     entry.projects.map((project) => project),
   );

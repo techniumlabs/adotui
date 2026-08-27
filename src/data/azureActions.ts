@@ -53,7 +53,7 @@ const mergeStrategyToAzFlags = (options: CompletionOptions): string[] => {
   return flags;
 };
 
-export const setVote = async (
+const setVote = async (
   ref: PrRef,
   vote: "approve" | "approve-with-suggestions" | "reject" | "reset" | "wait-for-author",
 ): Promise<void> => {

@@ -176,18 +176,34 @@ delete) require an explicit `y` confirmation — Enter does not confirm.
 - `src/data/config.ts` — loads and validates the multi-org/project config.
 - `src/data/command.ts` — CLI-agnostic process runner on `node:child_process` (run / runJson).
 - `src/data/azureCommon.ts` — shared Azure CLI status, organization, and JSON flags.
-- `src/data/azure.ts` / `azureRest.ts` — Azure DevOps command catalogs. Replaces `/tmp` with `os.tmpdir()` for Windows safety.
+- `src/data/adoFetch.ts` — REST client (cached auth, 429/401 retries, readable errors).
+- `src/data/azure.ts` — barrel over `azureLoad` / `azureRest` / `azureDiff` / `azureActions`.
 - `src/data/azureNormalize.ts` — maps Azure DevOps JSON to the domain model.
 - `src/app/dataController.ts` — orchestrates loading, refresh, and mock fallback.
 - `src/app/store.ts` + `src/app/actions/` — module-global Zustand store with stable, module-level action functions (toasts, refresh, selection, confirm pipeline, completion editor, command dispatch).
 - `src/app/hooks/useAppState.ts` — subscribes to the store, derives the current selection, and owns the lifecycle effects.
 - `src/app/hooks/useAppKeyboard.ts` — routes keyboard events to dedicated handlers under `src/app/hooks/keyboard/` (`globals.ts`, `filesKeyboard.ts`, etc.) using a central dispatch table.
 
-## Azure CLI commands used
+## Azure DevOps API usage
 
-- `az repos list` — repository discovery
-- `az repos pr list` — pull requests per repo
-- `az repos pr policy list` — check/policy rollups
-- `az devops invoke` (git iteration changes) — changed files
+Reads go straight to the REST API (`api-version=7.1`) through
+`src/data/adoFetch.ts`, which handles auth, throttling retries and error
+mapping:
+
+- `GET _apis/projects` — project discovery
+- `GET {project}/_apis/git/repositories` — repository discovery
+- `GET {project}/_apis/git/pullrequests` — pull requests (paged)
+- `GET {project}/_apis/policy/evaluations` — check/policy rollups
+- `GET .../pullRequests/{id}/iterations[/{n}/changes]` — changed files
+- `GET .../pullRequests/{id}/threads` (+ POST/PATCH/DELETE) — comments
+- `GET .../pullRequests/{id}/workitems` + `_apis/wit/workitems` — work items
+- `GET {project}/_apis/build/builds` — pipeline runs
+- `GET .../items` — file contents for diffs
+
+The `az` CLI is still used for credentials and for mutations:
+
+- `az account get-access-token` — bearer token (cached until it expires;
+  `AZURE_DEVOPS_EXT_PAT` is used instead when set)
+- `az account show` — current user identity
 - `az repos pr set-vote` — approve / reject
 - `az repos pr update --status` — abandon / complete
