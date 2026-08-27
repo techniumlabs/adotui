@@ -5,6 +5,7 @@ import { armConfirm, runConfirmedAction } from "./confirmActions";
 import { openCompletionEditor, submitCompletion } from "./completionActions";
 import { executeCommand } from "./commandActions";
 import { setDiffScrollOffset, setDiffSelectedRow, setCommentInputActive } from "./uiActions";
+import { openFilterPrompt, editFilterText, applyFilter, cancelFilter } from "./filterActions";
 import { updateFileDiff, setFileLoading, updatePr } from "./prDataActions";
 
 /**
@@ -23,6 +24,10 @@ export const appActions = {
   openCompletionEditor,
   submitCompletion,
   executeCommand,
+  openFilterPrompt,
+  editFilterText,
+  applyFilter,
+  cancelFilter,
   setDiffScrollOffset,
   setDiffSelectedRow,
   setCommentInputActive,

@@ -32,6 +32,8 @@ export const INITIAL_STATE: AppState = {
   diffSelectedRow: 0,
   treeFilter: "me" satisfies TreeFilter,
   fileFilter: "",
+  filterTarget: "tree",
+  filterRestore: "",
   commentInputActive: false,
   loadState: "loading",
   loadProgress: null,

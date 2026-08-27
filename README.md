@@ -159,7 +159,8 @@ for the full reference. The canonical table lives in `src/app/keymap.ts`.
 - `h` / `←`: back to the PR list from a PR tab
 - `enter`: tree → focus the PR list · list → open the PR overview
 - `v`: cycle the tree filter (me → with-prs → all)
-- `:` or `/`: command mode (`filter <query>`, `find <query>`, `refresh`, `help`…)
+- `/`: live filter for the current view (PRs; files when in Diff)
+- `:`: command mode (`filter <query>`, `find <query>`, `refresh`, `help`…)
 - `r`: refresh · `R` inside Comments/Pipelines: reload that view
 - `a` / `x` / `b` / `c`: approve / reject / abandon / complete the selected PR
 - `o`: open the selected PR in the browser

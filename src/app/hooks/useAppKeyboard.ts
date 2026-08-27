@@ -5,6 +5,7 @@ import { handleGlobals } from "./keyboard/globals";
 import { handleHelp } from "./keyboard/helpKeyboard";
 import { handleCompletion } from "./keyboard/completionKeyboard";
 import { handleCommand } from "./keyboard/commandKeyboard";
+import { handleFilter } from "./keyboard/filterKeyboard";
 import { handleTree } from "./keyboard/treeKeyboard";
 import { handleList } from "./keyboard/listKeyboard";
 import { handleDetail } from "./keyboard/detailKeyboard";
@@ -38,6 +39,7 @@ export function useAppKeyboard(app: AppHandle, exitApp: () => void, suppressed =
       if (state.focus === "help")       { handleHelp(input, key, app, exitApp); return; }
       if (state.focus === "completion") { handleCompletion(input, key, app, exitApp); return; }
       if (state.focus === "command")    { handleCommand(input, key, app, exitApp); return; }
+      if (state.focus === "filter")     { handleFilter(input, key, app, exitApp); return; }
 
       // 4. Guard: suppress global shortcuts while comment input is active
       if (state.commentInputActive) return;

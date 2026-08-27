@@ -178,7 +178,7 @@ export const App: React.FC = () => {
               />
               {selectedPr && <PrTabs focus={state.focus} />}
               {(() => {
-                const renderFocus = (state.focus === "command" || state.focus === "completion")
+                const renderFocus = (state.focus === "command" || state.focus === "completion" || state.focus === "filter")
                   ? (state.previousFocus ?? "detail")
                   : state.focus;
 
@@ -235,6 +235,14 @@ export const App: React.FC = () => {
         focus={state.focus}
         commandText={state.commandText}
         pendingConfirm={state.pendingConfirm}
+        filterPrompt={
+          state.focus === "filter"
+            ? {
+                target: state.filterTarget,
+                text: state.filterTarget === "files" ? state.fileFilter : state.treeFilter,
+              }
+            : undefined
+        }
       />
 
       {/* Unified Footer — swaps to the bottom-line loader during loads so

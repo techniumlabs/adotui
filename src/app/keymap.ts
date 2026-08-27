@@ -27,7 +27,8 @@ export const KEYMAP: KeymapSection[] = [
       { keys: "4", description: "PR tab: Pipelines", debugOnly: true },
       { keys: "h / ←", description: "Back to the PR list" },
       { keys: "v", description: "Tree filter: me → with-prs → all" },
-      { keys: ": or /", description: "Command mode" },
+      { keys: "/", description: "Filter current view (live)" },
+      { keys: ":", description: "Command mode" },
       { keys: "r", description: "Refresh from Azure DevOps" },
       { keys: "? / q", description: "This help / quit" },
     ],
@@ -100,6 +101,7 @@ export type FooterHint = { keys: string; label: string };
 export const footerHints = (hasSelectedPr: boolean): FooterHint[] => {
   const tabRange = process.env.NODE_ENV === "debug" ? "1-4" : "1-3";
   const base: FooterHint[] = [
+    { keys: "/", label: "filter" },
     { keys: ":", label: "commands" },
     { keys: "j/k", label: "move" },
     { keys: tabRange, label: "view tab" },

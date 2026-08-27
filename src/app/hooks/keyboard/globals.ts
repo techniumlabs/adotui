@@ -55,8 +55,12 @@ export function handleGlobals(
     return true;
   }
   if (input === "q") { exitApp(); process.exit(0); return true; }
-  if (input === ":" || input === "/") {
+  if (input === ":") {
     updateState((c) => ({ previousFocus: c.focus, focus: "command", commandText: "", banner: "Command mode." }));
+    return true;
+  }
+  if (input === "/") {
+    actions.openFilterPrompt();
     return true;
   }
   if (input === "v" || input === "V") {
