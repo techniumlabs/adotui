@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { computeScrollWindow, followSelection } from "../src/app/utils/scrollWindow";
+import { computeScrollWindow, followSelection, moveSelection } from "../src/app/utils/scrollWindow";
 
 describe("computeScrollWindow", () => {
   test("keeps a valid offset and reports both indicators", () => {
@@ -16,6 +16,32 @@ describe("computeScrollWindow", () => {
 
   test("negative offsets clamp to zero", () => {
     expect(computeScrollWindow(10, 4, -3)).toEqual({ offset: 0, canScrollUp: false, canScrollDown: true });
+  });
+});
+
+describe("moveSelection", () => {
+  test("moves within the list", () => {
+    expect(moveSelection(2, 1, 10)).toBe(3);
+    expect(moveSelection(2, -1, 10)).toBe(1);
+    expect(moveSelection(0, 5, 10)).toBe(5);
+  });
+
+  test("clamps at both ends", () => {
+    expect(moveSelection(9, 1, 10)).toBe(9);
+    expect(moveSelection(0, -1, 10)).toBe(0);
+    expect(moveSelection(3, -10, 10)).toBe(0);
+    expect(moveSelection(3, 99, 10)).toBe(9);
+  });
+
+  test("empty lists stay at 0 instead of falling to -1", () => {
+    expect(moveSelection(0, 1, 0)).toBe(0);
+    expect(moveSelection(0, -1, 0)).toBe(0);
+    expect(moveSelection(0, 5, 0)).toBe(0);
+  });
+
+  test("single-item lists never move off the item", () => {
+    expect(moveSelection(0, 1, 1)).toBe(0);
+    expect(moveSelection(0, -1, 1)).toBe(0);
   });
 });
 

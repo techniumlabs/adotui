@@ -12,14 +12,11 @@ export function handleCompletion(input: string, key: Key, app: AppHandle, _exitA
     return;
   }
 
-  const isTextField = state.completionCursor >= COMPLETION_CURSOR.BYPASS_REASON &&
-    state.completionCursor <= COMPLETION_CURSOR.IGNORE_IDS;
-
-  if (key.upArrow || (!isTextField && input === "k")) {
+  if (key.upArrow) {
     updateState((c) => ({ completionCursor: clamp(c.completionCursor - 1, 0, COMPLETION_FIELD_COUNT - 1) }));
     return;
   }
-  if (key.downArrow || key.tab || (!isTextField && input === "j")) {
+  if (key.downArrow || key.tab) {
     updateState((c) => ({ completionCursor: clamp(c.completionCursor + 1, 0, COMPLETION_FIELD_COUNT - 1) }));
     return;
   }

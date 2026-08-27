@@ -1,5 +1,5 @@
 export type KeyBinding = {
-  /** Display form of the key(s), e.g. "j/k", "Shift+Tab". */
+  /** Display form of the key(s), e.g. "↑/↓", "Shift+Tab". */
   keys: string;
   description: string;
   /** Only active/shown when NODE_ENV=debug. */
@@ -46,7 +46,7 @@ export const KEYMAP: KeymapSection[] = [
   {
     title: "Tree / PR List",
     bindings: [
-      { keys: "j/k ↑/↓", description: "Move selection" },
+      { keys: "↑/↓", description: "Move selection" },
       { keys: "h/l ←/→", description: "Tree: org · List: tree/detail" },
       { keys: "Enter", description: "Tree: to list · List: overview" },
       { keys: "m", description: "Comments (same as 3)" },
@@ -57,7 +57,7 @@ export const KEYMAP: KeymapSection[] = [
     title: "Diff (2)",
     bindings: [
       { keys: "←/→", description: "Prev / next file" },
-      { keys: "j/k ↑/↓", description: "Move row selection" },
+      { keys: "↑/↓", description: "Move row selection" },
       { keys: "g / G", description: "Top / bottom" },
       { keys: "PgUp/PgDn", description: "Scroll a viewport" },
       { keys: "n", description: "Comment on selected line" },
@@ -66,7 +66,7 @@ export const KEYMAP: KeymapSection[] = [
   {
     title: "Comments (3)",
     bindings: [
-      { keys: "j/k ↑/↓", description: "Move between threads" },
+      { keys: "↑/↓", description: "Move between threads" },
       { keys: "←/→", description: "Select root / replies" },
       { keys: "n / r / e", description: "New / reply / edit" },
       { keys: "d", description: "Delete own comment (y/n)" },
@@ -78,7 +78,7 @@ export const KEYMAP: KeymapSection[] = [
     title: "Pipelines (4)",
     debugOnly: true,
     bindings: [
-      { keys: "j/k", description: "Move selection" },
+      { keys: "↑/↓", description: "Move selection" },
       { keys: "o", description: "Open run in browser" },
       { keys: "R", description: "Reload runs" },
     ],
@@ -103,7 +103,7 @@ export const footerHints = (hasSelectedPr: boolean): FooterHint[] => {
   const base: FooterHint[] = [
     { keys: "/", label: "filter" },
     { keys: ":", label: "commands" },
-    { keys: "j/k", label: "move" },
+    { keys: "↑/↓", label: "move" },
     { keys: tabRange, label: "view tab" },
     { keys: "tab", label: "focus" },
   ];

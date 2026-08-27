@@ -5,6 +5,7 @@ import type { FocusArea } from "../types";
 import { glyph, palette, truncate } from "../theme";
 import { formatRelativeAge, openInBrowser } from "../utils";
 import { usePipelineRuns } from "../hooks/usePipelineRuns";
+import { moveSelection } from "../utils";
 
 type PipelineRunsViewProps = {
   selectedPr?: PullRequest;
@@ -61,10 +62,10 @@ export const PipelineRunsView: React.FC<PipelineRunsViewProps> = ({
     (input, key) => {
       if (!active) return;
 
-      if (input === "j" || key.downArrow) {
-        setSelectedIdx((i) => Math.min(i + 1, runs.length - 1));
-      } else if (input === "k" || key.upArrow) {
-        setSelectedIdx((i) => Math.max(i - 1, 0));
+      if (key.downArrow) {
+        setSelectedIdx((i) => moveSelection(i, 1, runs.length));
+      } else if (key.upArrow) {
+        setSelectedIdx((i) => moveSelection(i, -1, runs.length));
       } else if (input === "o") {
         const run = runs[selectedIdx];
         if (run?.url) openInBrowser(run.url);

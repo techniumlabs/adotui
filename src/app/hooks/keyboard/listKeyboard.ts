@@ -5,8 +5,8 @@ import { patchState } from "../../store";
 export function handleList(input: string, key: Key, app: AppHandle, _exitApp: () => void): void {
   const { actions } = app;
 
-  if (input === "j" || key.downArrow) { actions.changePrSelection(1); return; }
-  if (input === "k" || key.upArrow)   { actions.changePrSelection(-1); return; }
+  if (key.downArrow) { actions.changePrSelection(1); return; }
+  if (key.upArrow)   { actions.changePrSelection(-1); return; }
 
   if (input === "h" || key.leftArrow) {
     patchState({ focus: "tree", banner: "Focus: tree" });
@@ -21,6 +21,6 @@ export function handleList(input: string, key: Key, app: AppHandle, _exitApp: ()
     return;
   }
   if (input === "p" && process.env.NODE_ENV === "debug") {
-    patchState({ focus: "runs", banner: "Pipeline runs. j/k=navigate  o=open  R=reload  h=back" });
+    patchState({ focus: "runs", banner: "Pipeline runs. arrows=navigate  o=open  R=reload  h=back" });
   }
 }

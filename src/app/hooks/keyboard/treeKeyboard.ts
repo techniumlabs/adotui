@@ -5,8 +5,8 @@ import { patchState } from "../../store";
 export function handleTree(input: string, key: Key, app: AppHandle, _exitApp: () => void): void {
   const { actions } = app;
 
-  if (input === "j" || key.downArrow)  { actions.moveTreeSelection(0, 1); return; }
-  if (input === "k" || key.upArrow)    { actions.moveTreeSelection(0, -1); return; }
+  if (key.downArrow) { actions.moveTreeSelection(0, 1); return; }
+  if (key.upArrow)   { actions.moveTreeSelection(0, -1); return; }
   if (input === "h" || key.leftArrow)  { actions.moveTreeSelection(-1, 0, "Organization changed."); return; }
 
   if (input === "l" || key.rightArrow || key.return) {

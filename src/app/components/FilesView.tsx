@@ -99,7 +99,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
         return;
       }
 
-      // Row-level diff navigation (j/k, g/G, PageUp/PageDown)
+      // Row-level diff navigation (arrows, g/G, PageUp/PageDown)
       if (diffRows.length > 0) {
         const terminalHeight = process.stdout.rows ?? 40;
         const viewportH = Math.max(5, terminalHeight - 27);
@@ -266,7 +266,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
 
                 <Text color={palette.accentDim}>n</Text> comment{"  "}
                 <Text color={palette.accentDim}>←/→</Text> switch files{"  "}
-                <Text color={palette.accentDim}>j/k, ↑/↓</Text> navigate{"  "}
+                <Text color={palette.accentDim}>↑/↓</Text> navigate{"  "}
                 <Text color={palette.accentDim}>g/G</Text> top/end
               </Text>
             </Box>

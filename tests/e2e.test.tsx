@@ -8,6 +8,7 @@ process.env.ADOTUI_MOCK = "1";
 process.env.NODE_ENV = "test";
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+const ARROW_DOWN = "\u001B[B";
 
 describe("Adotui E2E Navigation", () => {
   // The zustand store is module-global, so state (tree scroll, active view)
@@ -27,7 +28,7 @@ describe("Adotui E2E Navigation", () => {
     expect(frame).toInclude("Details");
   });
 
-  test("tree navigation: jumping across organizations using j/k", async () => {
+  test("tree navigation: jumping across organizations using the arrow keys", async () => {
     const { stdin, lastFrame } = render(<App />);
     await delay(100);
 
@@ -36,8 +37,8 @@ describe("Adotui E2E Navigation", () => {
 
     // Under the default "My PRs" filter, navigation skips repos without the
     // login user's PRs: adotui-core → enrollment-service → ui-observability.
-    stdin.write("j");
-    stdin.write("j");
+    stdin.write(ARROW_DOWN);
+    stdin.write(ARROW_DOWN);
 
     await delay(50);
     frame = lastFrame();
@@ -47,8 +48,8 @@ describe("Adotui E2E Navigation", () => {
 
     // Two more presses cross into megacorp-holdings and land on repo-3,
     // skipping hidden repo-2.
-    stdin.write("j");
-    stdin.write("j");
+    stdin.write(ARROW_DOWN);
+    stdin.write(ARROW_DOWN);
 
     await delay(50);
     frame = lastFrame();

@@ -11,7 +11,7 @@ export type DiffNavContext = {
 };
 
 /**
- * Row-level diff navigation (j/k, g/G, PageUp/PageDown) with
+ * Row-level diff navigation (arrows, g/G, PageUp/PageDown) with
  * scroll-follows-selection. Owned by the diff view — the central
  * `filesKeyboard.ts` deliberately does NOT bind these keys, so exactly one
  * handler reacts per keypress.
@@ -21,14 +21,14 @@ export type DiffNavContext = {
 export function handleDiffNavigation(input: string, key: Key, ctx: DiffNavContext): boolean {
   const { rowCount, selectedRow, scrollOffset, viewportH, onSelectedRowChange, onScrollOffsetChange } = ctx;
 
-  if (input === "j" || key.downArrow) {
+  if (key.downArrow) {
     const nextRow = Math.min(selectedRow + 1, rowCount - 1);
     onSelectedRowChange(nextRow);
     const nextOffset = followSelection(nextRow, scrollOffset, viewportH);
     if (nextOffset !== scrollOffset) onScrollOffsetChange(nextOffset);
     return true;
   }
-  if (input === "k" || key.upArrow) {
+  if (key.upArrow) {
     const nextRow = Math.max(selectedRow - 1, 0);
     onSelectedRowChange(nextRow);
     const nextOffset = followSelection(nextRow, scrollOffset, viewportH);

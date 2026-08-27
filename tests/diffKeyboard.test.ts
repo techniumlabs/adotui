@@ -3,6 +3,8 @@ import type { Key } from "ink";
 import { handleDiffNavigation, type DiffNavContext } from "../src/app/components/diff/diffKeyboard";
 
 const key = (overrides: Partial<Key> = {}): Key => overrides as Key;
+const DOWN = key({ downArrow: true });
+const UP = key({ upArrow: true });
 
 const makeCtx = (overrides: Partial<DiffNavContext> = {}) => {
   const calls = { row: [] as number[], offset: [] as number[] };
@@ -19,30 +21,30 @@ const makeCtx = (overrides: Partial<DiffNavContext> = {}) => {
 };
 
 describe("handleDiffNavigation", () => {
-  test("j moves down without scrolling inside the window", () => {
+  test("down arrow moves without scrolling inside the window", () => {
     const { ctx, calls } = makeCtx();
-    expect(handleDiffNavigation("j", key(), ctx)).toBe(true);
+    expect(handleDiffNavigation("", DOWN, ctx)).toBe(true);
     expect(calls.row).toEqual([6]);
     expect(calls.offset).toEqual([]);
   });
 
-  test("j at the window bottom scrolls one row", () => {
+  test("down arrow at the window bottom scrolls one row", () => {
     const { ctx, calls } = makeCtx({ selectedRow: 9 });
-    handleDiffNavigation("j", key(), ctx);
+    handleDiffNavigation("", DOWN, ctx);
     expect(calls.row).toEqual([10]);
     expect(calls.offset).toEqual([1]);
   });
 
-  test("j clamps at the last row without scrolling past the end", () => {
+  test("down arrow clamps at the last row without scrolling past the end", () => {
     const { ctx, calls } = makeCtx({ selectedRow: 19, scrollOffset: 10 });
-    handleDiffNavigation("j", key(), ctx);
+    handleDiffNavigation("", DOWN, ctx);
     expect(calls.row).toEqual([19]);
     expect(calls.offset).toEqual([]);
   });
 
-  test("k above the window scrolls up", () => {
+  test("up arrow above the window scrolls up", () => {
     const { ctx, calls } = makeCtx({ selectedRow: 3, scrollOffset: 3 });
-    handleDiffNavigation("k", key(), ctx);
+    handleDiffNavigation("", UP, ctx);
     expect(calls.row).toEqual([2]);
     expect(calls.offset).toEqual([2]);
   });

@@ -154,7 +154,7 @@ The footer lists the shortcuts for your current context; press `?` in the app
 for the full reference. The canonical table lives in `src/app/keymap.ts`.
 
 - `tab` / `shift+tab`: cycle pane focus forward / backward
-- `j` / `k` or arrows: navigate items in the focused pane
+- `↑` / `↓`: navigate items in the focused pane
 - `1`-`3`: PR tabs — Overview, Diff, Comments (`4` Pipelines in debug builds)
 - `h` / `←`: back to the PR list from a PR tab
 - `enter`: tree → focus the PR list · list → open the PR overview

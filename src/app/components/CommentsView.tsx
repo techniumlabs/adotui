@@ -11,7 +11,7 @@ import {
   type PrComment,
 } from "../hooks/usePrComments";
 import { ThreadCard } from "./comments/ThreadCard";
-import { computeScrollWindow, followSelection } from "../utils";
+import { computeScrollWindow, followSelection, moveSelection } from "../utils";
 
 type CommentsViewProps = {
   selectedPr?: PullRequest;
@@ -117,16 +117,16 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
       }
 
       // Navigation mode
-      if (input === "j" || key.downArrow) {
+      if (key.downArrow) {
         setSelectedThread((i) => {
-          const next = Math.min(i + 1, stateRef.current.threads.length - 1);
+          const next = moveSelection(i, 1, stateRef.current.threads.length);
           if (next !== i) setSelectedCommentIndex(-1);
           setThreadScrollOffset(followSelection(next, stateRef.current.threadScrollOffset, maxVisibleThreads()));
           return next;
         });
-      } else if (input === "k" || key.upArrow) {
+      } else if (key.upArrow) {
         setSelectedThread((i) => {
-          const next = Math.max(i - 1, 0);
+          const next = moveSelection(i, -1, stateRef.current.threads.length);
           if (next !== i) setSelectedCommentIndex(-1);
           setThreadScrollOffset(followSelection(next, stateRef.current.threadScrollOffset, maxVisibleThreads()));
           return next;
@@ -134,7 +134,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
       } else if (key.pageDown) {
         setSelectedThread((i) => {
           const maxVis = maxVisibleThreads();
-          const next = Math.min(i + maxVis, stateRef.current.threads.length - 1);
+          const next = moveSelection(i, maxVis, stateRef.current.threads.length);
           setSelectedCommentIndex(-1);
           if (next >= stateRef.current.threadScrollOffset + maxVis) {
             setThreadScrollOffset(Math.min(next - maxVis + 1, stateRef.current.threads.length - maxVis));
@@ -144,7 +144,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
       } else if (key.pageUp) {
         setSelectedThread((i) => {
           const maxVis = maxVisibleThreads();
-          const next = Math.max(i - maxVis, 0);
+          const next = moveSelection(i, -maxVis, stateRef.current.threads.length);
           setSelectedCommentIndex(-1);
           setThreadScrollOffset(followSelection(next, stateRef.current.threadScrollOffset, maxVis));
           return next;
@@ -337,7 +337,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
       <Box height={1} marginTop={1} flexShrink={0}>
         {active && inputMode === "none" && (
           <Text color={palette.muted}>
-            <Text color={palette.accentDim}>j/k</Text> navigate{"  "}
+            <Text color={palette.accentDim}>↑/↓</Text> navigate{"  "}
             <Text color={palette.accentDim}>←/→</Text> select comment{"  "}
             <Text color={palette.accentDim}>n</Text> new{"  "}
             <Text color={palette.accentDim}>r</Text> reply{"  "}
