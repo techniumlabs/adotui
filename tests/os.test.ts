@@ -1,4 +1,4 @@
-import { expect, test, describe, mock, afterEach } from "bun:test";
+import { expect, test, describe, afterEach } from "bun:test";
 import { openInBrowser } from "../src/app/utils";
 
 describe("OS Specific Logic - openInBrowser", () => {
@@ -27,10 +27,10 @@ describe("OS Specific Logic - openInBrowser", () => {
     mockPlatform("darwin");
     
     let executedCmd: string[] = [];
-    Bun.spawn = mock(({ cmd }: any) => {
-      executedCmd = cmd;
-      return { stdout: "ignore", stderr: "ignore" } as any;
-    });
+    Bun.spawn = ((cmds: string[]) => {
+      executedCmd = cmds;
+      return {} as never;
+    }) as unknown as typeof Bun.spawn;
 
     openInBrowser("https://example.com");
     
@@ -41,10 +41,10 @@ describe("OS Specific Logic - openInBrowser", () => {
     mockPlatform("win32");
     
     let executedCmd: string[] = [];
-    Bun.spawn = mock(({ cmd }: any) => {
-      executedCmd = cmd;
-      return { stdout: "ignore", stderr: "ignore" } as any;
-    });
+    Bun.spawn = ((cmds: string[]) => {
+      executedCmd = cmds;
+      return {} as never;
+    }) as unknown as typeof Bun.spawn;
 
     openInBrowser("https://example.com");
     
@@ -55,10 +55,10 @@ describe("OS Specific Logic - openInBrowser", () => {
     mockPlatform("linux");
     
     let executedCmd: string[] = [];
-    Bun.spawn = mock(({ cmd }: any) => {
-      executedCmd = cmd;
-      return { stdout: "ignore", stderr: "ignore" } as any;
-    });
+    Bun.spawn = ((cmds: string[]) => {
+      executedCmd = cmds;
+      return {} as never;
+    }) as unknown as typeof Bun.spawn;
 
     openInBrowser("https://example.com");
     

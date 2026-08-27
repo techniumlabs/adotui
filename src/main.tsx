@@ -47,10 +47,9 @@ const printDiagnostic = async () => {
 
   // Check az CLI
   try {
-    const { execFile } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execFileAsync = promisify(execFile);
-    const { stdout: text } = await execFileAsync("az", ["--version"]);
+    const proc = Bun.spawn(["az", "--version"], { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
+    const text = await new Response(proc.stdout).text();
+    await proc.exited;
     const firstLine = text.split("\n")[0]?.trim() ?? "unknown";
     console.log(`  Azure CLI: ${firstLine}`);
   } catch {
@@ -83,20 +82,20 @@ const updateCli = async () => {
     const installUrl = "https://raw.githubusercontent.com/techniumlabs/adotui/main/install.sh";
     console.log(`Running installation script from ${installUrl}...`);
     
-    const { spawn } = await import("node:child_process");
-    const child = spawn("bash", ["-c", `curl -fsSL ${installUrl} | bash`], {
-      stdio: "inherit"
+    const child = Bun.spawn(["bash", "-c", `curl -fsSL ${installUrl} | bash`], {
+      stdin: "inherit",
+      stdout: "inherit",
+      stderr: "inherit",
     });
-    
-    child.on("close", (code) => {
-      if (code === 0) {
-        console.log("Update completed successfully!");
-        process.exit(0);
-      } else {
-        console.error(`Update script failed with exit code ${code}.`);
-        process.exit(code ?? 1);
-      }
-    });
+
+    const code = await child.exited;
+    if (code === 0) {
+      console.log("Update completed successfully!");
+      process.exit(0);
+    } else {
+      console.error(`Update script failed with exit code ${code}.`);
+      process.exit(code);
+    }
   } catch (err) {
     console.error(`Failed to update: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
@@ -126,8 +125,7 @@ if (args.includes("--diagnostic")) {
 
 if (args.includes("--update")) {
   await updateCli();
-  // Wait for asynchronous update process to complete and exit
-  await new Promise(() => {});
+  process.exit(0);
 }
 
 render(<App />);

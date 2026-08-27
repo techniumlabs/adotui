@@ -1,5 +1,3 @@
-import { spawn } from "node:child_process";
-
 export const openInBrowser = (url: string): void => {
   const platform = process.platform;
   const cmd =
@@ -9,5 +7,5 @@ export const openInBrowser = (url: string): void => {
         ? ["cmd", "/c", "start", "", url]
         : ["xdg-open", url];
 
-  spawn(cmd[0]!, cmd.slice(1), { stdio: "ignore" });
+  Bun.spawn(cmd, { stdin: "ignore", stdout: "ignore", stderr: "ignore" });
 };

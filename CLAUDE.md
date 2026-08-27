@@ -13,6 +13,7 @@
 - Use `bun run <script>` instead of `npm run <script>`
 - Prefer `Bun.file` over `node:fs`'s readFile/writeFile
 - Use `Bun.spawn` or `Bun.$` instead of `child_process` or `execa`.
+- Documented exceptions: `src/data/command.ts` stays on `node:child_process` (the single subprocess entry point; mature timeout/kill/stream semantics every az call relies on), and `src/app/utils/debugLog.ts` keeps `node:fs` `appendFileSync` (append with strict ordering, which `Bun.file` doesn't cover).
 
 ## Terminal UI (Ink) Guidelines
 - **Layout Model**: Use standard React `<Box>` flexbox properties. ADOTUI relies on a strict split-pane structure with a fixed-width left column and dynamic-width right column. 

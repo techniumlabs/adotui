@@ -3,7 +3,6 @@
  * commits from the Azure DevOps git items REST API (the only direct REST
  * usage in adotui — see azureAuth.ts) and diffs them with the system `diff`.
  */
-import { spawn } from "node:child_process";
 import { withTempFile } from "./tempFile";
 import type { PullRequestFileChange } from "../domain/types";
 import { getAdoAuthHeader } from "./azureAuth";
@@ -53,20 +52,16 @@ const buildUnifiedDiff = async (
 ): Promise<{ rawDiff: string; additions: number; deletions: number }> =>
   withTempFile(oldContent, (oldPath) =>
     withTempFile(newContent, async (newPath) => {
-      const proc = spawn("diff", [
+      const proc = Bun.spawn([
+        "diff",
         "-u",
         "-L", `a/${filePath}`,
         "-L", `b/${filePath}`,
         oldPath, newPath,
-      ], {
-        stdio: ["ignore", "pipe", "ignore"],
-      });
+      ], { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
 
-      const rawDiff = await new Promise<string>((resolve) => {
-        let out = "";
-        proc.stdout.on("data", (chunk) => { out += chunk; });
-        proc.on("close", () => resolve(out));
-      });
+      const rawDiff = await new Response(proc.stdout).text();
+      await proc.exited;
 
       const lines = rawDiff.split("\n");
       const additions = lines.filter(

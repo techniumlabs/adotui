@@ -1,6 +1,5 @@
 import { homedir } from "node:os";
 import { dirname, join, parse } from "node:path";
-import { promises as fs } from "node:fs";
 
 /**
  * A single Azure DevOps organization + project to monitor.
@@ -196,14 +195,10 @@ export const loadConfig = async (): Promise<ConfigResult> => {
   const searchedPaths = configSearchPaths();
 
   const existsResults = await Promise.all(
-    searchedPaths.map(async (path) => {
-      try {
-        await fs.access(path);
-        return { path, exists: true };
-      } catch {
-        return { path, exists: false };
-      }
-    })
+    searchedPaths.map(async (path) => ({
+      path,
+      exists: await Bun.file(path).exists(),
+    })),
   );
 
   const existing = existsResults.find((r) => r.exists);
@@ -213,7 +208,7 @@ export const loadConfig = async (): Promise<ConfigResult> => {
 
     let parsed: unknown;
     try {
-      const content = await fs.readFile(path, "utf-8");
+      const content = await Bun.file(path).text();
       parsed = JSON.parse(content);
     } catch (cause) {
       return {
@@ -240,5 +235,5 @@ export const configSearchPathsForHelp = (): string[] => configSearchPaths();
 
 export const writeConfig = async (config: AdoConfig): Promise<void> => {
   const path = join(process.cwd(), "adotui.config.json");
-  await fs.writeFile(path, JSON.stringify(config, null, 2), "utf-8");
+  await Bun.write(path, JSON.stringify(config, null, 2));
 };
