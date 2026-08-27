@@ -3,7 +3,9 @@
  * Seeds (or removes) Azure DevOps test data for adotui load testing.
  *
  * Creates projects named `adotui-loadtest-p<N>`, each with repos containing an
- * initial commit, feature branches, and active PRs — entirely server-side via
+ * initial commit (README + seed source files), feature branches, and active
+ * PRs whose commits carry multi-line code changes (edits, additions and
+ * deletions across several files) — entirely server-side via
  * the az CLI (no local clones). Cleanup deletes ONLY projects carrying the
  * loadtest prefix, so pre-existing projects are never touched.
  *
@@ -125,6 +127,169 @@ const addFile = (path: string, content: string): Record<string, unknown> => ({
   newContent: { content, contentType: "rawtext" },
 });
 
+const editFile = (path: string, content: string): Record<string, unknown> => ({
+  changeType: "edit",
+  item: { path },
+  newContent: { content, contentType: "rawtext" },
+});
+
+// ─── seed file contents ───────────────────────────────────────────────────────
+// Built from line arrays (not template literals) so the generated code can
+// itself contain backticks and ${} placeholders. The base files land on main;
+// each feature branch edits them (changed constants, rewritten bodies, added
+// and removed blocks) so every PR shows realistic multi-line, multi-hunk diffs.
+
+const baseAppFile = (repo: string): string =>
+  [
+    "/**",
+    " * Demo order service for " + repo + " — seeded by dev/testdata.ts.",
+    " */",
+    "export interface Order {",
+    "  id: number;",
+    "  customer: string;",
+    "  items: string[];",
+    "  total: number;",
+    '  status: "pending" | "paid" | "shipped";',
+    "}",
+    "",
+    "const TAX_RATE = 0.08;",
+    "",
+    "export const applyTax = (subtotal: number): number => {",
+    "  return subtotal * (1 + TAX_RATE);",
+    "};",
+    "",
+    "export const formatOrder = (order: Order): string => {",
+    "  const lines = [",
+    "    `Order #${order.id} for ${order.customer}`,",
+    '    `Items: ${order.items.join(", ")}`,',
+    "    `Total: ${order.total.toFixed(2)}`,",
+    "    `Status: ${order.status}`,",
+    "  ];",
+    '  return lines.join("\\n");',
+    "};",
+    "",
+    "export const summarize = (orders: Order[]): string => {",
+    "  const total = orders.reduce((acc, order) => acc + order.total, 0);",
+    '  const shipped = orders.filter((order) => order.status === "shipped").length;',
+    "  return `${orders.length} orders, ${shipped} shipped, revenue ${total.toFixed(2)}`;",
+    "};",
+    "",
+  ].join("\n");
+
+const modifiedAppFile = (repo: string, n: number): string =>
+  [
+    "/**",
+    " * Demo order service for " + repo + " — seeded by dev/testdata.ts.",
+    " * Revision " + n + ": fees, discounts and refreshed formatting.",
+    " */",
+    "export interface Order {",
+    "  id: number;",
+    "  customer: string;",
+    "  items: string[];",
+    "  total: number;",
+    '  status: "pending" | "paid" | "shipped" | "refunded";',
+    "}",
+    "",
+    "const TAX_RATE = 0.0" + (8 + n) + ";",
+    "const SERVICE_FEE = " + n + ".5;",
+    "",
+    "export const applyTax = (subtotal: number, includeFee = true): number => {",
+    "  const taxed = subtotal * (1 + TAX_RATE);",
+    "  return includeFee ? taxed + SERVICE_FEE : taxed;",
+    "};",
+    "",
+    "export const applyDiscount = (subtotal: number, percent: number): number => {",
+    "  if (percent <= 0) return subtotal;",
+    "  const capped = Math.min(percent, 50);",
+    "  return subtotal * (1 - capped / 100);",
+    "};",
+    "",
+    "export const formatOrder = (order: Order): string => {",
+    "  const lines = [",
+    "    `Order #${order.id} — ${order.customer}`,",
+    '    `Items (${order.items.length}): ${order.items.join(" | ")}`,',
+    "    `Total: ${applyTax(order.total).toFixed(2)} incl. tax`,",
+    "  ];",
+    '  return lines.join("\\n");',
+    "};",
+    "",
+    "export const summarize = (orders: Order[]): string => {",
+    "  const total = orders.reduce((acc, order) => acc + order.total, 0);",
+    '  const shipped = orders.filter((order) => order.status === "shipped").length;',
+    '  const refunded = orders.filter((order) => order.status === "refunded").length;',
+    "  return `${orders.length} orders, ${shipped} shipped, ${refunded} refunded, revenue ${total.toFixed(2)}`;",
+    "};",
+    "",
+  ].join("\n");
+
+const baseUtilsFile = (repo: string): string =>
+  [
+    "// Utility helpers for " + repo + ".",
+    "",
+    "export const clamp = (value: number, min: number, max: number): number => {",
+    "  if (value < min) return min;",
+    "  if (value > max) return max;",
+    "  return value;",
+    "};",
+    "",
+    "export const chunk = <T>(items: T[], size: number): T[][] => {",
+    "  const result: T[][] = [];",
+    "  for (let i = 0; i < items.length; i += size) {",
+    "    result.push(items.slice(i, i + size));",
+    "  }",
+    "  return result;",
+    "};",
+    "",
+    "export const unique = <T>(items: T[]): T[] => {",
+    "  return [...new Set(items)];",
+    "};",
+    "",
+  ].join("\n");
+
+const modifiedUtilsFile = (repo: string, n: number): string =>
+  [
+    "// Utility helpers for " + repo + " (revision " + n + ").",
+    "",
+    "export const clamp = (value: number, min: number, max: number): number =>",
+    "  Math.min(Math.max(value, min), max);",
+    "",
+    "export const chunk = <T>(items: T[], size: number): T[][] => {",
+    "  if (size <= 0) throw new RangeError(`chunk size must be positive, got ${size}`);",
+    "  const result: T[][] = [];",
+    "  for (let i = 0; i < items.length; i += size) {",
+    "    result.push(items.slice(i, i + size));",
+    "  }",
+    "  return result;",
+    "};",
+    "",
+    "export const unique = <T>(items: T[]): T[] => {",
+    "  return [...new Set(items)];",
+    "};",
+    "",
+    "export const sum = (values: number[]): number => {",
+    "  return values.reduce((acc, value) => acc + value, 0);",
+    "};",
+    "",
+  ].join("\n");
+
+const featureFile = (repo: string, n: number): string =>
+  [
+    "// Feature module " + n + " for " + repo + ".",
+    "",
+    "export interface FeatureFlag {",
+    "  name: string;",
+    "  enabled: boolean;",
+    "  rollout: number;",
+    "}",
+    "",
+    "export const FLAG: FeatureFlag = {",
+    '  name: "feature-' + n + '",',
+    "  enabled: " + (n % 2 === 0) + ",",
+    "  rollout: " + n * 10 + ",",
+    "};",
+    "",
+  ].join("\n");
+
 const projectState = async (org: string, name: string): Promise<string | null> => {
   try {
     const proj = await runJson<{ state?: string }>(AZ, [
@@ -202,7 +367,11 @@ const seedRepo = async (
       refUpdates: [{ name: "refs/heads/main", oldObjectId: ZERO_OBJECT_ID }],
       commits: [{
         comment: "chore: initial commit",
-        changes: [addFile("/README.md", `# ${repo}\n\nSeeded by dev/testdata.ts.`)],
+        changes: [
+          addFile("/README.md", `# ${repo}\n\nSeeded by dev/testdata.ts.`),
+          addFile("/src/app.ts", baseAppFile(repo)),
+          addFile("/src/utils.ts", baseUtilsFile(repo)),
+        ],
       }],
     });
     tip = init.commits?.[0]?.commitId;
@@ -250,7 +419,11 @@ const seedRepo = async (
           refUpdates: [{ name: `refs/heads/feature-${n}`, oldObjectId: tip! }],
           commits: [{
             comment: `feat: change ${n} for ${repo}`,
-            changes: [addFile(`/src/change-${n}.md`, `## Change ${n}\n\nSeeded change for ${repo}.`)],
+            changes: [
+              editFile("/src/app.ts", modifiedAppFile(repo, n)),
+              editFile("/src/utils.ts", modifiedUtilsFile(repo, n)),
+              addFile(`/src/feature-${n}.ts`, featureFile(repo, n)),
+            ],
           }],
         }),
       ).catch(() => {});
