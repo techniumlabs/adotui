@@ -265,7 +265,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
               <Text color={palette.muted}>
 
                 <Text color={palette.accentDim}>n</Text> comment{"  "}
-                <Text color={palette.accentDim}>[/]</Text> switch files{"  "}
+                <Text color={palette.accentDim}>[ ] ←/→</Text> switch files{"  "}
                 <Text color={palette.accentDim}>j/k, ↑/↓</Text> navigate{"  "}
                 <Text color={palette.accentDim}>g/G</Text> top/end
               </Text>

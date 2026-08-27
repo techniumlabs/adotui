@@ -45,7 +45,7 @@ export function handleGlobals(
     if (input === "h" && ["detail", "files", "comments", "runs"].includes(state.focus)) {
       patchState({ focus: "list", fileFilter: "", banner: "Focus: list" }); return true;
     }
-    if (key.leftArrow && ["detail", "files", "runs"].includes(state.focus)) {
+    if (key.leftArrow && ["detail", "runs"].includes(state.focus)) {
       patchState({ focus: "list", fileFilter: "", banner: "Focus: list" }); return true;
     }
   }

@@ -25,7 +25,7 @@ export const KEYMAP: KeymapSection[] = [
       { keys: "Tab/Shift+Tab", description: "Cycle pane focus fwd / back" },
       { keys: "1-3", description: "PR tabs: Overview · Diff · Comments" },
       { keys: "4", description: "PR tab: Pipelines", debugOnly: true },
-      { keys: "h / ←", description: "Back to the PR list" },
+      { keys: "h", description: "Back to the PR list" },
       { keys: "v", description: "Tree filter: me → with-prs → all" },
       { keys: "/", description: "Filter current view (live)" },
       { keys: ":", description: "Command mode" },
@@ -56,7 +56,7 @@ export const KEYMAP: KeymapSection[] = [
   {
     title: "Diff (2)",
     bindings: [
-      { keys: "[ / ]", description: "Prev / next file" },
+      { keys: "[ ] or ←/→", description: "Prev / next file" },
       { keys: "j/k ↑/↓", description: "Move row selection" },
       { keys: "g / G", description: "Top / bottom" },
       { keys: "PgUp/PgDn", description: "Scroll a viewport" },
