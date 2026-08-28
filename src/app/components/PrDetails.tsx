@@ -1,6 +1,5 @@
 import React from "react";
 import { Box, Text } from "ink";
-import Spinner from "ink-spinner";
 
 import type { PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
@@ -65,7 +64,7 @@ export const PrDetails: React.FC<PrDetailsProps> = ({
         </Text>
         {selectedPr && !selectedPr.detailsLoaded && (
           <Text color={palette.muted}>
-            {"  "}<Spinner type="dots" /> loading details...
+            {"  "}{glyph.clock} loading details...
           </Text>
         )}
       </Box>

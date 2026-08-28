@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Bottom-line progress loader with star pulse, project counter, and elapsed time
+- `dev/testdata.ts` to seed and clean up Azure DevOps load-test data
 - `--version`, `--help`, and `--diagnostic` CLI flags
 - Homebrew formula auto-generation on release
 - Cross-platform binary builds (linux/macOS/Windows × x64/arm64)
@@ -24,6 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `install.sh` now correctly detects Linux ARM64 architecture
+
+### Changed
+- PR loading is 7x faster on large configs: one paged project-wide PR listing
+  per project (grouped by repository) with bounded concurrency, replacing one
+  `az` call per repository in a serial loop
+- `top` is now an optional per-repository cap; all PRs are kept when unset
+- Auto refreshes run silently without banner updates
+
+### Fixed
+- Screen flicker while loading: frame stays under the terminal height and
+  animations are progress-driven instead of timer-driven
+- PRs beyond the first `--top` window are no longer silently dropped
+
 
 ## [0.1.0] - 2026-07-01
 

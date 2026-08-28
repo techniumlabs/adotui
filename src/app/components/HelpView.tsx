@@ -1,8 +1,55 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { glyph, palette } from "../theme";
+import { KEYMAP, type KeyBinding, type KeymapSection } from "../keymap";
+
+const isDebug = () => process.env.NODE_ENV === "debug";
+
+const visibleBindings = (section: KeymapSection): KeyBinding[] =>
+  section.bindings.filter((b) => !b.debugOnly || isDebug());
+
+const Section: React.FC<{ section: KeymapSection }> = ({ section }) => {
+  const bindings = visibleBindings(section);
+  if (bindings.length === 0) return null;
+  // Fixed-width key column (capped) + truncated description column keeps the
+  // grid aligned — wrapped text previously bled across the column boundary.
+  const keyWidth = Math.min(Math.max(...bindings.map((b) => b.keys.length)) + 2, 16);
+
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Text bold color={palette.text}>{section.title}</Text>
+      {bindings.map((binding) => (
+        <Box key={binding.keys}>
+          <Box width={keyWidth} flexShrink={0}>
+            <Text color={palette.accent} bold>{binding.keys}</Text>
+          </Box>
+          <Text color={palette.text} wrap="truncate-end">{binding.description}</Text>
+        </Box>
+      ))}
+    </Box>
+  );
+};
 
 export const HelpView: React.FC = () => {
+  const sections = KEYMAP
+    .filter((s) => !s.debugOnly || isDebug())
+    .filter((s) => visibleBindings(s).length > 0);
+
+  // Balance the two columns by rendered row count, not section count.
+  const heightOf = (s: KeymapSection) => visibleBindings(s).length + 2;
+  const totalRows = sections.reduce((acc, s) => acc + heightOf(s), 0);
+  const left: KeymapSection[] = [];
+  const right: KeymapSection[] = [];
+  let acc = 0;
+  for (const section of sections) {
+    if (acc < totalRows / 2) {
+      left.push(section);
+      acc += heightOf(section);
+    } else {
+      right.push(section);
+    }
+  }
+
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1} flexGrow={1} borderStyle="round" borderColor={palette.accent}>
       <Box marginBottom={1}>
@@ -12,93 +59,19 @@ export const HelpView: React.FC = () => {
       </Box>
 
       <Box flexDirection="row" width="100%">
-        {/* Left Column */}
-        <Box flexDirection="column" width="50%" paddingRight={2}>
-          <Box marginBottom={1}>
-            <Text bold color={palette.text}>Global Navigation</Text>
+        {[left, right].map((column, index) => (
+          <Box key={index} flexDirection="column" width="50%" paddingRight={index === 0 ? 2 : 0}>
+            {column.map((section) => (
+              <Section key={section.title} section={section} />
+            ))}
           </Box>
-          <Box flexDirection="column" marginBottom={1}>
-            <Text><Text color={palette.accent} bold>Tab  </Text> Cycle focus between panes</Text>
-            <Text>
-              {process.env.NODE_ENV === "debug" ? (
-                <>
-                  <Text color={palette.accent} bold>1-4  </Text>
-                  Switch to Details(1), Diff(2), Comments(3), Runs(4)
-                </>
-              ) : (
-                <>
-                  <Text color={palette.accent} bold>1-3  </Text>
-                  Switch to Details(1), Diff(2), Comments(3)
-                </>
-              )}
-            </Text>
-            <Text><Text color={palette.accent} bold>?    </Text> Toggle this help screen</Text>
-            <Text><Text color={palette.accent} bold>q    </Text> Quit application</Text>
-            <Text><Text color={palette.accent} bold>r    </Text> Manual refresh</Text>
-            <Text><Text color={palette.accent} bold>/    </Text> Enter command mode</Text>
-          </Box>
-
-          <Box marginBottom={1}>
-            <Text bold color={palette.text}>Pull Request Actions (Global)</Text>
-          </Box>
-          <Box flexDirection="column" marginBottom={1}>
-            <Text><Text color={palette.accent} bold>a    </Text> Approve PR</Text>
-            <Text><Text color={palette.accent} bold>x    </Text> Reject PR (request changes)</Text>
-            <Text><Text color={palette.accent} bold>b    </Text> Abandon PR</Text>
-            <Text><Text color={palette.accent} bold>c    </Text> Complete & Merge PR</Text>
-            <Text><Text color={palette.accent} bold>enter</Text> Open PR in default web browser (if in list)</Text>
-            <Text><Text color={palette.accent} bold>o    </Text> Open PR in default web browser</Text>
-          </Box>
-
-          <Box marginBottom={1}>
-            <Text bold color={palette.text}>Command Bar (`/`)</Text>
-          </Box>
-          <Box flexDirection="column" marginBottom={1}>
-            <Text><Text color={palette.accent} bold>filter &lt;query&gt;</Text> Apply tree/list filter</Text>
-            <Text><Text color={palette.accent} bold>find &lt;query&gt;  </Text> Apply wildcard filter in Files view</Text>
-            <Text><Text color={palette.accent} bold>find          </Text> Clear file filter</Text>
-            <Text><Text color={palette.accent} bold>help          </Text> Show command help</Text>
-            <Text><Text color={palette.accent} bold>Esc           </Text> Cancel command</Text>
-          </Box>
-        </Box>
-
-        {/* Right Column */}
-        <Box flexDirection="column" width="50%">
-          <Box marginBottom={1}>
-            <Text bold color={palette.text}>Filtering Syntax (Tree & List)</Text>
-          </Box>
-          <Box flexDirection="column" marginBottom={1}>
-            <Text><Text color={palette.accent} bold>author:&lt;name&gt;   </Text> Filter by PR author</Text>
-            <Text><Text color={palette.accent} bold>title:&lt;text&gt;    </Text> Filter by PR title</Text>
-            <Text><Text color={palette.accent} bold>merge:&lt;status&gt;  </Text> Filter by merge status (e.g., conflicts)</Text>
-            <Text>Filters can be combined: <Text color={palette.warn}>author:john merge:conflict</Text></Text>
-            <Text>Press <Text color={palette.accent} bold>v</Text> in Tree to toggle repositories with no PRs.</Text>
-          </Box>
-
-          <Box marginBottom={1}>
-            <Text bold color={palette.text}>Comments View (`3`)</Text>
-          </Box>
-          <Box flexDirection="column" marginBottom={1}>
-            <Text><Text color={palette.accent} bold>j/k  </Text> Navigate comments</Text>
-            <Text><Text color={palette.accent} bold>n    </Text> Add a new thread</Text>
-            <Text><Text color={palette.accent} bold>r    </Text> Reply to selected thread</Text>
-            <Text><Text color={palette.accent} bold>d    </Text> Delete selected comment</Text>
-          </Box>
-
-          <Box marginBottom={1}>
-            <Text bold color={palette.text}>Files View (`2`)</Text>
-          </Box>
-          <Box flexDirection="column" marginBottom={1}>
-            <Text><Text color={palette.accent} bold>[ / ]</Text> Prev/Next file</Text>
-            <Text><Text color={palette.accent} bold>PgUp/PgDn</Text> Scroll diff up/down</Text>
-            <Text><Text color={palette.accent} bold>g / G</Text> Jump to top/bottom of diff</Text>
-            <Text><Text color={palette.accent} bold>d    </Text> Toggle diff mode (split/unified) *if supported</Text>
-          </Box>
-        </Box>
+        ))}
       </Box>
 
-      <Box marginTop={1} justifyContent="center">
-        <Text color={palette.muted}>Press <Text color={palette.accent} bold>?</Text> or <Text color={palette.accent} bold>Esc</Text> to return to your previous view.</Text>
+      <Box justifyContent="center">
+        <Text color={palette.muted}>
+          Press <Text color={palette.accent} bold>?</Text> / <Text color={palette.accent} bold>Esc</Text> / <Text color={palette.accent} bold>h</Text> to return to your previous view.
+        </Text>
       </Box>
     </Box>
   );

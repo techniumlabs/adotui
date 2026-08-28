@@ -120,7 +120,7 @@ describe("Config validation", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.config.status).toBe("active");
-      expect(result.config.top).toBe(50);
+      expect(result.config.top).toBeUndefined();
     }
   });
 

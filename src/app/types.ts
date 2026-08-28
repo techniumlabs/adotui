@@ -1,10 +1,8 @@
 import type { AppData } from "../domain/types";
 
-export type FocusArea = "tree" | "list" | "detail" | "command" | "completion" | "files" | "comments" | "runs" | "help";
+export type FocusArea = "tree" | "list" | "detail" | "command" | "completion" | "filter" | "files" | "comments" | "runs" | "help";
 
 export type MergeStrategy = "noFastForward" | "squash" | "rebase" | "rebaseMerge";
-
-export type DiffViewMode = "unified" | "split";
 
 export type TreeFilter = string;
 
@@ -59,11 +57,14 @@ export type AppState = {
   banner: string;
   autoRefresh: boolean;
   lastRefreshISO: string;
-  diffViewMode: DiffViewMode;
   diffScrollOffset: number;
   diffSelectedRow: number;
   treeFilter: TreeFilter;
   fileFilter: string;
+  /** Which filter the "/" prompt edits: the PR tree/list or the diff file list. */
+  filterTarget: "tree" | "files";
+  /** Filter value restored when the "/" prompt is cancelled. */
+  filterRestore: string;
   /**
    * True while CommentsView has a text-input box open (new comment / reply).
    * When set, App.tsx must suppress ALL keyboard shortcuts — including h —

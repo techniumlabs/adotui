@@ -4,7 +4,7 @@
 - **Runtime**: Bun (default to using Bun instead of Node.js)
 - **UI Framework**: React + Ink (Terminal UI)
 - **Language**: TypeScript
-- **Backend API**: Azure CLI (`az`) spawned via Bun's `Bun.spawn`
+- **Backend API**: Azure DevOps REST API via `src/data/adoFetch.ts` (auth header cached in `azureAuth.ts`). The `az` CLI is still used for credentials (`az account get-access-token`), the availability check, and PR mutations — reads must not spawn `az`, a process costs ~400-1200ms before the request starts.
 
 ## Bun Conventions
 - Use `bun <file>` instead of `node <file>`
@@ -13,6 +13,7 @@
 - Use `bun run <script>` instead of `npm run <script>`
 - Prefer `Bun.file` over `node:fs`'s readFile/writeFile
 - Use `Bun.spawn` or `Bun.$` instead of `child_process` or `execa`.
+- Documented exceptions: `src/data/command.ts` stays on `node:child_process` (the single subprocess entry point; mature timeout/kill/stream semantics every az call relies on), and `src/app/utils/debugLog.ts` keeps `node:fs` `appendFileSync` (append with strict ordering, which `Bun.file` doesn't cover).
 
 ## Terminal UI (Ink) Guidelines
 - **Layout Model**: Use standard React `<Box>` flexbox properties. ADOTUI relies on a strict split-pane structure with a fixed-width left column and dynamic-width right column. 
@@ -24,15 +25,13 @@
 - **Tables**: Use fixed-width columns inside flex rows for aligning tabular data (like the Pull Request list). Use the `truncate` utility to cap strings and prevent table explosion on small terminals.
 
 ## State Management
-- Complex UI state is managed centrally by composing sub-hooks in `useAppState.ts`:
-  - `useToast.ts` (toasts with UUID IDs)
-  - `useRefresh.ts` (automatic & manual fetching)
-  - `useSelection.ts` (flat tree, PR list, & diff select/scroll tracking)
-  - `useConfirmAction.ts` (y/n confirmation pipeline for destructive actions)
-  - `useCompletionEditor.ts` (merging & autocompletion strategy inputs)
-  - `useCommandDispatch.ts` (dispatching console `:` commands)
-- Presentational components invoke actions via named helper methods on the `actions` return from `useAppState`. Direct `setState` invocation is hidden.
-- Keyboard bindings are decentralized into per-focus files under `src/app/hooks/keyboard/` (e.g. `globals.ts`, `filesKeyboard.ts`, `completionKeyboard.ts`), loaded with a unified state handler table in `useAppKeyboard.ts`. All handlers share the exported type `AppHandle`.
+- App state lives in a module-global Zustand store (`src/app/store.ts`). Updates use Zustand's partial merge via `patchState(partial)` / `updateState(fn)` — supply only the keys that change, never spread the whole state.
+- Mutations are stable module-level action functions under `src/app/actions/` (toasts, refresh, selection, confirm pipeline, completion editor, command dispatch, PR data patches), assembled into the `appActions` object in `actions/index.ts`. Derivations shared by actions and rendering live in `src/app/selectors.ts`.
+- `useAppState.ts` subscribes to the store, derives the current selection, owns lifecycle effects (initial load, auto-refresh interval), and returns `{ state, ..., actions }`; `AppHandle` is its return type.
+- Presentational components invoke actions via named helper methods on the `actions` return from `useAppState`. Direct store mutation is hidden from components.
+- Loading is progressive: `loadAppData` streams `LoadPartial`s (one per org, then one per project) via `onPartial` while still resolving the **config-ordered** tree for its return value. `refreshActions` folds partials into the store through `mergeLoadPartials` (upsert by project/repo, never blind append) behind a 250ms coalescer with a trailing flush, guarded by a `loadEpoch` request id. Two invariants: never call `updateState` for a no-op (zustand notifies on every set, and each set is a full Ink frame), and keep `loadAppData`'s returned order config-stable so the silent auto-refresh does not move the selection.
+- View-local data fetching lives in dedicated hooks (`usePrComments`, `usePipelineRuns`, `useDiffComment`, `useLazyFileDiff`); components keep only UI state (selection, scroll, input mode).
+- Keyboard bindings are two-tier: app-level focus routing lives in per-focus files under `src/app/hooks/keyboard/` (e.g. `globals.ts`, `filesKeyboard.ts`, `completionKeyboard.ts`), dispatched by `useAppKeyboard.ts`; self-contained views (diff rows, comments, pipeline runs, setup wizard) own their keys via `useInput(..., { isActive })` — every key must be handled by exactly one tier (see `src/app/components/diff/diffKeyboard.ts`). Documented shortcuts render from `src/app/keymap.ts` (HelpView + footer) — update that table whenever a binding changes.
 
 ## Testing
 Use `bun test` to run tests.

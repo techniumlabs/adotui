@@ -1,6 +1,5 @@
 import React from "react";
 import { Box, Text, useApp } from "ink";
-import Spinner from "ink-spinner";
 import { CommandBar } from "./components/CommandBar";
 import { CommentsView } from "./components/CommentsView";
 import { CompletionEditor } from "./components/CompletionEditor";
@@ -10,11 +9,13 @@ import { PipelineRunsView } from "./components/PipelineRunsView";
 import { PrDetails } from "./components/PrDetails";
 import { PrTabs } from "./components/PrTabs";
 import { PullRequestList } from "./components/PullRequestList";
+import { StatusLoader } from "./components/StatusLoader";
 import { SummaryBar } from "./components/SummaryBar";
 import { ToastContainer } from "./components/ToastContainer";
 import { formatRelativeAge } from "./utils";
 import { glyph, palette } from "./theme";
 import { useAppState } from "./hooks/useAppState";
+import { footerHints } from "./keymap";
 import { useAppKeyboard } from "./hooks/useAppKeyboard";
 import { usePrDetails } from "./hooks/usePrDetails";
 import { useTerminalSize } from "./hooks/useTerminalSize";
@@ -29,23 +30,38 @@ export const App: React.FC = () => {
   const [setupLoading, setSetupLoading] = React.useState(false);
   const { exit } = useApp();
   const size = useTerminalSize();
-  const app = useAppState(exit);
+  const app = useAppState();
   // Suppress the main keyboard while the setup screen is still showing
   // (including the load it kicked off).
   useAppKeyboard(app, exit, setupLoading);
   usePrDetails(app.selectedPr, app.actions.updatePr);
+
+  // The load streams in, so the tree can be shown the moment real
+  // repositories land. Dismissing on the first ORGANIZATION would swap the
+  // splash for an empty tree, which is worse than the splash itself.
+  const hasRepositories = React.useMemo(
+    () => app.state.data.organizations.some((org) => org.repositories.length > 0),
+    [app.state.data],
+  );
 
   React.useEffect(() => {
     if (app.state.loadState === "setup") {
       setShowSplash(false);
       return;
     }
-    // If we've finished the initial load, wait a short moment and dismiss splash
-    if (app.state.loadState !== "loading" && showSplash) {
-      const t = setTimeout(() => setShowSplash(false), 2000);
+    if (!showSplash) return;
+    if (hasRepositories) {
+      setShowSplash(false);
+      return;
+    }
+    // Nothing arrived at all (empty config, or an error): dismiss shortly
+    // after the load settles rather than holding a splash over a finished
+    // screen.
+    if (app.state.loadState !== "loading") {
+      const t = setTimeout(() => setShowSplash(false), 600);
       return () => clearTimeout(t);
     }
-  }, [app.state.loadState, showSplash]);
+  }, [app.state.loadState, hasRepositories, showSplash]);
 
   // Once the setup-initiated load settles, hand over to the main UI.
   React.useEffect(() => {
@@ -70,9 +86,15 @@ export const App: React.FC = () => {
 
   const availableContentHeight = Math.max(10, size.rows - 15);
   const maxPrs = Math.max(5, Math.floor(availableContentHeight / 2));
-  // Rows available inside the tree pane: terminal minus header/banner/summary
-  // above, command bar/footer below, and the pane's own border + title row.
-  const treeMaxRows = Math.max(6, size.rows - 12);
+  // Fixed chrome rows around the main panes: header (1), banner (2),
+  // summary (1), command bar (2), footer (2). The frame stays one row short
+  // of the terminal so Ink can diff-render in place; when the output reaches
+  // the terminal height Ink clears and repaints the whole screen on every
+  // render, which showed up as constant flicker while loading.
+  const chromeRows = 8;
+  const frameHeight = Math.max(14, size.rows - 1);
+  const paneHeight = Math.max(6, frameHeight - chromeRows);
+  const treeMaxRows = paneHeight;
 
   if (showSplash) {
     return <Splash />;
@@ -93,10 +115,10 @@ export const App: React.FC = () => {
   }
 
   return (
-    <Box flexDirection="column" height={size.rows} width="100%">
+    <Box flexDirection="column" height={frameHeight} width="100%">
       <ToastContainer toasts={state.toasts || []} />
       {/* Header */}
-      <Box paddingX={1} justifyContent="space-between">
+      <Box paddingX={1} justifyContent="space-between" flexShrink={0}>
         <Text color={palette.accent} bold>
           {glyph.dot} ADOTUI
         </Text>
@@ -106,8 +128,9 @@ export const App: React.FC = () => {
       </Box>
 
       {/* Banner / Status line */}
-      <Box paddingX={1} borderStyle="single" borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} borderColor={palette.border}>
+      <Box paddingX={1} flexShrink={0} borderStyle="single" borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} borderColor={palette.border}>
         <Text
+          wrap="truncate-end"
           color={
             state.loadState === "error"
               ? palette.danger
@@ -118,13 +141,13 @@ export const App: React.FC = () => {
                   : palette.text
           }
         >
-          {state.loadState === "loading" ? <Spinner type="dots" /> : ""}
-          {state.loadState === "loading" ? " " : ""}
-          {state.banner}
+          {state.loadState === "loading"
+            ? "Loading pull requests from Azure DevOps..."
+            : state.banner}
         </Text>
       </Box>
 
-      <Box paddingX={1}>
+      <Box paddingX={1} flexShrink={0}>
         <SummaryBar
           activePrs={activePrs}
           totalPrs={totalPrs}
@@ -136,7 +159,7 @@ export const App: React.FC = () => {
         />
       </Box>
 
-      <Box flexGrow={1} flexDirection="row" overflow="hidden">
+      <Box height={paneHeight} flexShrink={0} flexDirection="row" overflow="hidden">
         {state.focus === "help" ? (
           <HelpView />
         ) : (
@@ -154,6 +177,7 @@ export const App: React.FC = () => {
               flexGrow={1}
               marginLeft={1}
               flexDirection="column"
+              overflow="hidden"
               borderStyle="round"
               borderColor={state.focus !== "tree" ? palette.accent : palette.border}
               width={size.columns - 20}
@@ -169,7 +193,7 @@ export const App: React.FC = () => {
               />
               {selectedPr && <PrTabs focus={state.focus} />}
               {(() => {
-                const renderFocus = (state.focus === "command" || state.focus === "completion")
+                const renderFocus = (state.focus === "command" || state.focus === "completion" || state.focus === "filter")
                   ? (state.previousFocus ?? "detail")
                   : state.focus;
 
@@ -183,7 +207,6 @@ export const App: React.FC = () => {
                       diffSelectedRow={state.diffSelectedRow}
                       onSelectedRowChange={actions.setDiffSelectedRow}
                       focus={state.focus}
-                      diffViewMode={state.diffViewMode}
                       onInputModeChange={actions.setCommentInputActive}
                       isLoading={state.loadState === "loading"}
                       fileFilter={state.fileFilter}
@@ -227,10 +250,23 @@ export const App: React.FC = () => {
         focus={state.focus}
         commandText={state.commandText}
         pendingConfirm={state.pendingConfirm}
+        filterPrompt={
+          state.focus === "filter"
+            ? {
+                target: state.filterTarget,
+                text: state.filterTarget === "files" ? state.fileFilter : state.treeFilter,
+              }
+            : undefined
+        }
       />
 
-      {/* Unified Footer */}
+      {/* Unified Footer — swaps to the bottom-line loader during loads so
+          the animation only ever rewrites the last row of the frame. */}
+      {state.loadState === "loading" ? (
+        <StatusLoader message={state.banner} progress={state.loadProgress} />
+      ) : (
       <Box
+        flexShrink={0}
         borderStyle="single"
         borderTop={true}
         borderLeft={false}
@@ -239,27 +275,16 @@ export const App: React.FC = () => {
         borderColor={palette.border}
         paddingX={2}
       >
-        <Text color={palette.muted}>
-          <Text color={palette.accent} bold>/</Text> filter{"   "}
-          <Text color={palette.accent} bold>j/k</Text> move{"   "}
-          <Text color={palette.accent} bold>1-4</Text> switch view tab{"   "}
-          <Text color={palette.accent} bold>tab</Text> focus{"   "}
-          {selectedPr ? (
-            <>
-              <Text color={palette.accent} bold>a</Text> approve{"   "}
-              <Text color={palette.accent} bold>x</Text> reject{"   "}
-              <Text color={palette.accent} bold>b</Text> abandon{"   "}
-              <Text color={palette.accent} bold>c</Text> complete{"   "}
-            </>
-          ) : (
-            <>
-              <Text color={palette.accent} bold>enter</Text> open pr{"   "}
-            </>
-          )}
-          <Text color={palette.accent} bold>?</Text> help{"   "}
-          <Text color={palette.accent} bold>q</Text> quit
+        <Text color={palette.muted} wrap="truncate-end">
+          {footerHints(!!selectedPr).map((hint, index) => (
+            <Text key={hint.keys}>
+              {index > 0 ? "   " : ""}
+              <Text color={palette.accent} bold>{hint.keys}</Text> {hint.label}
+            </Text>
+          ))}
         </Text>
       </Box>
+      )}
 
       <CompletionEditor state={state} />
     </Box>

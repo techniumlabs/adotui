@@ -46,6 +46,18 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
   const active = focus === "tree";
   const filteringByPrs = treeFilter === "with-prs";
   const isCustomFilter = treeFilter !== "all" && treeFilter !== "with-prs";
+  // The header is "<title> v <badge>" inside a fixed 36-wide panel, which
+  // leaves ~15 columns for the badge. A custom filter is shown verbatim
+  // (its warn colour already marks it as a filter) and truncated to fit,
+  // rather than spending 8 of those columns on a "Filter:" prefix that
+  // would push the title off the row.
+  const filterLabel = filteringByPrs
+    ? "PRs only"
+    : treeFilter === "all"
+      ? "All"
+      : treeFilter === "me"
+        ? "My PRs"
+        : truncate(treeFilter, 15);
 
   // Build one element per terminal line so the pane can be windowed to the
   // available height, scrolling to keep the selection visible.
@@ -114,12 +126,12 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
           const projConnector = isLastProject ? glyph.branchLast : glyph.branch;
 
           rows.push(
-            <Box key={`${orgKey}-proj-${projectName}`}>
+            <Text key={`${orgKey}-proj-${projectName}`} wrap="truncate-end">
               <Text color={palette.muted}>{"  "}{projConnector} </Text>
               <Text color={palette.warn} bold>
-                {truncate(projectName, PANEL_WIDTH - 8)}
+                {truncate(projectName, PANEL_WIDTH - 10)}
               </Text>
-            </Box>,
+            </Text>,
           );
 
           entries.forEach(({ repo, flatIndex }, entryIdx) => {
@@ -130,20 +142,27 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
 
             if (repoSelected) selectedRow = rows.length;
             rows.push(
-              <Box key={`${orgKey}-repo-${flatIndex}`}>
-                <Text color={palette.muted}>
-                  {vertPrefix}{repoConnector}{" "}
+              // One Text per row, truncated: a row that wraps to a second
+              // line makes the body taller than the number of rows the
+              // window budgeted, and Ink composites the surplus back over
+              // the header (and blanks rows out mid-list).
+              <Text key={`${orgKey}-repo-${flatIndex}`} wrap="truncate-end">
+                {/* Colour alone was too easy to miss, so the selected repo
+                    gets the same pointer the org row and PR list use. It
+                    replaces the connector to keep the columns aligned. */}
+                <Text color={repoSelected ? palette.accent : palette.muted} bold={repoSelected}>
+                  {vertPrefix}{repoSelected ? glyph.pointer : repoConnector}{" "}
                 </Text>
                 <Text
                   color={repoSelected ? palette.accent : palette.text}
                   bold={repoSelected}
                 >
-                  {truncate(repo.name, PANEL_WIDTH - 14)}
+                  {truncate(repo.name, PANEL_WIDTH - 16)}
                 </Text>
                 <Text color={repo.pullRequests.length > 0 ? palette.ok : palette.muted}>
                   {" "}({repo.pullRequests.length})
                 </Text>
-              </Box>,
+              </Text>,
             );
           });
         });
@@ -153,10 +172,16 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
 
   // Window the rows: keep the selection roughly centered and show how many
   // rows are hidden above/below.
+  // maxRows is the panel's TOTAL height budget from App, but two rows go to
+  // the border and one to the header, so only maxRows - 3 are left for the
+  // tree. Handing the body more than that does not clip: Ink composites the
+  // surplus back over the first rows, which is why the title used to read
+  // "3 moretions" and rows under the cursor blanked out mid-navigation.
+  const bodyRows = Math.max(3, maxRows - 4);
   const total = rows.length;
   let body = rows;
-  if (total > maxRows) {
-    const inner = Math.max(3, maxRows - 2);
+  if (total > bodyRows) {
+    const inner = Math.max(3, bodyRows - 2);
     const start = clamp(selectedRow - Math.floor(inner / 2), 0, total - inner);
     const end = start + inner;
     body = [
@@ -179,19 +204,20 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
       flexDirection="column"
       overflow="hidden"
     >
-      {/* Header row: title + filter badge */}
+      {/* Header row: title + the active view, prefixed with the key that
+          cycles it. Everything shares this one row on purpose: a third
+          element or an extra row makes the panel taller than the height App
+          allots it, and Ink composites the overflow back over this line
+          instead of clipping (a garbled title once the tree scrolls). */}
       <Box justifyContent="space-between">
         <Text color={active ? palette.accent : palette.muted} bold>
           {glyph.files} Organizations
         </Text>
-        <Text color={filteringByPrs || isCustomFilter ? palette.warn : palette.muted}>
-          {filteringByPrs
-            ? "PRs only"
-            : treeFilter === "all"
-              ? "All"
-              : treeFilter === "me"
-                ? "My PRs"
-                : `Filter: ${treeFilter}`}
+        <Text
+          color={filteringByPrs || isCustomFilter ? palette.warn : palette.muted}
+          wrap="truncate-end"
+        >
+          {filterLabel}
         </Text>
       </Box>
 
@@ -201,7 +227,12 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
         body
       )}
 
-      {/* Hints moved to global footer */}
+      {/* Says what the header's "v" does. The body budget above reserves this
+          row, so the panel still fits the height App allots it. */}
+      <Text color={palette.muted} wrap="truncate-end">
+        {"  "}<Text color={palette.accentDim}>v</Text> switch view
+      </Text>
+
     </Box>
   );
 };

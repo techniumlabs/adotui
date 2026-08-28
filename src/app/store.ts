@@ -3,23 +3,27 @@ import { INITIAL_STATE } from "./constants";
 import type { AppState } from "./types";
 
 /**
- * We provide a setState signature compatible with React's useState
- * so we can migrate custom hooks without rewriting them all at once.
+ * Module-global Zustand store holding the entire app state tree.
+ * State only — actions live as stable module-level functions in
+ * `src/app/actions/`. Updates go through `patchState` / `updateState`,
+ * which use Zustand's native partial merge: callers supply only the keys
+ * they change instead of spreading the full state.
  */
-export type SetState = (updater: AppState | ((current: AppState) => AppState)) => void;
+export const useAppStore = create<AppState>()(() => ({ ...INITIAL_STATE }));
 
-interface AppStore extends AppState {
-  setState: SetState;
-}
+export const getState = (): AppState => useAppStore.getState();
 
-export const useAppStore = create<AppStore>((set) => ({
-  ...INITIAL_STATE,
-  setState: (updater) => set((state) => {
-    // If updater is a function (like produce or (c) => ({...})), call it.
-    if (typeof updater === "function") {
-      return updater(state);
-    }
-    // Otherwise, just merge the object (which might be the full state tree).
-    return updater;
-  }),
-}));
+/** Merge a partial slice into the app state. */
+export const patchState = (partial: Partial<AppState>): void => {
+  useAppStore.setState(partial);
+};
+
+/**
+ * Compute a partial update from the current state and merge it.
+ * Return `{}` for a no-op.
+ */
+export const updateState = (
+  updater: (current: AppState) => Partial<AppState>,
+): void => {
+  useAppStore.setState(updater);
+};

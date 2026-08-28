@@ -1,25 +1,17 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import Spinner from "ink-spinner";
 import type { PrCommentThread, PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
-import { glyph, palette, truncate } from "../theme";
-import { formatRelativeAge } from "../utils";
-import {
-  fetchPrComments,
-  postPrComment,
-  replyToPrThread,
-  updatePrThreadStatus,
-  deletePrComment,
-  editPrComment,
-} from "../../data/azureRest";
+import { glyph, palette } from "../theme";
 import { usePasteHandler } from "../hooks/usePasteHandler";
 import {
-  commentCacheKey,
-  getCommentCache,
-  invalidateCommentCache,
-  setCommentCache,
-} from "../../data/cache";
+  usePrComments,
+  resolveTargetComment,
+  type CommentInputMode,
+  type PrComment,
+} from "../hooks/usePrComments";
+import { ThreadCard } from "./comments/ThreadCard";
+import { computeScrollWindow, followSelection, moveSelection } from "../utils";
 
 type CommentsViewProps = {
   selectedPr?: PullRequest;
@@ -28,35 +20,10 @@ type CommentsViewProps = {
   onInputModeChange: (active: boolean) => void;
 };
 
-type CommentInputMode = "none" | "new" | "reply" | "edit";
-
-const threadStatusColor = (
-  status: PrCommentThread["status"],
-): string => {
-  switch (status) {
-    case "active":
-      return palette.warn;
-    case "fixed":
-    case "byDesign":
-      return palette.ok;
-    case "wontFix":
-    case "closed":
-      return palette.muted;
-    default:
-      return palette.muted;
-  }
-};
-
-const threadStatusLabel = (status: PrCommentThread["status"]): string => {
-  switch (status) {
-    case "active": return "open";
-    case "fixed": return "fixed";
-    case "wontFix": return "wontfix";
-    case "closed": return "closed";
-    case "byDesign": return "bydesign";
-    case "pending": return "pending";
-    default: return "unknown";
-  }
+/** Max visible threads for the current terminal height. */
+const maxVisibleThreads = (): number => {
+  const termH = process.stdout.rows ?? 40;
+  return Math.max(4, Math.floor((Math.max(5, termH - 22)) / 5));
 };
 
 export const CommentsView: React.FC<CommentsViewProps> = ({
@@ -67,17 +34,26 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
 }) => {
   const active = focus === "comments";
 
-  const [threads, setThreads] = useState<PrCommentThread[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // UI state: selection, scroll, input mode. Data lives in usePrComments.
   const [selectedThread, setSelectedThread] = useState(0);
   const [selectedCommentIndex, setSelectedCommentIndex] = useState(-1);
   const [threadScrollOffset, setThreadScrollOffset] = useState(0);
   const [inputMode, setInputMode] = useState<CommentInputMode>("none");
   const [inputText, setInputText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const isSubmittingRef = React.useRef(false);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ thread: PrCommentThread; comment: PrComment } | null>(null);
+
+  const {
+    threads,
+    loading,
+    error,
+    submitting,
+    statusMsg,
+    loadComments,
+    submitComment,
+    deleteComment,
+    toggleThreadStatus,
+    canModifyComment,
+  } = usePrComments(selectedPr, currentUserEmail, () => setSelectedThread(0));
 
   usePasteHandler((pastedText) => {
     if (inputMode !== "none" && !submitting) {
@@ -90,132 +66,10 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputMode]);
 
-  // ── Data loading ───────────────────────────────────────────────────────────
-
-  const loadComments = useCallback(
-    async (force = false) => {
-      if (!selectedPr) return;
-      const repoId = selectedPr.repositoryId ?? selectedPr.repository;
-      const key = commentCacheKey(
-        selectedPr.organizationUrl,
-        selectedPr.project,
-        repoId,
-        selectedPr.id,
-      );
-
-      if (!force) {
-        const cached = getCommentCache(key);
-        if (cached) {
-          setThreads(cached);
-          return;
-        }
-      }
-
-      setLoading(true);
-      setError(null);
-      try {
-
-        const data = await fetchPrComments(
-          selectedPr.organizationUrl,
-          selectedPr.project,
-          repoId,
-          selectedPr.id,
-        );
-        setCommentCache(key, data);
-        setThreads(data);
-        setSelectedThread(0);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load comments.");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [selectedPr],
-  );
-
+  // A reload can shrink the list under the cursor — keep the selection valid.
   useEffect(() => {
-
-    if (selectedPr) {
-      void loadComments();
-
-    } else {
-      setThreads([]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPr?.id]);
-
-  // ── Actions ────────────────────────────────────────────────────────────────
-
-  const submitComment = useCallback(async () => {
-    if (!selectedPr || !inputText.trim() || isSubmittingRef.current) return;
-    const repoId = selectedPr.repositoryId ?? selectedPr.repository;
-
-    isSubmittingRef.current = true;
-    setSubmitting(true);
-
-    try {
-      let ok = false;
-      if (inputMode === "new") {
-        ok = await postPrComment(
-          selectedPr.organizationUrl,
-          selectedPr.project,
-          repoId,
-          selectedPr.id,
-          inputText.trim(),
-        );
-      } else if (inputMode === "reply") {
-        const thread = threads[selectedThread];
-        if (thread) {
-          ok = await replyToPrThread(
-            selectedPr.organizationUrl,
-            selectedPr.project,
-            repoId,
-            selectedPr.id,
-            thread.id,
-            thread.comments[0]?.id ?? 1,
-            inputText.trim(),
-          );
-        }
-      } else if (inputMode === "edit") {
-        const thread = threads[selectedThread];
-        const comments = thread?.comments ?? [];
-        const commentToEdit = selectedCommentIndex === -1 ? comments[0] : comments[selectedCommentIndex + 1];
-        if (thread && commentToEdit) {
-          ok = await editPrComment(
-            selectedPr.organizationUrl,
-            selectedPr.project,
-            repoId,
-            selectedPr.id,
-            thread.id,
-            commentToEdit.id,
-            inputText.trim(),
-          );
-        }
-      }
-
-      if (ok) {
-        const key = commentCacheKey(
-          selectedPr.organizationUrl,
-          selectedPr.project,
-          repoId,
-          selectedPr.id,
-        );
-        invalidateCommentCache(key);
-        setStatusMsg("Comment posted. Refreshing…");
-        setInputMode("none");
-        setInputText("");
-        await loadComments(true);
-        setStatusMsg(null);
-      } else {
-        setStatusMsg("Failed to post comment (check auth/permissions).");
-      }
-    } catch (e) {
-      setStatusMsg(e instanceof Error ? e.message : "Error posting comment.");
-    } finally {
-      isSubmittingRef.current = false;
-      setSubmitting(false);
-    }
-  }, [selectedPr, inputMode, inputText, selectedThread, selectedCommentIndex, threads, loadComments]);
+    setSelectedThread((i) => moveSelection(i, 0, threads.length));
+  }, [threads.length]);
 
   // ── Keyboard ───────────────────────────────────────────────────────────────
 
@@ -236,7 +90,16 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
           return;
         }
         if (key.return) {
-          void submitComment();
+          void submitComment(
+            inputMode,
+            inputText,
+            stateRef.current.selectedThread,
+            stateRef.current.selectedCommentIndex,
+            () => {
+              setInputMode("none");
+              setInputText("");
+            },
+          );
           return;
         }
         if (key.backspace || key.delete) {
@@ -249,32 +112,34 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         return;
       }
 
+      // Pending comment-delete confirmation gate
+      if (pendingDelete) {
+        if (input === "y" || input === "Y") {
+          deleteComment(pendingDelete.thread, pendingDelete.comment);
+        }
+        setPendingDelete(null);
+        return;
+      }
+
       // Navigation mode
-      if (input === "j" || key.downArrow) {
+      if (key.downArrow) {
         setSelectedThread((i) => {
-          const next = Math.min(i + 1, stateRef.current.threads.length - 1);
+          const next = moveSelection(i, 1, stateRef.current.threads.length);
           if (next !== i) setSelectedCommentIndex(-1);
-          const termH = process.stdout.rows ?? 40;
-          const maxVis = Math.max(4, Math.floor((Math.max(5, termH - 22)) / 5));
-          if (next >= stateRef.current.threadScrollOffset + maxVis) {
-            setThreadScrollOffset(next - maxVis + 1);
-          }
+          setThreadScrollOffset(followSelection(next, stateRef.current.threadScrollOffset, maxVisibleThreads()));
           return next;
         });
-      } else if (input === "k" || key.upArrow) {
+      } else if (key.upArrow) {
         setSelectedThread((i) => {
-          const next = Math.max(i - 1, 0);
+          const next = moveSelection(i, -1, stateRef.current.threads.length);
           if (next !== i) setSelectedCommentIndex(-1);
-          if (next < stateRef.current.threadScrollOffset) {
-            setThreadScrollOffset(next);
-          }
+          setThreadScrollOffset(followSelection(next, stateRef.current.threadScrollOffset, maxVisibleThreads()));
           return next;
         });
       } else if (key.pageDown) {
         setSelectedThread((i) => {
-          const termH = process.stdout.rows ?? 40;
-          const maxVis = Math.max(4, Math.floor((Math.max(5, termH - 22)) / 5));
-          const next = Math.min(i + maxVis, stateRef.current.threads.length - 1);
+          const maxVis = maxVisibleThreads();
+          const next = moveSelection(i, maxVis, stateRef.current.threads.length);
           setSelectedCommentIndex(-1);
           if (next >= stateRef.current.threadScrollOffset + maxVis) {
             setThreadScrollOffset(Math.min(next - maxVis + 1, stateRef.current.threads.length - maxVis));
@@ -283,13 +148,10 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         });
       } else if (key.pageUp) {
         setSelectedThread((i) => {
-          const termH = process.stdout.rows ?? 40;
-          const maxVis = Math.max(4, Math.floor((Math.max(5, termH - 22)) / 5));
-          const next = Math.max(i - maxVis, 0);
+          const maxVis = maxVisibleThreads();
+          const next = moveSelection(i, -maxVis, stateRef.current.threads.length);
           setSelectedCommentIndex(-1);
-          if (next < stateRef.current.threadScrollOffset) {
-            setThreadScrollOffset(Math.max(next, 0));
-          }
+          setThreadScrollOffset(followSelection(next, stateRef.current.threadScrollOffset, maxVis));
           return next;
         });
       } else if (input === "g") {
@@ -298,14 +160,13 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         setThreadScrollOffset(0);
       } else if (input === "G") {
         const last = Math.max(0, stateRef.current.threads.length - 1);
-        const termH = process.stdout.rows ?? 40;
-        const maxVis = Math.max(4, Math.floor((Math.max(5, termH - 22)) / 5));
+        const maxVis = maxVisibleThreads();
         setSelectedThread(last);
         setSelectedCommentIndex(-1);
         setThreadScrollOffset(Math.max(0, last - maxVis + 1));
-      } else if (input === "[" || key.leftArrow) {
+      } else if (key.leftArrow) {
         setSelectedCommentIndex((i) => Math.max(i - 1, -1));
-      } else if (input === "]" || key.rightArrow) {
+      } else if (key.rightArrow) {
         const thread = stateRef.current.threads[stateRef.current.selectedThread];
         if (thread) {
           // -1 is root comment, 0 is 1st reply, etc.
@@ -314,74 +175,30 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         }
       } else if (input === "e" && !key.ctrl && stateRef.current.threads[stateRef.current.selectedThread]) {
         const thread = stateRef.current.threads[stateRef.current.selectedThread];
-        const comments = thread?.comments ?? [];
-        const commentToEdit = stateRef.current.selectedCommentIndex === -1 ? comments[0] : comments[stateRef.current.selectedCommentIndex + 1];
+        const commentToEdit = resolveTargetComment(thread, stateRef.current.selectedCommentIndex);
         if (commentToEdit) {
-          if (currentUserEmail && commentToEdit.authorEmail && commentToEdit.authorEmail !== currentUserEmail) {
-            setStatusMsg("Cannot edit someone else's comment.");
-            setTimeout(() => setStatusMsg(null), 3000);
-            return;
-          }
+          if (!canModifyComment(commentToEdit, "edit")) return;
           setInputMode("edit");
           setInputText(commentToEdit.content.trim());
         }
       } else if (input === "d" && !key.ctrl && stateRef.current.threads[stateRef.current.selectedThread]) {
-        const thread = stateRef.current.threads[stateRef.current.selectedThread];
-        const comments = thread?.comments ?? [];
-        const commentToDelete = stateRef.current.selectedCommentIndex === -1 ? comments[0] : comments[stateRef.current.selectedCommentIndex + 1];
-        if (thread && commentToDelete && !isSubmittingRef.current) {
-          if (currentUserEmail && commentToDelete.authorEmail && commentToDelete.authorEmail !== currentUserEmail) {
-            setStatusMsg("Cannot delete someone else's comment.");
-            setTimeout(() => setStatusMsg(null), 3000);
-            return;
-          }
-          isSubmittingRef.current = true;
-          setSubmitting(true);
-          const repoId = selectedPr?.repositoryId ?? selectedPr?.repository;
-          if (selectedPr && repoId) {
-            deletePrComment(
-              selectedPr.organizationUrl,
-              selectedPr.project,
-              repoId,
-              selectedPr.id,
-              thread.id,
-              commentToDelete.id
-            ).then((ok) => {
-              isSubmittingRef.current = false;
-              setSubmitting(false);
-              if (ok) void loadComments(true);
-            });
-          }
+        const thread = stateRef.current.threads[stateRef.current.selectedThread]!;
+        const commentToDelete = resolveTargetComment(thread, stateRef.current.selectedCommentIndex);
+        if (commentToDelete) {
+          if (!canModifyComment(commentToDelete, "delete")) return;
+          setPendingDelete({ thread, comment: commentToDelete });
         }
       } else if (input === "n" && !key.ctrl) {
         setInputMode("new");
         setInputText("");
-      } else if (input === "r" && !key.ctrl && threads[selectedThread]) {
+      } else if (input === "r" && !key.ctrl && stateRef.current.threads[stateRef.current.selectedThread]) {
         setInputMode("reply");
         setInputText("");
-      } else if (input === "r" && key.ctrl) {
+      } else if (input === "R") {
         void loadComments(true);
       } else if (input === "s" && !key.ctrl && stateRef.current.threads[stateRef.current.selectedThread]) {
-        const thread = stateRef.current.threads[stateRef.current.selectedThread];
-        if (!thread || !selectedPr || isSubmittingRef.current) return;
-        isSubmittingRef.current = true;
-        setSubmitting(true);
-        const repoId = selectedPr.repositoryId ?? selectedPr.repository;
-        const newStatus = thread.status === "active" ? 2 : 1; // 2=fixed, 1=active
-        updatePrThreadStatus(
-          selectedPr.organizationUrl,
-          selectedPr.project,
-          repoId,
-          selectedPr.id,
-          thread.id!,
-          newStatus
-        ).then((ok) => {
-          isSubmittingRef.current = false;
-          setSubmitting(false);
-          if (ok) {
-            void loadComments(true);
-          }
-        });
+        const thread = stateRef.current.threads[stateRef.current.selectedThread]!;
+        toggleThreadStatus(thread);
       }
     },
     { isActive: active },
@@ -394,7 +211,6 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
 
   return (
     <Box
-      // marginTop={1}
       borderStyle="single"
       borderTop={true}
       borderBottom={false}
@@ -412,7 +228,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         <Box>
           {loading ? (
             <Text color={palette.muted}>
-              <Spinner type="dots" /> loading…
+              {glyph.clock} loading…
             </Text>
           ) : (
             <Text color={palette.muted}>
@@ -424,13 +240,17 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
 
       {/* Status / error */}
       <Box height={1}>
-        {(statusMsg ?? error) ? (
+        {pendingDelete ? (
+          <Text color={palette.warn}>
+            Delete comment by {pendingDelete.comment.author}? (y/n)
+          </Text>
+        ) : (statusMsg ?? error) ? (
           <Text color={error ? palette.danger : palette.warn}>
             {statusMsg ?? error}
           </Text>
         ) : submitting ? (
           <Text color={palette.accent}>
-            <Spinner type="dots" /> processing...
+            {glyph.clock} processing...
           </Text>
         ) : null}
       </Box>
@@ -446,7 +266,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
       {selectedPr && loading && threads.length === 0 && (
         <Box height={viewportH} justifyContent="center" alignItems="center" flexDirection="column">
           <Text color={palette.accent}>
-            <Spinner type="dots" /> Loading comments...
+            {glyph.clock} Loading comments...
           </Text>
         </Box>
       )}
@@ -462,136 +282,23 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         const maxVis = Math.max(4, Math.floor(viewportH / 5));
 
         const total = threads.length;
-        const clampedOffset = Math.max(0, Math.min(threadScrollOffset, total - maxVis));
+        const { offset: clampedOffset, canScrollUp, canScrollDown } = computeScrollWindow(total, maxVis, threadScrollOffset);
         const visibleThreads = threads.slice(clampedOffset, clampedOffset + maxVis);
 
         if (total === 0) return null;
-
-        const canScrollUp = clampedOffset > 0;
-        const canScrollDown = clampedOffset + maxVis < total;
 
         return (
           <Box flexDirection="column">
             <Box flexDirection="column" height={inputMode !== "none" ? viewportH - 6 : viewportH} overflow="hidden">
               {visibleThreads.map((thread) => {
                 const idx = threads.findIndex(t => t.id === thread.id);
-                const isSelected = idx === selectedThread && active;
-                const firstComment = thread.comments[0];
-                const replyCount = thread.comments.length - 1;
-
                 return (
-                  <Box
+                  <ThreadCard
                     key={thread.id}
-                    flexDirection="column"
-                    flexShrink={0}
-                    marginTop={1}
-                    borderStyle={isSelected ? "round" : undefined}
-                    borderColor={isSelected ? palette.accent : undefined}
-                    paddingX={isSelected ? 1 : 0}
-                  >
-                    {/* Thread header */}
-                    <Box>
-                      <Text color={isSelected ? palette.accent : palette.muted}>
-                        {isSelected ? glyph.pointer : glyph.pointerIdle}{" "}
-                      </Text>
-                      <Text color={threadStatusColor(thread.status)}>
-                        [{threadStatusLabel(thread.status)}]{"  "}
-                      </Text>
-                      {thread.filePath && (
-                        <Text color={palette.info}>
-                          {truncate(thread.filePath, 35)}
-                          {thread.lineNumber ? `:${thread.lineNumber}` : ""}
-                          {"  "}
-                        </Text>
-                      )}
-                      <Text color={palette.muted}>
-                        {thread.comments.length} comment{thread.comments.length !== 1 ? "s" : ""}
-                      </Text>
-                    </Box>
-
-                    {/* First comment preview */}
-                    {firstComment && (
-                      <Box marginLeft={2} flexDirection="column">
-                        <Box>
-                          <Text color={palette.textBright} bold inverse={isSelected && selectedCommentIndex === -1}>
-                            {isSelected && selectedCommentIndex === -1 ? "> " : ""}
-                            {firstComment.author}
-                          </Text>
-                          <Text color={palette.muted}>
-                            {"  "}{formatRelativeAge(firstComment.publishedDate)}
-                          </Text>
-                        </Box>
-                        <Box flexShrink={0}>
-                          <Text color={palette.text} wrap="wrap">
-                            {truncate(firstComment.content, 72)}
-                          </Text>
-                        </Box>
-                        {/* Show bordered replies box when thread is selected */}
-                        {isSelected && replyCount > 0 && (() => {
-                          const visibleRepliesCount = 4;
-                          let replyOffset = 0;
-                          if (replyCount > visibleRepliesCount) {
-                            if (selectedCommentIndex > 1) {
-                              replyOffset = Math.min(selectedCommentIndex - 1, replyCount - visibleRepliesCount);
-                            }
-                          }
-                          const visibleReplies = thread.comments.slice(1).slice(replyOffset, replyOffset + visibleRepliesCount);
-
-                          return (
-                            <Box
-                              marginTop={0.25}
-                              borderStyle="single"
-                              borderColor={palette.border}
-                              borderBottom={false}
-                              borderLeft={false}
-                              borderRight={false}
-                              flexDirection="column"
-                              flexShrink={0}
-                            // paddingX={1}
-                            >
-                              <Box justifyContent="space-between">
-                                <Text color={palette.muted}>Replies</Text>
-                                <Text color={palette.accentDim}>{Math.max(0, selectedCommentIndex + 1)}/{replyCount}</Text>
-                              </Box>
-                              <Box flexDirection="column" marginTop={1} paddingLeft={1}>
-                                {visibleReplies.map((reply, visIndex) => {
-                                  const index = replyOffset + visIndex;
-                                  const isReplySelected = selectedCommentIndex === index;
-                                  return (
-                                    <Box key={reply.id} marginTop={visIndex === 0 ? 0 : 1} flexDirection="column" flexShrink={0}>
-                                      <Box>
-                                        <Text color={palette.accentDim} bold inverse={isReplySelected}>
-                                          {isReplySelected ? "> ↳ " : "↳ "}
-                                          {reply.author}
-                                        </Text>
-                                        <Text color={palette.muted}>
-                                          {"  "}{formatRelativeAge(reply.publishedDate)}
-                                        </Text>
-                                      </Box>
-                                      <Box flexShrink={0}>
-                                        <Text color={palette.text} wrap="wrap">
-                                          {truncate(reply.content, 64)}
-                                        </Text>
-                                      </Box>
-                                    </Box>
-                                  );
-                                })}
-                              </Box>
-                            </Box>
-                          );
-                        })()}
-
-                        {/* Show simple reply indicator when thread is not selected */}
-                        {!isSelected && replyCount > 0 && (
-                          <Box flexShrink={0}>
-                            <Text color={palette.muted}>
-                              {"  "}↳ {replyCount} repl{replyCount !== 1 ? "ies" : "y"}
-                            </Text>
-                          </Box>
-                        )}
-                      </Box>
-                    )}
-                  </Box>
+                    thread={thread}
+                    isSelected={idx === selectedThread && active}
+                    selectedCommentIndex={selectedCommentIndex}
+                  />
                 );
               })}
             </Box>
@@ -635,14 +342,14 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
       <Box height={1} marginTop={1} flexShrink={0}>
         {active && inputMode === "none" && (
           <Text color={palette.muted}>
-            <Text color={palette.accentDim}>j/k</Text> navigate{"  "}
-            <Text color={palette.accentDim}>[/]</Text> select comment{"  "}
+            <Text color={palette.accentDim}>↑/↓</Text> navigate{"  "}
+            <Text color={palette.accentDim}>←/→</Text> select comment{"  "}
             <Text color={palette.accentDim}>n</Text> new{"  "}
             <Text color={palette.accentDim}>r</Text> reply{"  "}
             <Text color={palette.accentDim}>e</Text> edit{"  "}
             <Text color={palette.accentDim}>d</Text> delete{"  "}
             <Text color={palette.accentDim}>s</Text> resolve{"  "}
-            <Text color={palette.accentDim}>Ctrl+R</Text> refresh{"  "}
+            <Text color={palette.accentDim}>R</Text> refresh{"  "}
             <Text color={palette.accentDim}>h</Text> back
           </Text>
         )}

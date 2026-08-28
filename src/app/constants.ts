@@ -28,11 +28,12 @@ export const INITIAL_STATE: AppState = {
   banner: "Loading pull requests from Azure DevOps...",
   autoRefresh: true,
   lastRefreshISO: new Date().toISOString(),
-  diffViewMode: "unified",
   diffScrollOffset: 0,
   diffSelectedRow: 0,
   treeFilter: "me" satisfies TreeFilter,
   fileFilter: "",
+  filterTarget: "tree",
+  filterRestore: "",
   commentInputActive: false,
   loadState: "loading",
   loadProgress: null,
@@ -59,8 +60,6 @@ export const COMPLETION_FIELD_LABELS = [
 
 export const COMPLETION_FIELD_COUNT = 9;
 
-/** Sentinel value for scrolling to the end of a diff. */
-export const SCROLL_TO_END = Number.MAX_SAFE_INTEGER;
 
 /** Named indices for the completion editor cursor. Avoids magic numbers in keyboard handlers. */
 export const COMPLETION_CURSOR = {

@@ -39,5 +39,5 @@ jobs:
       - name: Run Tests
         run: bun run test
 
-      - name: Validate Build
-        run: bun run build:all-binaries
+      - name: Validate Build (linux-x64 only; release builds all targets)
+        run: bun run build:linux

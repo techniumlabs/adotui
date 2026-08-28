@@ -7,16 +7,19 @@ type CommandBarProps = {
   focus: FocusArea;
   commandText: string;
   pendingConfirm: PendingConfirm;
+  filterPrompt?: { target: "tree" | "files"; text: string };
 };
 
 export const CommandBar: React.FC<CommandBarProps> = ({
   focus,
   commandText,
   pendingConfirm,
+  filterPrompt,
 }) => {
   if (pendingConfirm) {
     return (
       <Box
+        flexShrink={0}
         borderStyle="single"
         borderTop={true}
         borderLeft={false}
@@ -40,10 +43,35 @@ export const CommandBar: React.FC<CommandBarProps> = ({
     );
   }
 
+  if (focus === "filter" && filterPrompt) {
+    return (
+      <Box
+        flexShrink={0}
+        borderStyle="single"
+        borderTop={true}
+        borderLeft={false}
+        borderRight={false}
+        borderBottom={false}
+        borderColor={palette.accent}
+        paddingX={2}
+      >
+        <Text color={palette.accent} bold>/ </Text>
+        <Text color={palette.textBright}>
+          {filterPrompt.text}
+          <Text color={palette.accent}>{"\u258C"}</Text>
+        </Text>
+        <Text color={palette.muted}>
+          {"  "}filtering {filterPrompt.target === "files" ? "files" : "PRs"} · Enter apply · Esc cancel
+        </Text>
+      </Box>
+    );
+  }
+
   const commandMode = focus === "command";
 
   return (
     <Box
+      flexShrink={0}
       borderStyle="single"
       borderTop={true}
       borderLeft={false}
@@ -69,7 +97,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({
             </>
           )
         ) : (
-          "Press / to filter or run commands"
+          "Press / to filter · : for commands"
         )}
       </Text>
     </Box>

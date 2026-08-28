@@ -14,7 +14,7 @@ export function usePasteHandler(onPaste: (text: string) => void) {
     let isPasting = false;
     let pasteBuffer = "";
 
-    process.stdin.emit = (event: string, ...args: any[]) => {
+    process.stdin.emit = ((event: string, ...args: unknown[]) => {
       if (event === "data" && args[0] instanceof Buffer) {
         const data = args[0] as Buffer;
         const str = data.toString("utf-8");
@@ -61,7 +61,7 @@ export function usePasteHandler(onPaste: (text: string) => void) {
       }
 
       return originalEmit(event, ...args);
-    };
+    }) as typeof process.stdin.emit;
 
     return () => {
       process.stdin.emit = originalEmit;

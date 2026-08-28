@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
-import Spinner from "ink-spinner";
-import { palette } from "../theme";
+import { glyph, palette } from "../theme";
 
 const ASCII_LOGO = [
   "█▀▀█ █▀▀▄ █▀▀█ ▀▀█▀▀ █  █ ▀█▀",
@@ -73,7 +72,7 @@ export const Splash: React.FC<SplashProps> = ({
         ))}
         <Box marginTop={1}>
           <Text color={palette.muted}>
-            <Spinner type="dots" /> {label}
+            {glyph.clock} {label}
           </Text>
         </Box>
       </Box>

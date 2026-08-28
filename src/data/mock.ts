@@ -419,6 +419,10 @@ export const MOCK_DATA: AppData = {
           organizationUrl,
           project: repo.project ?? repo.name,
           repository: repo.name,
+          // Mock PRs carry their details inline; without this flag
+          // usePrDetails would dispatch real `az` calls in mock mode and
+          // overwrite these files with empty live results.
+          detailsLoaded: true,
         })),
       })),
     };
