@@ -54,11 +54,19 @@ const IDENTITY_WAIT_MS = 500;
 /**
  * Replays MOCK_DATA as timed partials so streaming is demoable offline:
  *   ADOTUI_MOCK=1 ADOTUI_MOCK_STREAM=1 bun run start
- * Tests set ADOTUI_MOCK_STREAM_MS to keep the replay fast.
+ * ADOTUI_MOCK_STREAM_MS is the pause between steps; ADOTUI_MOCK_STREAM_BATCH
+ * (default 1) is how many projects arrive per step. Tests use a bigger batch:
+ * a CI runner's timers fire 30-170ms late, so 106 separate waits took seconds,
+ * while a handful of longer ones keeps the replay short and its length stable.
  */
 const mockStreamDelayMs = (): number => {
   const configured = Number(process.env.ADOTUI_MOCK_STREAM_MS);
   return Number.isFinite(configured) && configured >= 0 ? configured : 60;
+};
+
+const mockStreamBatch = (): number => {
+  const configured = Math.floor(Number(process.env.ADOTUI_MOCK_STREAM_BATCH));
+  return Number.isFinite(configured) && configured >= 1 ? configured : 1;
 };
 
 const streamMockData = async (stream: StreamOptions): Promise<void> => {
@@ -91,10 +99,13 @@ const streamMockData = async (stream: StreamOptions): Promise<void> => {
     });
   };
 
+  const batch = mockStreamBatch();
+  let sinceWait = 0;
   for (const org of orgs) emit(org, null, []);
   for (const org of orgs) {
     for (const [project, repositories] of projectsOf(org)) {
-      await Bun.sleep(mockStreamDelayMs());
+      if (sinceWait % batch === 0) await Bun.sleep(mockStreamDelayMs());
+      sinceWait += 1;
       current += 1;
       emit(org, project, repositories);
     }

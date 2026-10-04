@@ -40,8 +40,11 @@ describe("streaming refresh", () => {
   beforeEach(() => {
     setEnv("ADOTUI_MOCK", "1");
     setEnv("ADOTUI_MOCK_STREAM", "1");
-    // Small but non-zero so the replay spans several coalescing windows.
-    setEnv("ADOTUI_MOCK_STREAM_MS", "5");
+    // A few longer steps rather than one short wait per project (see
+    // mockStreamBatch): ~0.7s locally, spanning several coalescing windows, but
+    // not hostage to how late a slow runner's timers fire.
+    setEnv("ADOTUI_MOCK_STREAM_MS", "60");
+    setEnv("ADOTUI_MOCK_STREAM_BATCH", "10");
     setEnv("NODE_ENV", "test");
     resetRefreshState();
     useAppStore.setState({ ...INITIAL_STATE });

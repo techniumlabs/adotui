@@ -1,5 +1,6 @@
 import { test, expect, describe, mock, afterAll } from "bun:test";
 import { render } from "ink-testing-library";
+import { pressUntil, until } from "./helpers/wait";
 
 process.env.ADOTUI_MOCK = "1";
 process.env.NODE_ENV = "test";
@@ -27,35 +28,6 @@ mock.module("../src/data/azureRest", () => ({
 const { App } = await import("../src/app/App");
 const { useAppStore } = await import("../src/app/store");
 const { INITIAL_STATE } = await import("../src/app/constants");
-
-/** Polls instead of sleeping a fixed time: a loaded CI runner renders late. */
-const until = async (predicate: () => boolean, what: string, timeoutMs = 5_000): Promise<void> => {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (predicate()) return;
-    await new Promise((res) => setTimeout(res, 20));
-  }
-  throw new Error(`timed out waiting for ${what}`);
-};
-
-/** Presses `key` until `predicate` holds, so an early press that was ignored is retried. */
-const pressUntil = async (
-  stdin: { write: (data: string) => void },
-  key: string,
-  predicate: () => boolean,
-  what: string,
-): Promise<void> => {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    stdin.write(key);
-    try {
-      await until(predicate, what, 250);
-      return;
-    } catch {
-      // not yet: press again
-    }
-  }
-  throw new Error(`timed out waiting for ${what}`);
-};
 
 afterAll(() => {
   mock.module("../src/data/azureRest", () => realAzureRest);

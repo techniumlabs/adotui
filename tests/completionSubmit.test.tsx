@@ -3,11 +3,11 @@ import { render } from "ink-testing-library";
 import { App } from "../src/app/App";
 import { useAppStore } from "../src/app/store";
 import { INITIAL_STATE } from "../src/app/constants";
+import { pressUntil, until } from "./helpers/wait";
 
 process.env.ADOTUI_MOCK = "1";
 process.env.NODE_ENV = "test";
 
-const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 describe("completion editor submit", () => {
   beforeEach(() => {
@@ -16,21 +16,19 @@ describe("completion editor submit", () => {
 
   test("Enter on 'Complete PR' arms the y/n confirmation", async () => {
     const { stdin } = render(<App />);
-    await delay(100);
+    // Keys pressed before the data has loaded (and the input handlers attached) are ignored.
+    await until(() => useAppStore.getState().loadState === "ready", "the mock data to load");
 
     // Open the completion editor for the selected PR.
-    stdin.write("c");
-    await delay(50);
-    expect(useAppStore.getState().focus).toBe("completion");
+    await pressUntil(stdin, "c", () => useAppStore.getState().focus === "completion", "the completion editor to open");
 
     // Cursor starts on field 0; Enter advances one field per press until the
     // final "complete PR" row (index 8), where Enter submits.
     for (let i = 0; i < 8; i++) {
-      stdin.write("\r");
-      await delay(20);
+      const before = useAppStore.getState().completionCursor;
+      await pressUntil(stdin, "\r", () => useAppStore.getState().completionCursor !== before, `Enter to advance from field ${i}`);
     }
-    stdin.write("\r"); // submit on the "complete PR" row
-    await delay(50);
+    await pressUntil(stdin, "\r", () => useAppStore.getState().pendingConfirm !== null, "Enter on 'complete PR' to arm the confirmation");
 
     const pending = useAppStore.getState().pendingConfirm;
     expect(pending).not.toBeNull();
