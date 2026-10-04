@@ -27,7 +27,6 @@ const limitRule = (rule, max) => [
  */
 const DEBT = {
   "src/app/App.tsx": { "max-lines-per-function": 232 },
-  "src/app/components/SetupScreen.tsx": { "max-lines-per-function": 240 },
 };
 
 const layering = (group, message) => ({

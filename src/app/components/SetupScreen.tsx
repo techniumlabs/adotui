@@ -27,6 +27,99 @@ type ScreenMode = "list" | "add" | "pat" | "help";
  * mode, error) and delegates each mode's rendering and key handling to a
  * dedicated component under ./setup/.
  */
+/** The menu: one row per project, then add / PAT / help / (save) / exit. */
+const buildMenuItems = (projects: AdoProjectConfig[], pat: string): SetupMenuItem[] => [
+  ...projects.map((proj, idx): SetupMenuItem => ({
+    type: "project",
+    projectIndex: idx,
+    label: `${proj.project || "All Projects"} (${proj.organization})`,
+  })),
+  { type: "add", label: "+ Add New Project" },
+  { type: "pat", label: `🔑 Configure PAT Token (optional)${pat ? ` [Set: ...${pat.slice(-4)}]` : ""}` },
+  { type: "help", label: "❓ Keyboard & CLI Help" },
+  ...(projects.length > 0 ? [{ type: "save", label: "✓ Save & Load Configuration" } as SetupMenuItem] : []),
+  { type: "exit", label: "✗ Exit ADOTUI" },
+];
+
+/** Which screen a menu row opens (save and exit act instead of opening one). */
+const MODE_FOR_ITEM: Partial<Record<SetupMenuItem["type"], ScreenMode>> = {
+  add: "add",
+  project: "add",
+  pat: "pat",
+  help: "help",
+};
+
+/** The footer's key instructions. */
+const setupInstructions = (loading: boolean, mode: ScreenMode, item: SetupMenuItem | undefined): string => {
+  if (loading) return "Loading project data — please wait";
+  if (mode === "help") return "Press any key to return to the menu";
+  if (mode !== "list") return "Press Tab/Arrows to navigate · Enter to advance/select · Ctrl+C to quit";
+  if (item?.type === "project") {
+    return "Press Tab/Arrows to navigate · Delete/Backspace to remove project · Enter to edit project · Ctrl+C to quit";
+  }
+  return "Press Tab/Arrows to navigate · Enter to select · Ctrl+C to quit";
+};
+
+/**
+ * Writes the edited config back to the file it was loaded from, keeping the
+ * fields the wizard doesn't edit (status, top, reviewer, creator).
+ */
+const saveConfig = async (
+  loaded: { config: AdoConfig; source: string } | null,
+  projects: AdoProjectConfig[],
+  pat: string,
+): Promise<void> => {
+  const { pat: _oldPat, ...base }: Partial<AdoConfig> = loaded?.config ?? { status: "active", top: 50 };
+  await writeConfig({ ...base, projects, ...(pat.trim() ? { pat: pat.trim() } : {}) }, loaded?.source);
+};
+
+const toFormInitial = (project: AdoProjectConfig) => ({
+  organization: project.organization,
+  project: project.project ?? "",
+  repositories: project.repositories?.join(", ") ?? "",
+});
+
+/** The wizard's frame: logo, the current screen, error / saving lines and the key footer. */
+const SetupFrame: React.FC<{ error: string | null; submitting: boolean; footer: string; children: React.ReactNode }> = ({
+  error,
+  submitting,
+  footer,
+  children,
+}) => (
+  <Box flexDirection="column" flexGrow={1} justifyContent="center" alignItems="center" minHeight={26}>
+    <Box flexDirection="column" borderStyle="round" borderColor={palette.accent} paddingX={4} paddingY={1} width={70}>
+      <AsciiLogo />
+
+      {children}
+
+      {error && (
+        <Box justifyContent="center" marginTop={1}>
+          <Text color={palette.danger}>{error}</Text>
+        </Box>
+      )}
+
+      {submitting && (
+        <Box justifyContent="center" marginTop={1}>
+          <Text color={palette.ok}>Creating config file and loading...</Text>
+        </Box>
+      )}
+
+      <Box
+        justifyContent="center"
+        marginTop={1}
+        borderStyle="single"
+        borderTop={true}
+        borderBottom={false}
+        borderLeft={false}
+        borderRight={false}
+        borderColor={palette.border}
+      >
+        <Text color={palette.muted}>{footer}</Text>
+      </Box>
+    </Box>
+  </Box>
+);
+
 export const SetupScreen: React.FC<SetupScreenProps> = ({
   onComplete,
   loading = false,
@@ -60,25 +153,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
     void fetchExistingConfig();
   }, []);
 
-  // Build list of menu items dynamically
-  const menuItems: SetupMenuItem[] = [];
-  projects.forEach((proj, idx) => {
-    menuItems.push({
-      type: "project",
-      projectIndex: idx,
-      label: `${proj.project || "All Projects"} (${proj.organization})`,
-    });
-  });
-  menuItems.push({ type: "add", label: "+ Add New Project" });
-  menuItems.push({
-    type: "pat",
-    label: `🔑 Configure PAT Token (optional)${pat ? ` [Set: ...${pat.slice(-4)}]` : ""}`,
-  });
-  menuItems.push({ type: "help", label: "❓ Keyboard & CLI Help" });
-  if (projects.length > 0) {
-    menuItems.push({ type: "save", label: "✓ Save & Load Configuration" });
-  }
-  menuItems.push({ type: "exit", label: "✗ Exit ADOTUI" });
+  const menuItems = buildMenuItems(projects, pat);
 
   // Ctrl+C always exits, even while submitting or loading.
   useInput((input, key) => {
@@ -97,25 +172,11 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
   };
 
   const handleActivate = (item: SetupMenuItem) => {
-    if (item.type === "add") {
-      setEditingIndex(null);
-      setMode("add");
-      setError(null);
-    } else if (item.type === "project") {
-      setEditingIndex(item.projectIndex!);
-      setMode("add");
-      setError(null);
-    } else if (item.type === "pat") {
-      setMode("pat");
-      setError(null);
-    } else if (item.type === "help") {
-      setMode("help");
-      setError(null);
-    } else if (item.type === "save") {
-      void handleSubmit();
-    } else if (item.type === "exit") {
-      process.exit(0);
-    }
+    if (item.type === "save") return void handleSubmit();
+    if (item.type === "exit") process.exit(0);
+    setEditingIndex(item.type === "project" ? item.projectIndex! : null);
+    setMode(MODE_FOR_ITEM[item.type] ?? "list");
+    setError(null);
   };
 
   const handleDeleteProject = (idxToRemove: number) => {
@@ -155,12 +216,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
     setError(null);
 
     try {
-      // Keep the fields the wizard doesn't edit (status, top, reviewer, creator).
-      const { pat: _oldPat, ...base }: Partial<AdoConfig> = loaded?.config ?? { status: "active", top: 50 };
-      await writeConfig(
-        { ...base, projects, ...(pat.trim() ? { pat: pat.trim() } : {}) },
-        loaded?.source,
-      );
+      await saveConfig(loaded, projects, pat);
       delete process.env.ADOTUI_FORCE_SETUP;
       onComplete();
     } catch (e) {
@@ -169,23 +225,6 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
     }
   };
 
-  // Helper to build instructions for footer dynamically
-  const getInstructions = () => {
-    if (loading) {
-      return "Loading project data — please wait";
-    }
-    if (mode === "help") {
-      return "Press any key to return to the menu";
-    }
-    if (mode === "list") {
-      const currentItem = menuItems[selectedIndex];
-      if (currentItem && currentItem.type === "project") {
-        return "Press Tab/Arrows to navigate · Delete/Backspace to remove project · Enter to edit project · Ctrl+C to quit";
-      }
-      return "Press Tab/Arrows to navigate · Enter to select · Ctrl+C to quit";
-    }
-    return "Press Tab/Arrows to navigate · Enter to advance/select · Ctrl+C to quit";
-  };
 
   const editingProject = editingIndex !== null ? projects[editingIndex] : undefined;
 
@@ -211,15 +250,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
       return (
         <AddProjectForm
           key={editingIndex ?? -1}
-          initial={
-            editingProject
-              ? {
-                  organization: editingProject.organization,
-                  project: editingProject.project ?? "",
-                  repositories: editingProject.repositories?.join(", ") ?? "",
-                }
-              : undefined
-          }
+          initial={editingProject ? toFormInitial(editingProject) : undefined}
           editing={editingIndex !== null}
           onSubmit={handleAddSubmit}
           onCancel={returnToList}
@@ -243,53 +274,8 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
   };
 
   return (
-    <Box
-      flexDirection="column"
-      flexGrow={1}
-      justifyContent="center"
-      alignItems="center"
-      minHeight={26}
-    >
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor={palette.accent}
-        paddingX={4}
-        paddingY={1}
-        width={70}
-      >
-        <AsciiLogo />
-
-        {renderContent()}
-
-        {/* Error message */}
-        {error && (
-          <Box justifyContent="center" marginTop={1}>
-            <Text color={palette.danger}>{error}</Text>
-          </Box>
-        )}
-
-        {/* Submitting state */}
-        {isSubmitting && !loading && (
-          <Box justifyContent="center" marginTop={1}>
-            <Text color={palette.ok}>Creating config file and loading...</Text>
-          </Box>
-        )}
-
-        {/* Exit footer */}
-        <Box
-          justifyContent="center"
-          marginTop={1}
-          borderStyle="single"
-          borderTop={true}
-          borderBottom={false}
-          borderLeft={false}
-          borderRight={false}
-          borderColor={palette.border}
-        >
-          <Text color={palette.muted}>{getInstructions()}</Text>
-        </Box>
-      </Box>
-    </Box>
+    <SetupFrame error={error} submitting={isSubmitting && !loading} footer={setupInstructions(loading, mode, menuItems[selectedIndex])}>
+      {renderContent()}
+    </SetupFrame>
   );
 };
