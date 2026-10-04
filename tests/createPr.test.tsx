@@ -3,7 +3,7 @@ import { render } from "ink-testing-library";
 import { App } from "../src/app/App";
 import { useAppStore } from "../src/app/store";
 import { INITIAL_STATE } from "../src/app/constants";
-import { branchMatches, buildNewPr, defaultTitle } from "../src/app/createPr";
+import { branchMatches, buildNewPr, defaultTitle, pickedBranch } from "../src/app/createPr";
 import { createPullRequest, listBranches } from "../src/data/azure";
 import { AdoHttpError } from "../src/data/adoFetch";
 import type { CreatePrForm } from "../src/app/types";
@@ -132,7 +132,9 @@ describe("the form in the app (mock mode)", () => {
 
   /** Opens the form and waits until it is on screen with its branches (its keys are live from then on). */
   const openForm = async (stdin: { write: (d: string) => void }, lastFrame: () => string | undefined) => {
-    await pressUntil(stdin, "N", () => form()?.branches != null, "the form with branches");
+    // Re-press only until the form OPENS: once it is open, another N is typed into the branch filter.
+    await pressUntil(stdin, "N", () => form() !== null, "the form to open");
+    await until(() => form()?.branches != null, "the branches to load");
     await until(() => (lastFrame() ?? "").includes("source branch"), "the form on screen");
   };
   /** Types into the active field one key at a time, waiting for each to land. */
@@ -154,6 +156,8 @@ describe("the form in the app (mock mode)", () => {
   test("N opens it on screen with branches loaded and main as the target", async () => {
     const { stdin, lastFrame } = await start();
     await openForm(stdin, lastFrame);
+    const frame = lastFrame() ?? "";
+    if (!/target branch\s+main/.test(frame)) throw new Error(`form not rendered as expected:\n${frame}`);
     expect(lastFrame()).toContain("New pull request");
     expect(lastFrame()).toContain("source branch");
     expect(lastFrame()).toMatch(/target branch\s+main/);
@@ -163,7 +167,8 @@ describe("the form in the app (mock mode)", () => {
     const { stdin, lastFrame } = await start();
     await openForm(stdin, lastFrame);
     await typeQuery(stdin, "typo");
-    await until(() => (lastFrame() ?? "").includes("fix/typo"), "the filtered branch");
+    const f = form()!;
+    expect(pickedBranch(f.branches, f.source)).toBe("fix/typo");
     await moveToCreate(stdin);
     stdin.write("\r");
     await until(() => form() === null, "the form to close");
@@ -177,7 +182,8 @@ describe("the form in the app (mock mode)", () => {
     await typeQuery(stdin, "main");
     await moveToCreate(stdin);
     stdin.write("\r");
-    await until(() => (lastFrame() ?? "").includes("different branches"), "the validation message");
+    await until(() => (form()?.error ?? "").includes("different branches"), "the validation message");
+    expect(form()?.submitting).toBe(false); // nothing was sent
     stdin.write(ESC);
     await until(() => form() === null && useAppStore.getState().focus !== "createPr", "the form to close");
   });
