@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { AdoHttpError, adoGet, seg, __buildUrl } from "../src/data/adoFetch";
+import { AdoHttpError, adoGet, adoPatch, adoPost, seg, __buildUrl } from "../src/data/adoFetch";
 
 const ORG = "https://dev.azure.com/acme";
 const realFetch = globalThis.fetch;
@@ -82,6 +82,43 @@ describe("requests", () => {
 
     const result = await adoGet<{ value: unknown[] }>(ORG, "_apis/x");
     expect(result.value).toEqual([]);
+    expect(calls).toBe(2);
+  });
+
+  test("never replays a POST after a 5xx: the server may have saved it already", async () => {
+    let calls = 0;
+    globalThis.fetch = (async () => { calls += 1; return new Response("boom", { status: 503 }); }) as unknown as typeof fetch;
+    const err = await adoPost(ORG, "_apis/x", { content: "hi" }).catch((e: unknown) => e);
+    expect((err as AdoHttpError).status).toBe(503);
+    expect(calls).toBe(1);
+  });
+
+  test("never replays a POST after a connection error or timeout", async () => {
+    let calls = 0;
+    globalThis.fetch = (async () => { calls += 1; throw new Error("socket hang up"); }) as unknown as typeof fetch;
+    const err = await adoPost(ORG, "_apis/x", { content: "hi" }).catch((e: unknown) => e);
+    expect((err as AdoHttpError).status).toBe(0);
+    expect(calls).toBe(1);
+  });
+
+  test("still retries a throttled POST: a 429 is rejected before it runs", async () => {
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls += 1;
+      if (calls === 1) return new Response("", { status: 429, headers: { "retry-after": "0" } });
+      return json({ id: 1 });
+    }) as unknown as typeof fetch;
+    expect(await adoPost<{ id: number }>(ORG, "_apis/x", { content: "hi" })).toEqual({ id: 1 });
+    expect(calls).toBe(2);
+  });
+
+  test("an idempotent PATCH is still replayed after a 5xx", async () => {
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls += 1;
+      return calls === 1 ? new Response("", { status: 503 }) : json({ ok: true });
+    }) as unknown as typeof fetch;
+    expect(await adoPatch<{ ok: boolean }>(ORG, "_apis/x", { status: 2 })).toEqual({ ok: true });
     expect(calls).toBe(2);
   });
 

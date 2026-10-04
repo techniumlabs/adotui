@@ -94,6 +94,11 @@ const requestUrl = async <T>(
   options: AdoRequestOptions & { body?: unknown } = {},
 ): Promise<T> => {
   const url = buildUrl(baseUrl, path, options.query, options.apiVersion);
+  // After a timeout, connection error or 5xx the server may already have
+  // acted, so only idempotent methods are replayed: retrying a POST there
+  // would post the comment twice. 429 and 401 are rejected before anything
+  // runs, so they are safe to retry for every method.
+  const replaySafe = method !== "POST";
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     const authHeader = await getAdoAuthHeader();
@@ -113,7 +118,7 @@ const requestUrl = async <T>(
         signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
       });
     } catch (cause) {
-      if (attempt === MAX_ATTEMPTS) {
+      if (attempt === MAX_ATTEMPTS || !replaySafe) {
         throw new AdoHttpError(0, url, cause instanceof Error ? cause.message : String(cause));
       }
       await Bun.sleep(500 * attempt);
@@ -126,7 +131,7 @@ const requestUrl = async <T>(
       continue;
     }
     // Throttled or a transient server fault: honour Retry-After when given.
-    if ((resp.status === 429 || resp.status >= 500) && attempt < MAX_ATTEMPTS) {
+    if ((resp.status === 429 || (resp.status >= 500 && replaySafe)) && attempt < MAX_ATTEMPTS) {
       await Bun.sleep(retryDelayMs(resp, attempt));
       continue;
     }
