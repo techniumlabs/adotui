@@ -41,10 +41,12 @@ describe("clicking in the app", () => {
 
   const start = async () => {
     const app = render(<App mouse />);
-    // A realistic terminal: at the test renderer's default size the Diff tab's file list is squeezed off screen.
+    await until(() => useAppStore.getState().loadState === "ready", "the mock data to load");
+    // A realistic terminal: at the test renderer's default size the Diff tab's file list is
+    // squeezed off screen. Resize once the app's listener is attached, then wait for it.
     Object.defineProperty(app.stdout, "rows", { value: 50, configurable: true });
     app.stdout.emit("resize");
-    await until(() => useAppStore.getState().loadState === "ready", "the mock data to load");
+    await until(() => (app.lastFrame() ?? "").split("\n").length >= 49, "the 50-row frame");
     await new Promise((r) => setTimeout(r, 100));
     return app;
   };

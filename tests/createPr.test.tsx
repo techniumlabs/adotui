@@ -120,16 +120,40 @@ describe("the form in the app (mock mode)", () => {
 
   const start = async () => {
     const app = render(<App />);
+    await until(() => useAppStore.getState().loadState === "ready", "the mock data to load");
+    // Resize once the app is up (its resize listener is attached by then), and wait
+    // until the frame really is that tall: at the default 24 rows the form is clipped.
     Object.defineProperty(app.stdout, "rows", { value: 40, configurable: true });
     app.stdout.emit("resize");
-    await until(() => useAppStore.getState().loadState === "ready", "the mock data to load");
+    await until(() => (app.lastFrame() ?? "").split("\n").length >= 39, "the 40-row frame");
     return app;
   };
   const form = () => useAppStore.getState().createPr;
 
+  /** Opens the form and waits until it is on screen with its branches (its keys are live from then on). */
+  const openForm = async (stdin: { write: (d: string) => void }, lastFrame: () => string | undefined) => {
+    await pressUntil(stdin, "N", () => form()?.branches != null, "the form with branches");
+    await until(() => (lastFrame() ?? "").includes("source branch"), "the form on screen");
+  };
+  /** Types into the active field one key at a time, waiting for each to land. */
+  const typeQuery = async (stdin: { write: (d: string) => void }, text: string) => {
+    for (const ch of text) {
+      const before = form()?.source.query ?? "";
+      stdin.write(ch);
+      await until(() => form()?.source.query === before + ch, `"${ch}" to be typed`);
+    }
+  };
+  const moveToCreate = async (stdin: { write: (d: string) => void }) => {
+    while ((form()?.cursor ?? 0) < 5) {
+      const before = form()?.cursor;
+      stdin.write(DOWN);
+      await until(() => form()?.cursor !== before, "the cursor to move");
+    }
+  };
+
   test("N opens it on screen with branches loaded and main as the target", async () => {
     const { stdin, lastFrame } = await start();
-    await pressUntil(stdin, "N", () => form()?.branches !== null && form() !== null, "the form with branches");
+    await openForm(stdin, lastFrame);
     expect(lastFrame()).toContain("New pull request");
     expect(lastFrame()).toContain("source branch");
     expect(lastFrame()).toMatch(/target branch\s+main/);
@@ -137,11 +161,10 @@ describe("the form in the app (mock mode)", () => {
 
   test("filter, create: the form closes and the banner names the new PR", async () => {
     const { stdin, lastFrame } = await start();
-    await pressUntil(stdin, "N", () => form()?.branches != null, "the form with branches");
-    for (const ch of "typo") stdin.write(ch);
+    await openForm(stdin, lastFrame);
+    await typeQuery(stdin, "typo");
     await until(() => (lastFrame() ?? "").includes("fix/typo"), "the filtered branch");
-    for (let i = 0; i < 5; i += 1) stdin.write(DOWN);
-    await until(() => form()?.cursor === 5, "the create row");
+    await moveToCreate(stdin);
     stdin.write("\r");
     await until(() => form() === null, "the form to close");
     const toasts = useAppStore.getState().toasts.map((t) => `${t.type}: ${t.message}`);
@@ -150,11 +173,9 @@ describe("the form in the app (mock mode)", () => {
 
   test("the same branch twice is refused with a message, and Esc cancels", async () => {
     const { stdin, lastFrame } = await start();
-    await pressUntil(stdin, "N", () => form()?.branches != null, "the form with branches");
-    for (const ch of "main") stdin.write(ch);
-    await until(() => form()?.source.query === "main", "the source filter");
-    for (let i = 0; i < 5; i += 1) stdin.write(DOWN);
-    await until(() => form()?.cursor === 5, "the create row");
+    await openForm(stdin, lastFrame);
+    await typeQuery(stdin, "main");
+    await moveToCreate(stdin);
     stdin.write("\r");
     await until(() => (lastFrame() ?? "").includes("different branches"), "the validation message");
     stdin.write(ESC);

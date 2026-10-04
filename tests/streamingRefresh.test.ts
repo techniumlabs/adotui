@@ -21,7 +21,8 @@ const setEnv = (key: string, value: string) => {
   process.env[key] = value;
 };
 
-const waitFor = async (predicate: () => boolean, timeoutMs = 15_000): Promise<void> => {
+// 25s: within the 30s test timeout, with room for a slow Windows runner's timers.
+const waitFor = async (predicate: () => boolean, timeoutMs = 25_000): Promise<void> => {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) return;
