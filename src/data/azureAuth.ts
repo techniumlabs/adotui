@@ -39,20 +39,10 @@ const expiryFrom = (result: AccessTokenResult): number => {
   return Date.now() + FALLBACK_TTL_MS;
 };
 
-/**
- * Returns an Authorization header value, or null when no credentials are
- * available. PATs are used verbatim; AAD tokens are cached until expiry.
- */
-export const getAdoAuthHeader = async (): Promise<string | null> => {
-  const pat = process.env.AZURE_DEVOPS_EXT_PAT;
-  if (pat) {
-    return `Basic ${btoa(`:${pat}`)}`;
-  }
+/** The `az` call currently running, shared by every caller that arrives meanwhile. */
+let inflight: Promise<string | null> | null = null;
 
-  if (cached && Date.now() < cached.expiresAt) {
-    return cached.header;
-  }
-
+const acquireToken = async (): Promise<string | null> => {
   try {
     const result = await runJson<AccessTokenResult>(AZ, [
       "account",
@@ -70,7 +60,33 @@ export const getAdoAuthHeader = async (): Promise<string | null> => {
   }
 };
 
+/**
+ * Returns an Authorization header value, or null when no credentials are
+ * available. PATs are used verbatim; AAD tokens are cached until expiry.
+ */
+export const getAdoAuthHeader = async (): Promise<string | null> => {
+  const pat = process.env.AZURE_DEVOPS_EXT_PAT;
+  if (pat) {
+    return `Basic ${btoa(`:${pat}`)}`;
+  }
+
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.header;
+  }
+
+  // A cold start fires several requests at once; without sharing, each one
+  // would spawn its own `az` process (~400-1200ms of Python apiece).
+  if (!inflight) {
+    const request = acquireToken().finally(() => {
+      if (inflight === request) inflight = null;
+    });
+    inflight = request;
+  }
+  return inflight;
+};
+
 /** Drops the cached token (called after a 401 so the next call re-acquires). */
 export const clearAuthHeaderCache = (): void => {
   cached = null;
+  inflight = null;
 };
