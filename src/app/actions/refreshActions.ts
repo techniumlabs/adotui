@@ -1,4 +1,6 @@
-import { loadInitialData, reloadData } from "../dataController";
+import { loadInitialData, reloadData, type LoadResult } from "../dataController";
+import type { AppData } from "../../domain/types";
+import type { LoadState } from "../types";
 import { CACHE_REVALIDATE_DELAY_MS, PARTIAL_COMMIT_MS, PROGRESS_THROTTLE_MS } from "../constants";
 import { getState, patchState, updateState } from "../store";
 import { clampSelection } from "../selectors";
@@ -72,6 +74,23 @@ export const resetRefreshState = (): void => {
   isRefreshing = false;
   pendingReason = null;
   loadEpoch += 1;
+};
+
+/** The tree once a load finishes (see the comment at the call site). */
+const settledData = (current: AppData, result: LoadResult, keepStreamed: boolean): AppData => {
+  if (!result.ok) return current;
+  if (!keepStreamed) return result.data;
+  const email = result.data.currentUserEmail;
+  return email && email !== current.currentUserEmail ? { ...current, currentUserEmail: email } : current;
+};
+
+/** The banner once a load finishes. */
+const settledBanner = (result: LoadResult, reason: RefreshReason, isMissingConfig: boolean): string => {
+  if (isMissingConfig) {
+    return result.ok ? "Welcome to the configuration setup wizard!" : "No configuration found. Welcome to initial setup!";
+  }
+  if (!result.ok) return "Failed to load data. See toast for details.";
+  return reason === "auto" ? `Auto-refresh synced. ${result.banner}` : result.banner;
 };
 
 export const doRefresh = (reason: RefreshReason): void => {
@@ -159,17 +178,11 @@ export const doRefresh = (reason: RefreshReason): void => {
         // selection, so only adopt result.data when nothing streamed. A failed
         // load returns an empty tree: keep what is on screen instead.
         const keepStreamed = streamedAny && result.ok && !result.fromCache;
-        const nextData = !result.ok
-          ? current.data
-          : keepStreamed
-            ? (result.data.currentUserEmail &&
-               result.data.currentUserEmail !== current.data.currentUserEmail
-                ? { ...current.data, currentUserEmail: result.data.currentUserEmail }
-                : current.data)
-            : result.data;
+        const nextData = settledData(current.data, result, keepStreamed);
 
         const isMissingConfig = (!result.ok && result.errorType === "missing") || process.env.ADOTUI_FORCE_SETUP === "1";
-        const nextLoadState = isMissingConfig ? "setup" : (result.ok ? "ready" : "error");
+        let nextLoadState: LoadState = result.ok ? "ready" : "error";
+        if (isMissingConfig) nextLoadState = "setup";
 
         return {
           loadProgress: null,
@@ -177,15 +190,7 @@ export const doRefresh = (reason: RefreshReason): void => {
           ...clampSelection(current, nextData),
           lastRefreshISO: new Date().toISOString(),
           loadState: nextLoadState,
-          banner: result.ok
-            ? (isMissingConfig
-              ? "Welcome to the configuration setup wizard!"
-              : (reason === "auto"
-                ? `Auto-refresh synced. ${result.banner}`
-                : result.banner))
-            : isMissingConfig
-              ? "No configuration found. Welcome to initial setup!"
-              : "Failed to load data. See toast for details.",
+          banner: settledBanner(result, reason, isMissingConfig),
         };
       });
     })

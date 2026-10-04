@@ -41,6 +41,11 @@ export const editFilterText = (edit: (current: string) => string): void => {
 };
 
 /** Keeps the typed filter and closes the prompt (empty tree filter = all). */
+const filterBanner = (text: string, files: boolean): string => {
+  if (text.length > 0) return `Filter applied: ${text}`;
+  return files ? "File filter cleared." : "Filter cleared (showing all).";
+};
+
 export const applyFilter = (): void => {
   updateState((c) => {
     const text = (c.filterTarget === "files" ? c.fileFilter : c.treeFilter).trim();
@@ -50,11 +55,7 @@ export const applyFilter = (): void => {
       ...(c.filterTarget === "files"
         ? { fileFilter: text }
         : { treeFilter: cleared ? "all" : text }),
-      banner: cleared
-        ? c.filterTarget === "files"
-          ? "File filter cleared."
-          : "Filter cleared (showing all)."
-        : `Filter applied: ${text}`,
+      banner: filterBanner(text, c.filterTarget === "files"),
     };
   });
 };

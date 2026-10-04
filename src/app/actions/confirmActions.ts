@@ -8,6 +8,7 @@ import {
   completePr,
   rejectPr,
   type CompletionOutcome,
+  type PrRef,
 } from "../../data/azure";
 import { resolvePrRefFromParts } from "../dataController";
 import { getState, patchState, updateState } from "../store";
@@ -71,6 +72,22 @@ export const describeCompletion = (
   }
 };
 
+/** How each action is named in the prompt and the banners. */
+const ACTION_TEXT: Record<ConfirmKind, { verb: string; pending: string; success: string }> = {
+  approve: { verb: "Approve", pending: "Approving PR...", success: "PR approved." },
+  reject: { verb: "Reject", pending: "Rejecting PR...", success: "PR rejected (changes requested)." },
+  abandon: { verb: "Abandon", pending: "Abandoning PR...", success: "PR abandoned." },
+  // Completion reports its own outcome (describeCompletion).
+  complete: { verb: "Complete & merge", pending: "Completing PR...", success: "" },
+};
+
+/** The actions applied as soon as Azure DevOps accepts them. */
+const IMMEDIATE_ACTIONS: Record<Exclude<ConfirmKind, "complete">, (ref: PrRef) => Promise<void>> = {
+  approve: approvePr,
+  reject: rejectPr,
+  abandon: abandonPr,
+};
+
 export const runConfirmedAction = (confirm: NonNullable<AppState["pendingConfirm"]>): void => {
   const { kind, target, completionOptions } = confirm;
 
@@ -83,16 +100,8 @@ export const runConfirmedAction = (confirm: NonNullable<AppState["pendingConfirm
     }
   };
 
-  const pendingBanner =
-    kind === "approve"  ? "Approving PR..."  :
-    kind === "reject"   ? "Rejecting PR..."  :
-    kind === "abandon"  ? "Abandoning PR..." : "Completing PR...";
-
+  const { pending: pendingBanner, success: successBanner } = ACTION_TEXT[kind];
   const opts = completionOptions ?? DEFAULT_COMPLETION_OPTIONS;
-  const successBanner =
-    kind === "approve"  ? "PR approved."                              :
-    kind === "reject"   ? "PR rejected (changes requested)."          :
-    "PR abandoned.";
 
   const ref = resolvePrRefFromParts({
     organizationUrl: target.organizationUrl,
@@ -127,7 +136,7 @@ export const runConfirmedAction = (confirm: NonNullable<AppState["pendingConfirm
   }
 
   transformPrById(locator, optimistic, pendingBanner, "loading");
-  (kind === "approve" ? approvePr(ref) : kind === "reject" ? rejectPr(ref) : abandonPr(ref))
+  IMMEDIATE_ACTIONS[kind](ref)
     .then(() => {
       patchState({ banner: successBanner, loadState: "ready" });
       doRefresh("auto");
@@ -156,10 +165,7 @@ export const armConfirm = (kind: ConfirmKind, completionOptions?: CompletionOpti
     title: selectedPr.title,
     lastMergeSourceCommit: selectedPr.lastMergeSourceCommit,
   };
-  const verb =
-    kind === "approve"  ? "Approve"        :
-    kind === "reject"   ? "Reject"         :
-    kind === "abandon"  ? "Abandon"        : "Complete & merge";
+  const { verb } = ACTION_TEXT[kind];
   const suffix = kind === "abandon" || kind === "complete" ? " (irreversible)" : "";
   patchState({
     pendingConfirm: completionOptions ? { kind, target, completionOptions } : { kind, target },

@@ -141,6 +141,25 @@ const readBody = async <T>(resp: Response, url: string, asText: boolean): Promis
   }
 };
 
+/**
+ * Whether a response is worth another attempt, and how.
+ * - "auth": an expired cached token; drop it and re-acquire. A sign-in page
+ *   gets one retry only: a second one will not change for a third token (a
+ *   mistyped organization would otherwise cost several `az` processes).
+ * - "wait": throttled, or a transient server fault on a replay-safe method;
+ *   back off (honouring Retry-After).
+ */
+const retryAfterResponse = (
+  resp: Response,
+  { signIn, replaySafe, attempt }: { signIn: boolean; replaySafe: boolean; attempt: number },
+): "auth" | "wait" | null => {
+  const authAttempts = signIn ? ADO_SIGN_IN_MAX_ATTEMPTS : ADO_MAX_ATTEMPTS;
+  if ((resp.status === HTTP.UNAUTHORIZED || signIn) && attempt < authAttempts) return "auth";
+  const transient = resp.status === HTTP.TOO_MANY_REQUESTS || (resp.status >= HTTP.SERVER_ERROR && replaySafe);
+  if (transient && attempt < ADO_MAX_ATTEMPTS) return "wait";
+  return null;
+};
+
 const requestUrl = async <T>(
   baseUrl: string,
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
@@ -184,18 +203,12 @@ const requestUrl = async <T>(
     }
 
     const signIn = isSignInPage(resp, asText);
-
-    // An expired cached token: drop it and let the next attempt re-acquire. A
-    // sign-in page gets one retry only: a second one will not change for a
-    // third token (a mistyped organization would otherwise cost several `az`
-    // processes before the error shows).
-    const authAttempts = signIn ? ADO_SIGN_IN_MAX_ATTEMPTS : ADO_MAX_ATTEMPTS;
-    if ((resp.status === HTTP.UNAUTHORIZED || signIn) && attempt < authAttempts) {
+    const retry = retryAfterResponse(resp, { signIn, replaySafe, attempt });
+    if (retry === "auth") {
       clearAuthHeaderCache();
       continue;
     }
-    // Throttled or a transient server fault: honour Retry-After when given.
-    if ((resp.status === HTTP.TOO_MANY_REQUESTS || (resp.status >= HTTP.SERVER_ERROR && replaySafe)) && attempt < ADO_MAX_ATTEMPTS) {
+    if (retry === "wait") {
       await Bun.sleep(retryDelayMs(resp, attempt));
       continue;
     }

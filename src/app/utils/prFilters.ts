@@ -45,6 +45,27 @@ export const isAssignedReviewer = (pr: PullRequest, currentUserEmail?: string): 
     isCurrentUser(r.displayName + " " + r.uniqueName, currentUserEmail),
   );
 
+/** `key:value` filter terms; an unknown key matches everything. */
+const FIELD_MATCHERS: Partial<Record<string, (pr: PullRequest, value: string) => boolean>> = {
+  author: (pr, value) => pr.author.toLowerCase().includes(value),
+  merge: (pr, value) => pr.mergeStatus.toLowerCase().includes(value),
+  title: (pr, value) => pr.title.toLowerCase().includes(value),
+  // Not currently supported — filter returns no match to avoid silent aliasing.
+  description: () => false,
+  tag: (pr, value) => !!pr.tags?.some((tag) => tag.toLowerCase().includes(value)),
+};
+
+/** One whitespace-separated filter term: `key:value`, or free text matched against title and author. */
+const matchesFilterPart = (pr: PullRequest, part: string): boolean => {
+  const idx = part.indexOf(":");
+  if (idx === -1) {
+    const val = part.toLowerCase();
+    return pr.title.toLowerCase().includes(val) || pr.author.toLowerCase().includes(val);
+  }
+  const matcher = FIELD_MATCHERS[part.slice(0, idx).toLowerCase()];
+  return matcher ? matcher(pr, part.slice(idx + 1).toLowerCase()) : true;
+};
+
 export const matchesTreeFilter = (pr: PullRequest, filterStr: string, currentUserEmail?: string): boolean => {
   if (!filterStr || filterStr === "all" || filterStr === "with-prs") return true;
 
@@ -54,40 +75,7 @@ export const matchesTreeFilter = (pr: PullRequest, filterStr: string, currentUse
     return isMyPr(pr, currentUserEmail) || isAssignedReviewer(pr, currentUserEmail);
   }
 
-  const parts = filterStr.split(/\s+/);
-  for (const part of parts) {
-    if (part.includes(":")) {
-      const idx = part.indexOf(":");
-      const key = part.slice(0, idx).toLowerCase();
-      const value = part.slice(idx + 1).toLowerCase();
-
-      switch (key) {
-        case "author":
-          if (!pr.author.toLowerCase().includes(value)) return false;
-          break;
-        case "merge":
-          if (!pr.mergeStatus.toLowerCase().includes(value)) return false;
-          break;
-        case "title":
-          if (!pr.title.toLowerCase().includes(value)) return false;
-          break;
-        case "description":
-          // Not currently supported — filter returns no match to avoid silent aliasing.
-          return false;
-        case "tag":
-          if (!pr.tags?.some(tag => tag.toLowerCase().includes(value))) return false;
-          break;
-        default:
-          break;
-      }
-    } else {
-      const val = part.toLowerCase();
-      if (!pr.title.toLowerCase().includes(val) && !pr.author.toLowerCase().includes(val)) {
-        return false;
-      }
-    }
-  }
-  return true;
+  return filterStr.split(/\s+/).every((part) => matchesFilterPart(pr, part));
 };
 
 export const getVisiblePrs = (

@@ -148,7 +148,9 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
 
   // Support both the documented `projects` array and a shorthand where the
   // top level is directly an array of project configs.
-  const projectsRaw = Array.isArray(raw) ? (raw as unknown[]) : Array.isArray(record.projects) ? record.projects : [];
+  let projectsRaw: unknown[] = [];
+  if (Array.isArray(raw)) projectsRaw = raw;
+  else if (Array.isArray(record.projects)) projectsRaw = record.projects;
   if (projectsRaw.length === 0) {
     return invalid(source, `Config at ${source} has no "projects". Add at least one { organization, project }.`);
   }

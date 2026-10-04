@@ -8,7 +8,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 const LIMITS = {
   "max-lines": 300,
   "max-lines-per-function": 150,
-  complexity: 25,
+  complexity: 20,
   "max-params": 5,
   "max-depth": 4,
 };
@@ -23,7 +23,7 @@ const limitRule = (rule, max) => [
 /**
  * STANDARDS DEBT: files that already exceed a limit, pinned at today's value
  * so they cannot get worse. Fix the file, then delete its entry. Never add a
- * file and never raise a number — split the code instead (PLAN.md, Phase 6).
+ * file and never raise a number — split the code instead. (Empty: keep it so.)
  */
 const DEBT = {
 };
@@ -73,6 +73,11 @@ export default [
     rules: {
       "no-magic-numbers": ["error", { ignore: [-1, 0, 1, 2], ignoreArrayIndexes: true, ignoreDefaultValues: true, enforceConst: true }],
     },
+  },
+  // Logic layers: no nested ternaries (early returns or a lookup table instead).
+  {
+    files: ["src/data/**/*.ts", "src/app/actions/**/*.ts", "src/app/hooks/**/*.ts", "src/app/utils/**/*.ts"],
+    rules: { "no-nested-ternary": "error" },
   },
   // Layering: shared <- domain <- data <- app. Imports only point downward.
   {

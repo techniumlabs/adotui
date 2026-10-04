@@ -24,8 +24,10 @@ const text =
   };
 
 const mergeStrategy: FieldEditor = (opts, input, key) => {
-  const step = key.leftArrow || input === "h" ? -1 : key.rightArrow || input === "l" ? 1 : 0;
-  if (step === 0) return null;
+  let step: 1 | -1;
+  if (key.leftArrow || input === "h") step = -1;
+  else if (key.rightArrow || input === "l") step = 1;
+  else return null;
   const strategy = cycleMergeStrategy(opts.mergeStrategy, step);
   return { ...opts, mergeStrategy: strategy, squashMerge: strategy === "squash" };
 };

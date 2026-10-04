@@ -54,12 +54,10 @@ export interface LoadOptions {
   requestId?: number;
 }
 
-const describeError = (cause: unknown): string =>
-  cause instanceof AdoHttpError
-    ? cause.detail
-    : cause instanceof Error
-      ? cause.message
-      : String(cause);
+const describeError = (cause: unknown): string => {
+  if (cause instanceof AdoHttpError) return cause.detail;
+  return cause instanceof Error ? cause.message : String(cause);
+};
 
 /**
  * Runs `fn` over `items` with at most `limit` tasks in flight, preserving
