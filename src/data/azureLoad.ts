@@ -221,14 +221,18 @@ const resolveProjectId = async (
   return undefined;
 };
 
-/** Fetches blocking policy evaluations for a PR (check rollup). */
+/**
+ * Fetches blocking policy evaluations for a PR (check rollup). Returns null
+ * when they could not be fetched, which is not the same as "no policies": the
+ * caller keeps the counts it already has instead of showing 0 checks.
+ */
 const listPrPolicies = async (
   organization: string,
   project: string,
   projectId: string | undefined,
   prId: number,
-): Promise<AzurePolicyEvaluation[]> => {
-  if (!projectId) return [];
+): Promise<AzurePolicyEvaluation[] | null> => {
+  if (!projectId) return null;
   try {
     const result = await adoGet<AdoList<AzurePolicyEvaluation>>(
       organization,
@@ -240,19 +244,20 @@ const listPrPolicies = async (
       },
     );
     return result.value ?? [];
-  } catch {
-    // Policies may be unavailable; treat as no checks rather than failing.
-    return [];
+  } catch (cause) {
+    // Policies may be unavailable (no permission, no policy service).
+    debugLog("listPrPolicies failed", prId, cause);
+    return null;
   }
 };
 
-/** Fetches work items linked to a PR (refs, then one batch hydration call). */
+/** Fetches work items linked to a PR (refs, then one batch hydration call); null on failure. */
 const listPrWorkItems = async (
   organization: string,
   project: string,
   repositoryId: string,
   prId: number,
-): Promise<PullRequestWorkItem[]> => {
+): Promise<PullRequestWorkItem[] | null> => {
   try {
     const refs = await adoGet<AdoList<{ id?: string | number }>>(
       organization,
@@ -278,8 +283,9 @@ const listPrWorkItems = async (
         type: raw.fields?.["System.WorkItemType"] ?? "Unknown",
         url: raw.url ?? "",
       }));
-  } catch {
-    return [];
+  } catch (cause) {
+    debugLog("listPrWorkItems failed", prId, cause);
+    return null;
   }
 };
 
@@ -312,7 +318,8 @@ const listIterationChanges = async (
 
 /**
  * Fetches changed files for a PR from the latest iteration, along with the
- * commit pair the diff view needs to fetch file contents lazily.
+ * commit pair the diff view needs to fetch file contents lazily. Null when the
+ * fetch failed (a PR with no iterations is a real, empty result).
  */
 const listPrFileChanges = async (
   organization: string,
@@ -321,7 +328,7 @@ const listPrFileChanges = async (
   prId: number,
   sourceCommit: string | undefined,
   targetCommit: string | undefined,
-): Promise<{ files: PullRequestFileChange[]; iterSourceCommit?: string; iterTargetCommit?: string }> => {
+): Promise<{ files: PullRequestFileChange[]; iterSourceCommit?: string; iterTargetCommit?: string } | null> => {
   const prPath = `${seg(project)}/_apis/git/repositories/${seg(repositoryId)}/pullRequests/${prId}`;
   try {
     const iterations = await adoGet<AzureIterationList>(organization, `${prPath}/iterations`);
@@ -345,7 +352,7 @@ const listPrFileChanges = async (
     return { files, iterSourceCommit, iterTargetCommit };
   } catch (cause) {
     debugLog("listPrFileChanges failed", prId, cause);
-    return { files: [] };
+    return null;
   }
 };
 
@@ -386,23 +393,29 @@ export const fetchPrDetails = async (pr: PullRequest): Promise<Partial<PullReque
     fetchPrComments(pr.organizationUrl, pr.project, repositoryId, pr.id),
   ]);
 
-  const checks = summarizeChecks(policies);
-  const threadList = threads ?? [];
-
-  return {
-    changedFiles: fileRes.files,
-    iterSourceCommit: fileRes.iterSourceCommit,
-    iterTargetCommit: fileRes.iterTargetCommit,
-    checksPassed: checks.passed,
-    checksTotal: checks.total,
-    workItems: items,
-    comments: threadList.reduce((acc, t) => acc + t.comments.length, 0),
-    activeComments: threadList.reduce(
+  // Each fetch reports null on failure. A failed one is left out of the result,
+  // so applying it keeps what the PR already shows instead of overwriting it
+  // with zeros (a refresh would otherwise blank the counts on a network blip).
+  const details: Partial<PullRequest> = { detailsLoaded: true };
+  if (fileRes) {
+    details.changedFiles = fileRes.files;
+    details.iterSourceCommit = fileRes.iterSourceCommit;
+    details.iterTargetCommit = fileRes.iterTargetCommit;
+  }
+  if (policies) {
+    const checks = summarizeChecks(policies);
+    details.checksPassed = checks.passed;
+    details.checksTotal = checks.total;
+  }
+  if (items) details.workItems = items;
+  if (threads) {
+    details.comments = threads.reduce((acc, t) => acc + t.comments.length, 0);
+    details.activeComments = threads.reduce(
       (acc, t) => acc + (t.status === "active" || t.status === "pending" ? t.comments.length : 0),
-      0
-    ),
-    detailsLoaded: true,
-  };
+      0,
+    );
+  }
+  return details;
 };
 
 /** Structured fetch progress: how many projects are done out of the total. */

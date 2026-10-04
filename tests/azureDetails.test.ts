@@ -4,17 +4,24 @@ import type { PullRequest } from "../src/domain/types";
 
 const realFetch = globalThis.fetch;
 let savedPat: string | undefined;
+let savedMock: string | undefined;
 let requests: URL[] = [];
 
 beforeEach(() => {
   savedPat = process.env.AZURE_DEVOPS_EXT_PAT;
   process.env.AZURE_DEVOPS_EXT_PAT = "test-pat";
+  // Other test files set ADOTUI_MOCK globally, and mock mode answers comment
+  // fetches with canned threads instead of going through fetch.
+  savedMock = process.env.ADOTUI_MOCK;
+  delete process.env.ADOTUI_MOCK;
   requests = [];
 });
 afterEach(() => {
   globalThis.fetch = realFetch;
   if (savedPat === undefined) delete process.env.AZURE_DEVOPS_EXT_PAT;
   else process.env.AZURE_DEVOPS_EXT_PAT = savedPat;
+  if (savedMock === undefined) delete process.env.ADOTUI_MOCK;
+  else process.env.ADOTUI_MOCK = savedMock;
 });
 
 const pr = {
@@ -33,11 +40,13 @@ const entries = (from: number, count: number) =>
   Array.from({ length: count }, (_, i) => ({ changeType: "edit", item: { path: `/f${from + i}.ts` } }));
 
 /** Routes the endpoints fetchPrDetails touches; `changes` answers the paged one. */
-const serve = (changes: (skip: number) => unknown) => {
+const serve = (changes: (skip: number) => unknown, failing: string[] = []) => {
   globalThis.fetch = (async (input: string | URL) => {
     const url = new URL(String(input));
     requests.push(url);
     const path = url.pathname;
+    // 403 is not retried, so a failing endpoint costs no backoff sleep.
+    if (failing.some((suffix) => path.endsWith(suffix))) return json({ message: "denied" }, 403);
     if (path.endsWith("/iterations")) {
       return json({ value: [{ id: 1, sourceRefCommit: { commitId: "src" }, commonRefCommit: { commitId: "tgt" } }] });
     }
@@ -76,5 +85,44 @@ describe("iteration changes paging", () => {
     serve(() => ({ changeEntries: entries(0, 3) }));
     expect((await fetchPrDetails(pr)).changedFiles).toHaveLength(3);
     expect(requests.filter((u) => u.pathname.endsWith("/changes"))).toHaveLength(1);
+  });
+});
+
+describe("partial failures keep what the PR already shows", () => {
+  const ok = () => ({ changeEntries: entries(0, 2) });
+  const keys = async (failing: string[]) => {
+    serve(ok, failing);
+    return Object.keys(await fetchPrDetails(pr)).sort();
+  };
+  const ALL = ["activeComments", "changedFiles", "checksPassed", "checksTotal", "comments", "detailsLoaded", "iterSourceCommit", "iterTargetCommit", "workItems"];
+
+  test("everything succeeding reports every field", async () => {
+    expect(await keys([])).toEqual(ALL);
+  });
+
+  test("failed policies leave the check counts out (not 0/0)", async () => {
+    expect(await keys(["/policy/evaluations"])).toEqual(ALL.filter((k) => !k.startsWith("checks")));
+  });
+
+  test("failed work items leave workItems out (not [])", async () => {
+    expect(await keys(["/workitems"])).toEqual(ALL.filter((k) => k !== "workItems"));
+  });
+
+  test("failed comments leave the comment counts out (not 0)", async () => {
+    expect(await keys(["/threads"])).toEqual(ALL.filter((k) => k !== "comments" && k !== "activeComments"));
+  });
+
+  test("failed file changes leave the files and commits out (not [])", async () => {
+    expect(await keys(["/iterations"])).toEqual(
+      ALL.filter((k) => k !== "changedFiles" && !k.startsWith("iter")),
+    );
+  });
+
+  test("a PR with no iterations reports an empty file list (a real result)", async () => {
+    globalThis.fetch = (async (input: string | URL) => {
+      const path = new URL(String(input)).pathname;
+      return json(path.endsWith("/iterations") ? { value: [] } : { value: [] });
+    }) as unknown as typeof fetch;
+    expect((await fetchPrDetails(pr)).changedFiles).toEqual([]);
   });
 });

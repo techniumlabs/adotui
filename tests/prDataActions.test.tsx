@@ -100,6 +100,13 @@ describe("updatePr revalidation", () => {
     expect(prIn("core").checksPassed).toBe(3);
   });
 
+  test("fields absent from the details keep their previous values", () => {
+    updatePr(makePr(1, "core"), { checksPassed: 4, checksTotal: 5, comments: 3, workItems: [{ id: 9 } as never] });
+    updatePr(makePr(1, "core"), { detailsLoaded: true }); // every detail fetch failed
+    expect(prIn("core")).toMatchObject({ checksPassed: 4, checksTotal: 5, comments: 3, detailsLoaded: true });
+    expect(prIn("core").workItems).toHaveLength(1);
+  });
+
   test("a failed file fetch (no commits) keeps the files shown", () => {
     updatePr(makePr(1, "core"), { changedFiles: [], detailsLoaded: true });
     expect(prIn("core").changedFiles).toHaveLength(1);
