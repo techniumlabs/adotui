@@ -7,7 +7,7 @@
 import { withTempFile } from "./tempFile";
 import type { PullRequestFileChange } from "../domain/types";
 import { adoGetText, seg } from "./adoFetch";
-import { debugLog } from "../app/utils";
+import { debugLog } from "../shared/debugLog";
 
 /**
  * Fetches the raw text content of a file at a specific commit from the Azure

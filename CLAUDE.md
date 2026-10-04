@@ -4,7 +4,7 @@
 - **Runtime**: Bun (default to using Bun instead of Node.js)
 - **UI Framework**: React + Ink (Terminal UI)
 - **Language**: TypeScript
-- **Backend API**: Azure DevOps REST API via `src/data/adoFetch.ts` (auth header cached in `azureAuth.ts`). The `az` CLI is still used for credentials (`az account get-access-token`), the availability check, and PR mutations — reads must not spawn `az`, a process costs ~400-1200ms before the request starts.
+- **Backend API**: Azure DevOps REST API via `src/data/adoFetch.ts` (auth header cached in `azureAuth.ts`). Reads AND writes (votes, abandon, complete) are REST; the `az` CLI is only the credential source (`az account get-access-token`, when no PAT is set) — never spawn `az` for data, a process costs ~400-1200ms before the request starts. The signed-in identity comes from `azureIdentity.ts` (`connectionData`, preview api-version).
 
 ## Bun Conventions
 - Use `bun <file>` instead of `node <file>`
@@ -13,7 +13,7 @@
 - Use `bun run <script>` instead of `npm run <script>`
 - Prefer `Bun.file` over `node:fs`'s readFile/writeFile
 - Use `Bun.spawn` or `Bun.$` instead of `child_process` or `execa`.
-- Documented exceptions: `src/data/command.ts` stays on `node:child_process` (the single subprocess entry point; mature timeout/kill/stream semantics every az call relies on), and `src/app/utils/debugLog.ts` keeps `node:fs` `appendFileSync` (append with strict ordering, which `Bun.file` doesn't cover).
+- Documented exceptions: `src/data/command.ts` stays on `node:child_process` (the single subprocess entry point; mature timeout/kill/stream semantics every az call relies on), and `src/shared/debugLog.ts` keeps `node:fs` `appendFileSync` (append with strict ordering, which `Bun.file` doesn't cover).
 
 ## Terminal UI (Ink) Guidelines
 - **Layout Model**: Use standard React `<Box>` flexbox properties. ADOTUI relies on a strict split-pane structure with a fixed-width left column and dynamic-width right column. 
@@ -55,11 +55,11 @@ test("example test", () => {
 Enforced by `bun run lint` (CI fails on a violation) unless marked *guideline*.
 
 - **Size limits** (`src/`, code lines only — blanks and comments don't count): file ≤ 300 · function or component ≤ 150 (guideline: ≤ 80) · cyclomatic complexity ≤ 25 (guideline: ≤ 15) · parameters ≤ 5 (more → a parameter object, like `PrTarget`) · nesting depth ≤ 4. Over a limit means split: extract a hook, a sub-component or a module. Files already over are pinned at today's value in `eslint.config.js` under `DEBT` — fix the file, then delete its entry; never add a file or raise a number. `src/data/mock.ts` (a fixture) is exempt.
-- **Layering**: `domain/` (pure types) ← `data/` (Azure REST, CLI, config; no React) ← `app/` (state, UI). Imports only point downward. Four `data/` files still import upward (PLAN.md 6.6).
+- **Layering**: `shared/` (`debugLog`) ← `domain/` (pure types) ← `data/` (Azure REST, config; no React) ← `app/` (state, UI). Imports only point downward; lint-enforced with no exceptions.
 - **Constants**: no magic numbers or strings for tunables — timeouts, retry counts, page sizes, TTLs, limits, API versions, URLs. Name them `UPPER_SNAKE` with a unit suffix (`_MS`, `_SIZE`) and keep them in the layer's constants module: `src/app/constants.ts` for UI/app, `src/data/constants.ts` for REST/auth/config (to be created, PLAN.md 6.1; today 8 of them are spread over 7 files). Layout numbers inside one component's JSX are the only exception. *Not lint-enforced yet; `no-magic-numbers` is switched on for the logic layers when 6.1 lands.*
 - **Reusable components**: shared building blocks live in `src/app/components/ui/` (planned: `Pane`, `PanelHeader`, `EmptyState` — PLAN.md 6.3). Rule of three: the third copy of a JSX pattern becomes a shared component. Views compose primitives and take colours and glyphs only from `palette`/`glyph`. One exported component per file, `PascalCase.tsx`; hooks are `useThing.ts`.
 - **Design patterns** — use the ones already here; add a new one only for a concrete need:
-  - *Gateway*: `data/adoFetch.ts` is the only Azure DevOps HTTP entry point and `data/command.ts` runs every `az` call the data layer makes (`--diagnostic` in `main.tsx` is the one exception).
+  - *Gateway*: `data/adoFetch.ts` is the only Azure DevOps HTTP entry point and `data/command.ts` runs every `az` call the data layer makes (`--diagnostic` in `main.tsx` is the one exception; today only for the token).
   - *Adapter*: `data/azureNormalize.ts` maps Azure payloads to `domain/` types; the UI never sees raw Azure shapes.
   - *Command/Action*: every state change is a module-level action (see State Management); components never touch the store directly.
   - *Container/Presentational*: data hooks (`usePrComments`, …) own fetching, components own UI state.

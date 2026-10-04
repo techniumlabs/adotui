@@ -30,14 +30,14 @@ Status: `[x]` done · `[~]` code done, awaiting commit · `[ ]` pending
 - [x] 2.7 **Details gap:** `fetchPrDetails` returns only the fields whose fetch succeeded, so a partial failure can't zero counts.
 
 ## Phase 3 — PR actions over REST (drops the `azure-devops` extension)
-- [ ] 3.1 Identity from `GET _apis/connectionData` (cached per org); replaces `az account show`. Check the api-version on the live org first.
-- [ ] 3.2 Vote: `PUT …/pullRequests/{id}/reviewers/{myId}` with `{ vote: 10 }` / `{ vote: -10 }`.
-- [ ] 3.3 Abandon: `PATCH …/pullRequests/{id}` `{ status: "abandoned" }`.
-- [ ] 3.4 Complete: `PATCH` with `lastMergeSourceCommit` + `completionOptions` (all 4 merge strategies).
+- [x] 3.1 Identity from `GET _apis/connectionData` (cached per org); replaces `az account show`. Check the api-version on the live org first.
+- [x] 3.2 Vote: `PUT …/pullRequests/{id}/reviewers/{myId}` with `{ vote: 10 }` / `{ vote: -10 }`.
+- [x] 3.3 Abandon: `PATCH …/pullRequests/{id}` `{ status: "abandoned" }`.
+- [x] 3.4 Complete: `PATCH` with `lastMergeSourceCommit` + `completionOptions` (all 4 merge strategies).
       Carry `lastMergeSourceCommit` on the PR/`PrRef`; delete `completionStrategyNote`.
-- [ ] 3.5 Delete `checkAzAvailable`, `orgArgs` and the other az-only helpers; README prerequisites no longer need the extension.
-- [ ] 3.6 Tests with mocked fetch: method, path and body for each mutation; `connectionData` parsing.
-- [ ] 3.7 **Live check on `techium-labs-test`** (disposable org): approve, reject, abandon, complete (squash and rebase); reseed with `dev/testdata.ts` if needed.
+- [x] 3.5 Delete `checkAzAvailable`, `orgArgs` and the other az-only helpers; README prerequisites no longer need the extension.
+- [x] 3.6 Tests with mocked fetch: method, path and body for each mutation; `connectionData` parsing.
+- [x] 3.7 **Live check on `techium-labs-test`** (disposable org): approve, reject, abandon, complete (squash and rebase); reseed with `dev/testdata.ts` if needed.
 
 ## Phase 4 — CI and release
 - [ ] 4.1 `release.yml` runs typecheck and tests before building.
@@ -60,7 +60,7 @@ Standards and the lint ratchet are in (see CLAUDE.md "Code Standards", `DEBT` in
 - [ ] 6.3 **Shared UI primitives** in `src/app/components/ui/`: `Pane` (25 inline `borderStyle`s), `PanelHeader` (7 copies), `EmptyState` (8 copies).
 - [ ] 6.4 **Split the long components** to ≤ 150 lines each: `CommentsView` (296-line component, 320-line file), `FilesView`, `SetupScreen`, `App`, `PrDetails`, `OrganizationTree`, `usePrComments`.
 - [ ] 6.5 **Parameter objects:** `azureRest.ts` mutations (7 positional args → a `ThreadRef`), `azureDiff.fetchFileDiff`, `listPrFileChanges`.
-- [ ] 6.6 **Layering:** move `debugLog` and `CompletionOptions` below `app/`; drop `LAYERING_DEBT`.
+- [x] 6.6 **Layering:** `debugLog` → `src/shared/`, `CompletionOptions`/`MergeStrategy` → `domain/`; `LAYERING_DEBT` deleted (done with Phase 3).
 - [ ] 6.7 **Complexity:** `completionKeyboard` (45), `CommentsView` (41), `FilesView` (32), `config.ts` (29), `globals.ts` (28) → lookup tables / smaller functions; fix `usePasteHandler` nesting.
 - [ ] 6.8 **Tighten the ratchet** once `DEBT` is empty: function 150 → 100, complexity 25 → 20; enable `no-nested-ternary` (44 today).
 
@@ -70,6 +70,13 @@ Standards and the lint ratchet are in (see CLAUDE.md "Code Standards", `DEBT` in
 - The Kilo Code extension created `.kilo/worktrees/believed-skate/` (a full repo copy) mid-session and broke `bun run lint`;
   agent-tooling dirs (`.claude`, `.kilo`, `.serena`) are now ESLint-ignored. The worktree itself was left alone.
 - `adotui --update`'s old `curl -f … | bash` reported success when the download failed (fixed in 2.4).
+
+- Live check (techium-labs-test, 2026-10-04): identity needs `api-version=7.1-preview.1` (plain 7.1 → HTTP 400); approve/reject/abandon,
+  squash and rebase completion all verified. A real stale `lastMergeSourceCommit` is refused with 409 TF401192 (guard works);
+  an all-zero commit is treated as "none" and merges anyway. Test PRs consumed: 216 active (vote -10), 217 abandoned, 218 and 221 active
+  with conflicts, 219 and 220 completed — reseed with `bun dev/testdata.ts` when needed.
+- Completion is asynchronous: PATCH returning 200 does not mean merged (PR 218 was accepted but stayed active on conflicts), yet the
+  banner says "PR completed and merged." Pre-existing with `az`; fix = poll the PR after completing, or word the banner "Completion requested".
 
 ## Not fixing (noted)
 - With a PAT, a 401 is retried twice for nothing.

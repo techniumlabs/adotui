@@ -6,7 +6,6 @@ import {
   abandonPr,
   approvePr,
   completePr,
-  completionStrategyNote,
   rejectPr,
   type PrRef,
 } from "../../data/azure";
@@ -71,9 +70,7 @@ export const runConfirmedAction = (confirm: NonNullable<AppState["pendingConfirm
     kind === "approve"  ? "PR approved."                              :
     kind === "reject"   ? "PR rejected (changes requested)."          :
     kind === "abandon"  ? "PR abandoned."                             :
-    `PR completed and merged. ${serializeCompletionOptions(opts)}${
-      completionStrategyNote(opts) ? ` ${completionStrategyNote(opts)}` : ""
-    }`;
+    `PR completed and merged. ${serializeCompletionOptions(opts)}`;
 
   transformPrById(
     { organizationUrl: target.organizationUrl, repository: target.repository, prId: target.prId },
@@ -87,6 +84,7 @@ export const runConfirmedAction = (confirm: NonNullable<AppState["pendingConfirm
     project: target.project,
     repository: target.repository,
     prId: target.prId,
+    lastMergeSourceCommit: target.lastMergeSourceCommit,
   });
 
   if (!ref) {
@@ -125,6 +123,7 @@ export const armConfirm = (kind: ConfirmKind, completionOptions?: CompletionOpti
     repository: selectedPr.repository,
     prId: selectedPr.id,
     title: selectedPr.title,
+    lastMergeSourceCommit: selectedPr.lastMergeSourceCommit,
   };
   const verb =
     kind === "approve"  ? "Approve"        :

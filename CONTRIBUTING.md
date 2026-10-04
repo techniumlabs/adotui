@@ -4,7 +4,7 @@ Thanks for your interest in contributing! Here's how to get started.
 
 ## Development Setup
 
-1. **Prerequisites**: [Bun](https://bun.sh/) (latest), [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) with the `azure-devops` extension.
+1. **Prerequisites**: [Bun](https://bun.sh/) (latest), [Git](https://git-scm.com/downloads), and either the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) signed in (`az login`) or a PAT in `AZURE_DEVOPS_EXT_PAT`.
 2. Clone the repo and install dependencies:
    ```bash
    git clone https://github.com/techniumlabs/adotui.git
@@ -25,7 +25,7 @@ src/
 ├── domain/types.ts       # Domain model (PullRequest, AppData, etc.)
 ├── data/                 # Azure DevOps API layer
 │   ├── config.ts         # Config loading and validation
-│   ├── azure.ts          # az CLI command catalog
+│   ├── azure.ts          # barrel over the REST modules
 │   ├── azureRest.ts      # REST API calls
 │   ├── azureNormalize.ts # Raw → domain type mapping
 │   └── azureTypes.ts     # Azure wire types

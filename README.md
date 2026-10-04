@@ -1,13 +1,13 @@
 # adotui
 
-Terminal UI for monitoring pull requests across multiple Azure DevOps organizations and repositories, backed by the Azure CLI (`az`) — the way `ghui` uses `gh` for GitHub.
+Terminal UI for monitoring pull requests across multiple Azure DevOps organizations and repositories, talking to the Azure DevOps REST API directly (the Azure CLI is only an optional way to sign in) — the way `ghui` is a terminal UI for GitHub.
 
 ## Status
 
 - Bun + Ink + React + TypeScript
 - Grouped organization / repository / pull request view with split-pane layout
 - Keyboard-first navigation with filter search and dynamic focus
-- **Live Azure DevOps backend via the `az` CLI** (multi-org, multi-repo)
+- **Live Azure DevOps backend over REST** (multi-org, multi-repo; sign in with `az login` or a PAT)
 - Real PR actions: approve, reject, abandon, complete
 - Detailed pull request view with side-by-side metrics and diff/comment tabs
 - Auto-discovery of repositories per project
@@ -59,18 +59,10 @@ bun run start
 
 ## Prerequisites
 
-1. [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed (`az`).
-2. The Azure DevOps extension:
-   ```bash
-   az extension add --name azure-devops
-   ```
-3. Signed in with access to your organizations:
-   ```bash
-   az login
-   # or, for PAT-based auth:
-   # export AZURE_DEVOPS_EXT_PAT=<your-pat>
-   ```
-4. [Git](https://git-scm.com/downloads) on your `PATH` (adotui uses `git diff` to compute file diffs; this is what makes diffs work on Windows).
+1. Credentials for your Azure DevOps organizations — either:
+   - the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) signed in with `az login` (adotui only asks it for a token; the `azure-devops` extension is **not** needed), or
+   - a personal access token, via `export AZURE_DEVOPS_EXT_PAT=<your-pat>` or `pat` in the config. Approving, rejecting, abandoning and completing PRs need the **Code (Read & write)** scope.
+2. [Git](https://git-scm.com/downloads) on your `PATH` (adotui uses `git diff` to compute file diffs; this is what makes diffs work on Windows).
 
 ## Configuration
 
@@ -176,7 +168,8 @@ delete) require an explicit `y` confirmation — Enter does not confirm.
 
 - `src/data/config.ts` — loads and validates the multi-org/project config.
 - `src/data/command.ts` — CLI-agnostic process runner on `node:child_process` (run / runJson).
-- `src/data/azureCommon.ts` — shared Azure CLI status, organization, and JSON flags.
+- `src/data/azureCommon.ts` — constants for the `az` CLI (used only to obtain a token).
+- `src/data/azureIdentity.ts` — the signed-in identity (`connectionData`), used by votes and the "me" filter.
 - `src/data/adoFetch.ts` — REST client (cached auth, 429/401 retries, readable errors).
 - `src/data/azure.ts` — barrel over `azureLoad` / `azureRest` / `azureDiff` / `azureActions`.
 - `src/data/azureNormalize.ts` — maps Azure DevOps JSON to the domain model.
@@ -201,10 +194,14 @@ mapping:
 - `GET {project}/_apis/build/builds` — pipeline runs
 - `GET .../items` — file contents for diffs
 
-The `az` CLI is still used for credentials and for mutations:
+PR actions are REST calls too:
 
-- `az account get-access-token` — bearer token (cached until it expires;
-  `AZURE_DEVOPS_EXT_PAT` is used instead when set)
-- `az account show` — current user identity
-- `az repos pr set-vote` — approve / reject
-- `az repos pr update --status` — abandon / complete
+- `GET _apis/connectionData` — the signed-in identity (id and sign-in address)
+- `PUT .../pullrequests/{id}/reviewers/{me}` — approve (`10`) / reject (`-10`)
+- `PATCH .../pullrequests/{id}` — abandon, or complete with the chosen merge
+  strategy (all four are supported). Completion sends the source commit you
+  reviewed, so Azure DevOps refuses it if the branch has moved since.
+
+The `az` CLI is only used for one thing: `az account get-access-token` — a
+bearer token, cached until it expires (`AZURE_DEVOPS_EXT_PAT` is used instead
+when set).

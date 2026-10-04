@@ -1,7 +1,12 @@
-/** PR mutations: voting, abandoning and completing via `az repos pr`. */
-import type { CompletionOptions } from "../app/types";
-import { run } from "./command";
-import { AZ, orgArgs, jsonOutput } from "./azureCommon";
+/**
+ * PR mutations — vote, abandon, complete — over the Azure DevOps REST API
+ * (see adoFetch.ts). They throw AdoHttpError when Azure DevOps refuses; the
+ * confirm flow turns that into a banner.
+ */
+import type { CompletionOptions } from "../domain/types";
+import { AdoHttpError, adoGet, adoPatch, adoPut, seg } from "./adoFetch";
+import { getCurrentIdentity } from "./azureIdentity";
+import type { AzurePullRequest } from "./azureTypes";
 
 /** Identifies a specific PR for actions. */
 export interface PrRef {
@@ -9,99 +14,72 @@ export interface PrRef {
   project: string;
   repository: string;
   prId: number;
+  /**
+   * Head of the source branch when the user last saw the PR. Completion sends
+   * it so Azure DevOps refuses to merge commits pushed since the review.
+   */
+  lastMergeSourceCommit?: string;
 }
 
-/**
- * `az repos pr update` only exposes `--squash` for merge control; the other
- * domain strategies (noFastForward / rebase / rebaseMerge) cannot be selected
- * via this CLI and are governed by branch policy / server defaults. Callers
- * should surface `completionStrategyNote` to avoid claiming an unsupported
- * strategy was applied.
- */
-export const completionStrategyNote = (
-  options: CompletionOptions,
-): string | null => {
-  if (options.mergeStrategy === "squash" || options.mergeStrategy === "noFastForward") {
-    return null;
-  }
-  return `Note: '${options.mergeStrategy}' is not selectable via az; Azure used its policy/default merge.`;
+/** Azure DevOps error code: the source branch moved since `lastMergeSourceCommit`. */
+const SOURCE_MODIFIED_CODE = "TF401192";
+
+/** IdentityRefWithVote.vote values. */
+const VOTE_APPROVE = 10;
+const VOTE_REJECT = -10;
+
+const pullRequestPath = (ref: PrRef): string =>
+  `${seg(ref.project)}/_apis/git/repositories/${seg(ref.repository)}/pullrequests/${ref.prId}`;
+
+const castVote = async (ref: PrRef, vote: number): Promise<void> => {
+  const me = await getCurrentIdentity(ref.organization);
+  if (!me) throw new Error("Could not determine your Azure DevOps identity, so the vote was not cast.");
+  await adoPut(ref.organization, `${pullRequestPath(ref)}/reviewers/${me.id}`, { id: me.id, vote });
 };
 
-const mergeStrategyToAzFlags = (options: CompletionOptions): string[] => {
-  // Azure `pr update` completion only supports --squash; other strategies are
-  // governed by branch policy. We pass squash when selected (see
-  // completionStrategyNote for how unsupported strategies are surfaced).
-  const flags: string[] = [];
-  flags.push("--squash", options.mergeStrategy === "squash" ? "true" : "false");
-  flags.push(
-    "--delete-source-branch",
-    options.deleteSourceBranch ? "true" : "false",
-  );
-  flags.push(
-    "--transition-work-items",
-    options.transitionWorkItems ? "true" : "false",
-  );
-  if (options.bypassPolicy) {
-    flags.push("--bypass-policy", "true");
-    if (options.bypassReason) {
-      flags.push("--bypass-policy-reason", options.bypassReason);
-    }
-  }
-  if (options.mergeCommitMessage) {
-    flags.push("--merge-commit-message", options.mergeCommitMessage);
-  }
-  return flags;
-};
+export const approvePr = (ref: PrRef): Promise<void> => castVote(ref, VOTE_APPROVE);
 
-const setVote = async (
-  ref: PrRef,
-  vote: "approve" | "approve-with-suggestions" | "reject" | "reset" | "wait-for-author",
-): Promise<void> => {
-  await run(AZ, [
-    "repos",
-    "pr",
-    "set-vote",
-    "--id",
-    String(ref.prId),
-    "--vote",
-    vote,
-    ...orgArgs(ref.organization),
-    ...jsonOutput,
-  ]);
-};
-
-export const approvePr = (ref: PrRef): Promise<void> => setVote(ref, "approve");
-
-export const rejectPr = (ref: PrRef): Promise<void> => setVote(ref, "reject");
+export const rejectPr = (ref: PrRef): Promise<void> => castVote(ref, VOTE_REJECT);
 
 export const abandonPr = async (ref: PrRef): Promise<void> => {
-  await run(AZ, [
-    "repos",
-    "pr",
-    "update",
-    "--id",
-    String(ref.prId),
-    "--status",
-    "abandoned",
-    ...orgArgs(ref.organization),
-    ...jsonOutput,
-  ]);
+  await adoPatch(ref.organization, pullRequestPath(ref), { status: "abandoned" });
 };
 
-export const completePr = async (
-  ref: PrRef,
-  options: CompletionOptions,
-): Promise<void> => {
-  await run(AZ, [
-    "repos",
-    "pr",
-    "update",
-    "--id",
-    String(ref.prId),
-    "--status",
-    "completed",
-    ...mergeStrategyToAzFlags(options),
-    ...orgArgs(ref.organization),
-    ...jsonOutput,
-  ]);
+/** GitPullRequestCompletionOptions; optional fields are sent only when set. */
+const toCompletionOptions = (options: CompletionOptions) => ({
+  mergeStrategy: options.mergeStrategy,
+  deleteSourceBranch: options.deleteSourceBranch,
+  transitionWorkItems: options.transitionWorkItems,
+  ...(options.bypassPolicy
+    ? { bypassPolicy: true, ...(options.bypassReason ? { bypassReason: options.bypassReason } : {}) }
+    : {}),
+  ...(options.mergeCommitMessage ? { mergeCommitMessage: options.mergeCommitMessage } : {}),
+});
+
+export const completePr = async (ref: PrRef, options: CompletionOptions): Promise<void> => {
+  // Prefer the commit the user reviewed; fall back to the PR's current head
+  // for refs that never carried one (cached or mock-era data).
+  const commitId =
+    ref.lastMergeSourceCommit ??
+    (await adoGet<AzurePullRequest>(ref.organization, pullRequestPath(ref))).lastMergeSourceCommit?.commitId;
+  if (!commitId) {
+    throw new Error("This PR has no merge source commit yet (its merge may still be computing) — refresh and try again.");
+  }
+  try {
+    await adoPatch(ref.organization, pullRequestPath(ref), {
+      status: "completed",
+      lastMergeSourceCommit: { commitId },
+      completionOptions: toCompletionOptions(options),
+    });
+  } catch (cause) {
+    // Verified live: pushing to the source branch after the review makes Azure
+    // DevOps answer 409 TF401192, which is the guard doing its job.
+    if (cause instanceof AdoHttpError && cause.detail.includes(SOURCE_MODIFIED_CODE)) {
+      throw new Error(
+        "The source branch changed since you last loaded this PR — refresh, review the new commits, then complete again.",
+        { cause },
+      );
+    }
+    throw cause;
+  }
 };

@@ -1,8 +1,9 @@
-import type { AppData } from "../domain/types";
+import type { AppData, CompletionOptions, MergeStrategy } from "../domain/types";
+
+// Defined in domain/ (the data layer needs them); re-exported so app code is unchanged.
+export type { CompletionOptions, MergeStrategy };
 
 export type FocusArea = "tree" | "list" | "detail" | "command" | "completion" | "filter" | "files" | "comments" | "runs" | "help";
-
-export type MergeStrategy = "noFastForward" | "squash" | "rebase" | "rebaseMerge";
 
 export type TreeFilter = string;
 
@@ -17,6 +18,8 @@ export type PrTarget = {
   repository: string;
   prId: number;
   title: string;
+  /** Source-branch head when the PR was shown; completing is refused if it has moved. */
+  lastMergeSourceCommit?: string;
 };
 
 /**
@@ -32,16 +35,6 @@ export type PendingConfirm =
     }
   | null;
 
-export type CompletionOptions = {
-  autoCompleteIgnoreConfigIds: number[];
-  bypassPolicy: boolean;
-  bypassReason: string;
-  deleteSourceBranch: boolean;
-  mergeCommitMessage: string;
-  mergeStrategy: MergeStrategy;
-  squashMerge: boolean;
-  transitionWorkItems: boolean;
-};
 
 export type AppState = {
   data: AppData;

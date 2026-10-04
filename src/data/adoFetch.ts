@@ -89,7 +89,7 @@ const retryDelayMs = (resp: Response, attempt: number): number => {
 
 const requestUrl = async <T>(
   baseUrl: string,
-  method: "GET" | "POST" | "PATCH" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
   options: AdoRequestOptions & { body?: unknown; as?: "json" | "text" } = {},
 ): Promise<T> => {
@@ -158,6 +158,9 @@ export const adoGet = <T>(organization: string, path: string, options?: AdoReque
 
 export const adoPost = <T>(organization: string, path: string, body: unknown, options?: AdoRequestOptions): Promise<T> =>
   requestUrl<T>(organization, "POST", path, { ...options, body });
+
+export const adoPut = <T>(organization: string, path: string, body: unknown, options?: AdoRequestOptions): Promise<T> =>
+  requestUrl<T>(organization, "PUT", path, { ...options, body });
 
 export const adoPatch = <T>(organization: string, path: string, body: unknown, options?: AdoRequestOptions): Promise<T> =>
   requestUrl<T>(organization, "PATCH", path, { ...options, body });

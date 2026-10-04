@@ -107,6 +107,8 @@ export interface PullRequest {
   projectId?: string;
   iterSourceCommit?: string;
   iterTargetCommit?: string;
+  /** Head of the source branch at the last merge; completing sends it (see PrRef). */
+  lastMergeSourceCommit?: string;
   detailsLoaded?: boolean;
 }
 
@@ -128,3 +130,17 @@ export interface AppData {
   organizations: OrganizationNode[];
   currentUserEmail?: string;
 }
+
+export type MergeStrategy = "noFastForward" | "squash" | "rebase" | "rebaseMerge";
+
+/** How a PR is merged when completed (the UI's editable options). */
+export type CompletionOptions = {
+  autoCompleteIgnoreConfigIds: number[];
+  bypassPolicy: boolean;
+  bypassReason: string;
+  deleteSourceBranch: boolean;
+  mergeCommitMessage: string;
+  mergeStrategy: MergeStrategy;
+  squashMerge: boolean;
+  transitionWorkItems: boolean;
+};

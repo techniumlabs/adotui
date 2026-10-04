@@ -7,5 +7,5 @@ export * from "./format";
 export * from "./prFilters";
 export * from "./completionOptions";
 export * from "./browser";
-export * from "./debugLog";
+export * from "../../shared/debugLog";
 export * from "./scrollWindow";

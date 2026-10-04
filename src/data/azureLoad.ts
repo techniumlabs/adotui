@@ -30,7 +30,7 @@ import {
 } from "./azureNormalize";
 import { fetchPrComments } from "./azureRest";
 import { adoGet, adoGetFrom, AdoHttpError, seg, type AdoList } from "./adoFetch";
-import { debugLog } from "../app/utils";
+import { debugLog } from "../shared/debugLog";
 
 interface AzureProject {
   id: string;

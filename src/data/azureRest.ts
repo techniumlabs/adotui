@@ -12,7 +12,7 @@ import type {
   RunState,
 } from "../domain/types";
 import { adoDelete, adoGet, adoPatch, adoPost, seg, type AdoList } from "./adoFetch";
-import { debugLog } from "../app/utils";
+import { debugLog } from "../shared/debugLog";
 
 // ─── PR Comment types ─────────────────────────────────────────────────────────
 

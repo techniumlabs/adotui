@@ -201,5 +201,6 @@ export const normalizePullRequest = (
     // names (policy evaluations need the project id in particular).
     repositoryId: pr.repository?.id,
     projectId: pr.repository?.project?.id,
+    lastMergeSourceCommit: pr.lastMergeSourceCommit?.commitId,
   };
 };

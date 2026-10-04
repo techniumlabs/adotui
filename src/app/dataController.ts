@@ -1,13 +1,12 @@
 import { loadConfig } from "../data/config";
 import {
-  checkAzAvailable,
+  getCurrentIdentity,
   loadAppData,
   type LoadPartial,
   type LoadProgress,
   type PrRef,
 } from "../data/azure";
 import { MOCK_DATA } from "../data/mock";
-import { runJson } from "../data/command";
 import type { AppData, PullRequest, RepositoryNode } from "../domain/types";
 import { countTotalPrs } from "./utils";
 
@@ -37,13 +36,10 @@ export interface StreamOptions {
  */
 let cachedUserEmail: string | null | undefined;
 
-const resolveCurrentUser = async (): Promise<string | null> => {
+const resolveCurrentUser = async (organization: string): Promise<string | null> => {
   if (cachedUserEmail !== undefined) return cachedUserEmail;
-  const result = await runJson<{ user?: { name?: string } }>(
-    "az",
-    ["account", "show", "--output", "json"],
-  ).catch(() => null);
-  cachedUserEmail = result?.user?.name ?? null;
+  // Asked of the first configured organization: one config is one sign-in.
+  cachedUserEmail = (await getCurrentIdentity(organization))?.email ?? null;
   return cachedUserEmail;
 };
 
@@ -160,7 +156,7 @@ export const loadInitialData = async (
   }
 
   try {
-    const identityPromise = resolveCurrentUser();
+    const identityPromise = resolveCurrentUser(configResult.config.projects[0]!.organization);
     let identity: string | null = cachedUserEmail ?? null;
     let identityReleased = cachedUserEmail !== undefined;
     let buffered: LoadPartial[] = [];
@@ -220,10 +216,6 @@ export const loadInitialData = async (
       ok: true,
     };
   } catch (cause) {
-    const az = await checkAzAvailable();
-    if (!az.ok) {
-      return { data: { organizations: [] }, banner: az.error, ok: false };
-    }
     return {
       data: { organizations: [] },
       banner: `Failed to load data: ${
@@ -249,6 +241,7 @@ export const resolvePrRefFromParts = (parts: {
   project: string;
   repository: string;
   prId: number;
+  lastMergeSourceCommit?: string;
 }): PrRef | null => {
   if (isMockMode()) {
     return null;
@@ -261,6 +254,7 @@ export const resolvePrRefFromParts = (parts: {
     project: parts.project,
     repository: parts.repository,
     prId: parts.prId,
+    ...(parts.lastMergeSourceCommit ? { lastMergeSourceCommit: parts.lastMergeSourceCommit } : {}),
   };
 };
 
@@ -275,4 +269,5 @@ export const resolvePrRef = (pr: PullRequest): PrRef | null =>
     project: pr.project,
     repository: pr.repository,
     prId: pr.id,
+    lastMergeSourceCommit: pr.lastMergeSourceCommit,
   });

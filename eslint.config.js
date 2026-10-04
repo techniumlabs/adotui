@@ -43,14 +43,6 @@ const DEBT = {
   "src/data/config.ts": { complexity: 29 },
 };
 
-/** Files that import upward across layers today (debt, PLAN.md 6.6). */
-const LAYERING_DEBT = [
-  "src/data/azureActions.ts",
-  "src/data/azureDiff.ts",
-  "src/data/azureLoad.ts",
-  "src/data/azureRest.ts",
-];
-
 const layering = (group, message) => ({
   "no-restricted-imports": ["error", { patterns: [{ group, message }] }],
 });
@@ -88,20 +80,23 @@ export default [
       "no-console": "error",
     },
   },
-  // Layering: domain <- data <- app. Imports only point downward.
+  // Layering: shared <- domain <- data <- app. Imports only point downward.
   {
     files: ["src/domain/**/*.ts"],
     rules: layering(["../data/**", "../app/**"], "domain is the lowest layer and must not import data/ or app/."),
   },
   {
     files: ["src/data/**/*.ts"],
-    rules: layering(["../app/**"], "data/ must not import from app/ (layering: domain <- data <- app)."),
+    rules: layering(["../app/**"], "data/ must not import from app/ (layering: shared <- domain <- data <- app)."),
+  },
+  {
+    files: ["src/shared/**/*.ts"],
+    rules: layering(["../domain/**", "../data/**", "../app/**"], "shared/ is the lowest layer and must not import from the others."),
   },
   ...Object.entries(DEBT).map(([file, limits]) => ({
     files: [file],
     rules: Object.fromEntries(Object.entries(limits).map(([rule, max]) => [rule, limitRule(rule, max)])),
   })),
-  { files: LAYERING_DEBT, rules: { "no-restricted-imports": "off" } },
   // Permanent exemptions: a fixture is data, not logic; main.tsx is the CLI and prints to stdout.
   { files: ["src/data/mock.ts"], rules: { "max-lines": "off" } },
   { files: ["src/main.tsx"], rules: { "no-console": "off" } },
