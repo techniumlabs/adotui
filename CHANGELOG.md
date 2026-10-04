@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Mouse support: click a tree row, PR, tab label or file to select it, and scroll with the
+  wheel. adotui runs full-screen (alternate screen) while the mouse is on; `--no-mouse` or
+  `ADOTUI_NO_MOUSE=1` turns it off. PR actions stay keyboard-only
 - Bottom-line progress loader with star pulse, project counter, and elapsed time
 - `dev/testdata.ts` to seed and clean up Azure DevOps load-test data
 - `--version`, `--help`, and `--diagnostic` CLI flags
@@ -43,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release tooling pinned: `softprops/action-gh-release` to a commit SHA, Bun to 1.3.14
 
 ### Fixed
+- The tree's title icon was blanked on the first frame (Ink overlap glitch)
 - In the Diff tab, ←/→ switched files within the wrong PR's file list whenever the tree filter
   (the default "My PRs") hid an earlier PR in the same repository
 - The completion editor's merge commit message and bypass reason now accept spaces (the space

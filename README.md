@@ -166,6 +166,16 @@ for the full reference. The canonical table lives in `src/app/keymap.ts`.
 All mutating actions (approve, reject, abandon, complete/merge, comment
 delete) require an explicit `y` confirmation — Enter does not confirm.
 
+### Mouse
+
+Click a tree row, a PR, a tab label or a file to select it; the wheel scrolls
+the focused pane like ↑/↓. Actions (approve, abandon, complete…) stay on the
+keyboard so a stray click can never start one. adotui runs full-screen while
+the mouse is on and restores the terminal on exit. Because the app now
+receives clicks, copy text with **Shift+drag** (Option+drag in macOS
+Terminal). Turn it off with `--no-mouse` or `ADOTUI_NO_MOUSE=1`; under tmux,
+`set -g mouse on` passes clicks through.
+
 Completing a PR is asynchronous on Azure DevOps: it accepts the request first
 and merges afterwards. adotui watches the PR for up to 15 seconds and reports
 what happened — merged, or why it was not (merge conflicts, blocked by branch

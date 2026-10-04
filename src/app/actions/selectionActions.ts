@@ -1,4 +1,5 @@
-import { updateState } from "../store";
+import { getState, patchState, updateState } from "../store";
+import type { AppState } from "../types";
 import { selectSelectedPr } from "../selectors";
 import { clamp, getVisiblePrs, getVisibleFiles, matchesTreeFilter } from "../utils";
 
@@ -44,19 +45,46 @@ export const moveTreeSelection = (orgDelta: number, repoDelta: number, banner?: 
       if (nextOrgFirstItem !== -1) nextIndex = nextOrgFirstItem;
     }
 
-    const { orgIndex: nextOrgIndex, repoIndex: nextRepoIndex } = flatList[nextIndex]!;
-    const nextOrg = current.data.organizations[nextOrgIndex];
-    const nextRepo = nextOrg?.repositories[nextRepoIndex];
-    const nextVisible = getVisiblePrs(nextRepo, current.treeFilter, current.data.currentUserEmail);
-
-    return {
-      selectedOrgIndex: nextOrgIndex,
-      selectedRepoIndex: nextRepoIndex,
-      selectedPrIndex: clamp(current.selectedPrIndex, 0, Math.max(0, nextVisible.length - 1)),
-      fileFilter: "",
-      banner: banner ?? current.banner,
-    };
+    const { orgIndex, repoIndex } = flatList[nextIndex]!;
+    return treePatch(current, orgIndex, repoIndex, banner);
   });
+};
+
+/** Selecting a tree node: the PR index is clamped to the new repo's visible PRs. */
+const treePatch = (current: AppState, orgIndex: number, repoIndex: number, banner?: string): Partial<AppState> => {
+  const repo = current.data.organizations[orgIndex]?.repositories[repoIndex];
+  const visible = getVisiblePrs(repo, current.treeFilter, current.data.currentUserEmail);
+  return {
+    selectedOrgIndex: orgIndex,
+    selectedRepoIndex: repoIndex,
+    selectedPrIndex: clamp(current.selectedPrIndex, 0, Math.max(0, visible.length - 1)),
+    fileFilter: "",
+    banner: banner ?? current.banner,
+  };
+};
+
+/** A click on a tree row: an organization row opens its first visible repo, a repo row selects it. */
+export const selectTreeNode = (orgIndex: number, repoIndex?: number): void => {
+  const current = getState();
+  if (repoIndex === undefined) {
+    if (orgIndex !== current.selectedOrgIndex) moveTreeSelection(orgIndex - current.selectedOrgIndex, 0);
+  } else if (orgIndex !== current.selectedOrgIndex || repoIndex !== current.selectedRepoIndex) {
+    updateState((c) => treePatch(c, orgIndex, repoIndex));
+  }
+  if (getState().focus !== "tree") patchState({ focus: "tree" });
+};
+
+/** A click on a PR row (`index` into the visible PRs). */
+export const selectPr = (index: number): void => {
+  const delta = index - getState().selectedPrIndex;
+  if (delta !== 0) changePrSelection(delta);
+  if (getState().focus !== "list") patchState({ focus: "list" });
+};
+
+/** A click on a file in the Diff tab (`index` into the visible files). */
+export const selectFile = (index: number): void => {
+  const delta = index - getState().selectedFileIndex;
+  if (delta !== 0) changeFileSelection(delta);
 };
 
 export const changePrSelection = (delta: number): void => {

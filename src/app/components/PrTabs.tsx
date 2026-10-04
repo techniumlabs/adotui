@@ -2,12 +2,15 @@ import React from "react";
 import { Box, Text } from "ink";
 import type { FocusArea } from "../types";
 import { palette } from "../theme";
+import { ClickableBox } from "./ui/ClickableBox";
 
 type PrTabsProps = {
   focus: FocusArea;
+  /** Mouse: a click on a tab label opens it (same as its number key). */
+  onSelectTab?: (key: string) => void;
 };
 
-export const PrTabs: React.FC<PrTabsProps> = ({ focus }) => {
+export const PrTabs: React.FC<PrTabsProps> = ({ focus, onSelectTab }) => {
   // Determine which pane is currently visible based on App.tsx's routing logic
   const activeTab =
     focus === "files"
@@ -30,7 +33,7 @@ export const PrTabs: React.FC<PrTabsProps> = ({ focus }) => {
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
-          <Box key={tab.id} marginRight={2}>
+          <ClickableBox key={tab.id} marginRight={2} onClick={() => onSelectTab?.(tab.shortcut)}>
             {isActive ? (
               <Text backgroundColor={palette.accent} color="black" bold>
                 {" "}{tab.shortcut} {tab.label.toLowerCase()}{" "}
@@ -40,7 +43,7 @@ export const PrTabs: React.FC<PrTabsProps> = ({ focus }) => {
                 {tab.shortcut} {tab.label.toLowerCase()}
               </Text>
             )}
-          </Box>
+          </ClickableBox>
         );
       })}
     </Box>

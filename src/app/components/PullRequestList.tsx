@@ -5,6 +5,7 @@ import type { FocusArea } from "../types";
 import { glyph, palette, reviewBadge, statusBadge, truncate } from "../theme";
 import { isAssignedReviewer, isMyPr } from "../utils";
 import { PanelTitle } from "./ui/PanelTitle";
+import { ClickableBox } from "./ui/ClickableBox";
 
 type PullRequestListProps = {
   pullRequests: PullRequest[];
@@ -14,6 +15,8 @@ type PullRequestListProps = {
   focus: FocusArea;
   maxPrs?: number;
   currentUserEmail?: string;
+  /** Mouse: a click on a PR row selects it (index into visiblePrs). */
+  onSelectPr?: (index: number) => void;
 };
 
 const PrRow: React.FC<{
@@ -94,6 +97,7 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
   focus,
   maxPrs,
   currentUserEmail,
+  onSelectPr,
 }) => {
   const active = focus === "list";
 
@@ -133,34 +137,34 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
         </Text>
       </Box>
 
-      {visiblePrs.length > 0 ? (
-        active || focus === "tree" ? (
-          displayedPrs.map((pr, i) => {
-            const actualIndex = startIndex + i;
-            return (
+      {/* A PR row is several lines tall, so each row is its own click area. */}
+      <Box flexDirection="column">
+        {visiblePrs.length > 0 ? (
+          active || focus === "tree" ? (
+            displayedPrs.map((pr, i) => {
+              const actualIndex = startIndex + i;
+              return (
+                <ClickableBox key={pr.id} flexDirection="column" onClick={() => onSelectPr?.(actualIndex)}>
+                  <PrRow pr={pr} selected={actualIndex === selectedPrIndex} currentUserEmail={currentUserEmail} />
+                </ClickableBox>
+              );
+            })
+          ) : (
+            visiblePrs[selectedPrIndex] ? (
               <PrRow
-                key={pr.id}
-                pr={pr}
-                selected={actualIndex === selectedPrIndex}
+                key={visiblePrs[selectedPrIndex].id}
+                pr={visiblePrs[selectedPrIndex]}
+                selected={true}
                 currentUserEmail={currentUserEmail}
               />
-            );
-          })
+            ) : null
+          )
+        ) : pullRequests.length > 0 ? (
+          <Text color={palette.muted}>No PRs match filters.</Text>
         ) : (
-          visiblePrs[selectedPrIndex] ? (
-            <PrRow
-              key={visiblePrs[selectedPrIndex].id}
-              pr={visiblePrs[selectedPrIndex]}
-              selected={true}
-              currentUserEmail={currentUserEmail}
-            />
-          ) : null
-        )
-      ) : pullRequests.length > 0 ? (
-        <Text color={palette.muted}>No PRs match filters.</Text>
-      ) : (
-        <Text color={palette.muted}>No pull requests in this repository.</Text>
-      )}
+          <Text color={palette.muted}>No pull requests in this repository.</Text>
+        )}
+      </Box>
 
       {/* Hints moved to App.tsx */}
       

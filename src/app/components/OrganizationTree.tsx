@@ -5,6 +5,7 @@ import type { FocusArea, TreeFilter } from "../types";
 import { glyph, palette, truncate } from "../theme";
 import { matchesTreeFilter, clamp } from "../utils";
 import { PanelTitle } from "./ui/PanelTitle";
+import { ClickableBox } from "./ui/ClickableBox";
 
 type OrganizationTreeProps = {
   data: AppData;
@@ -14,7 +15,11 @@ type OrganizationTreeProps = {
   treeFilter: TreeFilter;
   /** Maximum tree rows to render; overflow is hidden and scrolls with the selection. */
   maxRows: number;
+  /** Mouse: a click on an organization or repository row. */
+  onSelectNode?: (orgIndex: number, repoIndex?: number) => void;
 };
+
+type TreeTarget = { orgIndex: number; repoIndex?: number };
 
 const PANEL_WIDTH = 36;
 
@@ -75,14 +80,20 @@ const RepoRow: React.FC<{ repo: RepositoryNode; selected: boolean; isLastProject
  * first rows, which is why the title used to read "3 moretions" and rows under
  * the cursor blanked out mid-navigation.
  */
-const windowRows = (rows: React.ReactNode[], selectedRow: number, maxRows: number): React.ReactNode[] => {
+const windowRows = (
+  rows: React.ReactNode[],
+  selectedRow: number,
+  maxRows: number,
+): { body: React.ReactNode[]; rowAt: (line: number) => number | undefined } => {
   const bodyRows = Math.max(3, maxRows - 4);
   const total = rows.length;
-  if (total <= bodyRows) return rows;
+  if (total <= bodyRows) return { body: rows, rowAt: (line) => line };
   const inner = Math.max(3, bodyRows - 2);
   const start = clamp(selectedRow - Math.floor(inner / 2), 0, total - inner);
   const end = start + inner;
-  return [
+  // Line 0 and the last line are the "N more" markers.
+  const rowAt = (line: number) => (line >= 1 && line <= inner ? start + line - 1 : undefined);
+  const body = [
     <Text key="tree-more-up" color={palette.muted}>
       {start > 0 ? `  ${glyph.up} ${start} more` : " "}
     </Text>,
@@ -91,6 +102,7 @@ const windowRows = (rows: React.ReactNode[], selectedRow: number, maxRows: numbe
       {end < total ? `  ${glyph.down} ${total - end} more` : " "}
     </Text>,
   ];
+  return { body, rowAt };
 };
 
 export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
@@ -100,6 +112,7 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
   focus,
   treeFilter,
   maxRows,
+  onSelectNode,
 }) => {
   const active = focus === "tree";
   const filteringByPrs = treeFilter === "with-prs";
@@ -120,6 +133,8 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
   // Build one element per terminal line so the pane can be windowed to the
   // available height, scrolling to keep the selection visible.
   const rows: React.ReactNode[] = [];
+  /** What a click on rows[i] selects (blank and project rows select nothing). */
+  const targets: TreeTarget[] = [];
   let selectedRow = 0;
 
   data.organizations.forEach((org, orgIndex) => {
@@ -151,6 +166,7 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
     }
 
     if (orgSelected) selectedRow = rows.length;
+    targets[rows.length] = { orgIndex };
     rows.push(
       <Text
         key={`${orgKey}-name`}
@@ -161,6 +177,7 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
         {truncate(org.name, PANEL_WIDTH - 4)}
       </Text>,
     );
+    targets[rows.length] = { orgIndex };
     rows.push(
       <Text key={`${orgKey}-count`} color={palette.muted}>
         {"  "}
@@ -195,6 +212,7 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
           entries.forEach(({ repo, flatIndex }, entryIdx) => {
             const selected = flatIndex === selectedRepoIndex;
             if (selected) selectedRow = rows.length;
+            targets[rows.length] = { orgIndex, repoIndex: flatIndex };
             rows.push(
               <RepoRow
                 key={`${orgKey}-repo-${flatIndex}`}
@@ -210,7 +228,7 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
     }
   });
 
-  const body = windowRows(rows, selectedRow, maxRows);
+  const { body, rowAt } = windowRows(rows, selectedRow, maxRows);
 
   return (
     <Box
@@ -241,7 +259,15 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
       {data.organizations.length === 0 ? (
         <Text color={palette.muted}>No organizations.</Text>
       ) : (
-        body
+        <ClickableBox
+          flexDirection="column"
+          onClick={(line) => {
+            const target = targets[rowAt(line) ?? -1];
+            if (target) onSelectNode?.(target.orgIndex, target.repoIndex);
+          }}
+        >
+          {body}
+        </ClickableBox>
       )}
 
       {/* Says what the header's "v" does. The body budget above reserves this

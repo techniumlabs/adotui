@@ -27,6 +27,8 @@ type FilesViewProps = {
   fileFilter?: string;
   updateFileDiff?: (target: PullRequest, filePath: string, diffData: { rawDiff: string; additions: number; deletions: number } | null) => void;
   setFileLoading?: (target: PullRequest, filePath: string) => void;
+  /** Mouse: a click on a file row selects it. */
+  onSelectFile?: (index: number) => void;
 };
 
 const okStatus = (msg: string | null) => msg === "Comment posted.";
@@ -44,6 +46,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
   fileFilter,
   updateFileDiff,
   setFileLoading,
+  onSelectFile,
 }) => {
   const active = focus === "files";
 
@@ -154,7 +157,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
         </Text>
       </Box>
 
-      <FileList files={flatFiles} selectedIndex={selectedFileIndex} fileFilter={fileFilter} />
+      <FileList files={flatFiles} selectedIndex={selectedFileIndex} fileFilter={fileFilter} onSelectFile={onSelectFile} />
 
       {selectedFile && (
         <DiffBody

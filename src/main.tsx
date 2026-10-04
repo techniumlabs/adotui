@@ -22,12 +22,14 @@ OPTIONS:
   --help, -h       Show this help message and exit
   --version, -v    Print version number and exit
   --diagnostic     Print diagnostic information (OS, arch, bun, az versions)
+  --no-mouse       Keyboard only (mouse mode: click to select, wheel to scroll)
   --update         Update adotui to the latest version
 
 ENVIRONMENT:
   ADOTUI_CONFIG            Path to config file
   ADOTUI_MOCK=1            Use mock data (offline/demo mode)
   AZURE_DEVOPS_EXT_PAT     Azure DevOps personal access token
+  ADOTUI_NO_MOUSE=1        Same as --no-mouse
   ADOTUI_CACHE_DIR         Directory for the on-disk data cache (default: ~/.cache/adotui)
   ADOTUI_DEBUG=1           Append debug log entries (off by default)
   ADOTUI_DEBUG_FILE        Debug log path (default: <tmpdir>/adotui-debug.log)
@@ -137,4 +139,10 @@ if (args.includes("--update")) {
   process.exit(0);
 }
 
-render(<App />);
+// Mouse: click to select, wheel to scroll. Click coordinates only match the
+// frame in the alternate screen, which also restores the terminal on exit.
+// Off when not a terminal, with --no-mouse, or ADOTUI_NO_MOUSE=1 (mouse mode
+// takes over click-and-drag, so copying text then needs Shift+drag).
+const mouse = Boolean(process.stdout.isTTY) && !args.includes("--no-mouse") && !process.env.ADOTUI_NO_MOUSE;
+
+render(<App mouse={mouse} />, { alternateScreen: mouse });

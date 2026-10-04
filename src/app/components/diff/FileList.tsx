@@ -1,7 +1,8 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Text } from "ink";
 import type { PullRequestFileChange } from "../../../domain/types";
 import { fileChangeBadge, glyph, palette } from "../../theme";
+import { ClickableBox } from "../ui/ClickableBox";
 
 /** How many file rows the list shows around the selection. */
 export const FILE_WINDOW = 5;
@@ -48,12 +49,22 @@ const FileRow: React.FC<{ file: PullRequestFileChange; selected: boolean }> = ({
 };
 
 /** The changed files, windowed to five rows around the selection. */
-export const FileList: React.FC<{ files: PullRequestFileChange[]; selectedIndex: number; fileFilter?: string }> = ({
-  files,
-  selectedIndex,
-  fileFilter,
-}) => (
-  <Box marginTop={1} flexDirection="column">
+export const FileList: React.FC<{
+  files: PullRequestFileChange[];
+  selectedIndex: number;
+  fileFilter?: string;
+  /** Mouse: a click on a file row selects it (index into files). */
+  onSelectFile?: (index: number) => void;
+}> = ({ files, selectedIndex, fileFilter, onSelectFile }) => (
+  <ClickableBox
+    marginTop={1}
+    flexDirection="column"
+    onClick={(line) => {
+      const shown = files.map((_, i) => i).filter((i) => isFileShown(i, selectedIndex, files.length));
+      const index = shown[line];
+      if (index !== undefined) onSelectFile?.(index);
+    }}
+  >
     {files.length === 0 ? (
       <Text color={palette.danger}>No files match the filter "{fileFilter}".</Text>
     ) : (
@@ -63,5 +74,5 @@ export const FileList: React.FC<{ files: PullRequestFileChange[]; selectedIndex:
         ) : null,
       )
     )}
-  </Box>
+  </ClickableBox>
 );

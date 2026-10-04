@@ -20,8 +20,10 @@ import { SetupScreen } from "./components/SetupScreen";
 import { TabContent } from "./components/TabContent";
 import { BannerLine, FooterHints } from "./components/AppChrome";
 import { useStartupScreens } from "./hooks/useStartupScreens";
+import { useMouseInput } from "./mouse/useMouse";
 
-export const App: React.FC = () => {
+/** `mouse`: click to select and wheel to scroll (needs the alternate screen; see main.tsx). */
+export const App: React.FC<{ mouse?: boolean }> = ({ mouse = false }) => {
   const { exit } = useApp();
   const size = useTerminalSize();
   const app = useAppState();
@@ -30,6 +32,7 @@ export const App: React.FC = () => {
   // (including the load it kicked off).
   useAppKeyboard(app, exit, setupLoading);
   usePrDetails(app.selectedPr, app.actions.updatePr);
+  useMouseInput(mouse);
 
 
   const {
@@ -112,6 +115,7 @@ export const App: React.FC = () => {
               focus={state.focus}
               treeFilter={state.treeFilter}
               maxRows={treeMaxRows}
+              onSelectNode={actions.selectTreeNode}
             />
 
             <Box
@@ -131,8 +135,9 @@ export const App: React.FC = () => {
                 focus={state.focus}
                 maxPrs={maxPrs}
                 currentUserEmail={state.data.currentUserEmail}
+                onSelectPr={actions.selectPr}
               />
-              {selectedPr && <PrTabs focus={state.focus} />}
+              {selectedPr && <PrTabs focus={state.focus} onSelectTab={actions.openPrTab} />}
               <TabContent app={app} />
             </Box>
           </>

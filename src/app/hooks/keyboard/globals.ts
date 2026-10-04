@@ -3,7 +3,8 @@ import type { AppHandle } from "../useAppState";
 import { FOCUS_ORDER, DEFAULT_COMPLETION_OPTIONS } from "../../constants";
 import { openInBrowser } from "../../utils";
 import { patchState, updateState } from "../../store";
-import type { AppState, FocusArea } from "../../types";
+import { openPrTab } from "../../actions/uiActions";
+import type { FocusArea } from "../../types";
 
 type GlobalCommand = (app: AppHandle, exitApp: () => void) => void;
 
@@ -29,24 +30,13 @@ const COMMANDS: Partial<Record<string, GlobalCommand>> = {
   c: ({ actions }) => actions.openCompletionEditor(DEFAULT_COMPLETION_OPTIONS),
 };
 
-/** PR tabs 1-3 (4 = pipelines, debug builds only). */
-const TAB_KEYS: Partial<Record<string, Partial<AppState>>> = {
-  "1": { focus: "detail", fileFilter: "", banner: "Focus: Overview" },
-  "2": { focus: "files", selectedFileIndex: 0, diffScrollOffset: 0, banner: "Focus: Diff" },
-  "3": { focus: "comments", fileFilter: "", banner: "Focus: Comments" },
-};
 const PR_PANES: readonly FocusArea[] = ["detail", "files", "comments", "runs"];
 /** Panes where ← goes back (in Diff and Comments, ← moves within the pane). */
 const LEFT_EXITS: readonly FocusArea[] = ["detail", "runs"];
 
 /** Tab switching and "back to the PR list"; only with a PR selected. */
 const handlePrNavigation = (input: string, key: Key, focus: FocusArea): boolean => {
-  const tab = TAB_KEYS[input];
-  if (tab) { patchState(tab); return true; }
-  if (input === "4") {
-    if (process.env.NODE_ENV === "debug") patchState({ focus: "runs", fileFilter: "", banner: "Focus: Pipelines" });
-    return true;
-  }
+  if (openPrTab(input)) return true;
   if ((input === "h" && PR_PANES.includes(focus)) || (key.leftArrow && LEFT_EXITS.includes(focus))) {
     patchState({ focus: "list", fileFilter: "", banner: "Focus: list" });
     return true;

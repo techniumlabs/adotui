@@ -26,6 +26,7 @@ export const TabContent: React.FC<{ app: AppHandle }> = ({ app }) => {
         fileFilter={state.fileFilter}
         updateFileDiff={actions.updateFileDiff}
         setFileLoading={actions.setFileLoading}
+        onSelectFile={actions.selectFile}
       />
     );
   }

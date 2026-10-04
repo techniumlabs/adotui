@@ -1,10 +1,10 @@
 import { addToast } from "./toastActions";
 import { doRefresh } from "./refreshActions";
-import { moveTreeSelection, changePrSelection, changeFileSelection } from "./selectionActions";
+import { moveTreeSelection, changePrSelection, changeFileSelection, selectTreeNode, selectPr, selectFile } from "./selectionActions";
 import { armConfirm, runConfirmedAction } from "./confirmActions";
 import { openCompletionEditor, submitCompletion } from "./completionActions";
 import { executeCommand } from "./commandActions";
-import { setDiffScrollOffset, setDiffSelectedRow, setCommentInputActive } from "./uiActions";
+import { setDiffScrollOffset, setDiffSelectedRow, setCommentInputActive, openPrTab } from "./uiActions";
 import { openFilterPrompt, editFilterText, applyFilter, cancelFilter } from "./filterActions";
 import { updateFileDiff, setFileLoading, updatePr } from "./prDataActions";
 
@@ -19,6 +19,10 @@ export const appActions = {
   moveTreeSelection,
   changePrSelection,
   changeFileSelection,
+  selectTreeNode,
+  selectPr,
+  selectFile,
+  openPrTab,
   armConfirm,
   runConfirmedAction,
   openCompletionEditor,
