@@ -5,7 +5,7 @@
  * costs ~400-1200ms before any request is made). Auth still comes from the
  * CLI (or a PAT) via azureAuth, cached between calls.
  */
-import { getAdoAuthHeader, clearAuthHeaderCache } from "./azureAuth";
+import { getAdoAuthHeader, clearAuthHeaderCache, isUsingPat } from "./azureAuth";
 
 /** Standard Azure DevOps list envelope. */
 export interface AdoList<T> {
@@ -76,9 +76,21 @@ const organizationOf = (url: string): string => {
   return hostname.endsWith("dev.azure.com") ? (pathname.split("/")[1] ?? hostname) : hostname;
 };
 
-const signInMessage = (url: string): string =>
-  `Azure DevOps answered with a sign-in page instead of data. Check that the organization ` +
-  `"${organizationOf(url)}" exists and that you are signed in to it (run \`az login\`, or set AZURE_DEVOPS_EXT_PAT).`;
+const signInMessage = (url: string): string => {
+  const organization = organizationOf(url);
+  if (isUsingPat()) {
+    // A PAT is used instead of `az login`, so a bad one fails even when you are logged in.
+    return (
+      `Azure DevOps rejected your personal access token (AZURE_DEVOPS_EXT_PAT, or "pat" in the config; ` +
+      `a PAT is used instead of \`az login\`). It is invalid, expired, or not for the organization ` +
+      `"${organization}". Fix it, or remove it to sign in with \`az login\`.`
+    );
+  }
+  return (
+    `Azure DevOps answered with a sign-in page instead of data. Check that the organization ` +
+    `"${organization}" exists and that you are signed in to it (run \`az login\`, or set AZURE_DEVOPS_EXT_PAT).`
+  );
+};
 
 /** Turns an error response body into a short, human-readable reason. */
 const describeFailure = async (resp: Response): Promise<string> => {

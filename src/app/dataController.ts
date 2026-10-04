@@ -6,6 +6,7 @@ import {
   type LoadProgress,
   type PrRef,
 } from "../data/azure";
+import { clearAuthHeaderCache } from "../data/azureAuth";
 import { MOCK_DATA } from "../data/mock";
 import type { AppData, PullRequest, RepositoryNode } from "../domain/types";
 import { countTotalPrs } from "./utils";
@@ -35,6 +36,36 @@ export interface StreamOptions {
  * `undefined` = not resolved yet, `null` = resolved but unavailable.
  */
 let cachedUserEmail: string | null | undefined;
+
+/** The PAT this module copied from the config into the environment, if any. */
+let patFromConfig: string | undefined;
+/** What AZURE_DEVOPS_EXT_PAT held before the config's PAT replaced it. */
+let envPatBefore: string | undefined;
+
+/**
+ * The config's `pat` becomes AZURE_DEVOPS_EXT_PAT, which every request reads.
+ * Config is re-read on each refresh, so a `pat` that was deleted from it must
+ * leave the environment too — otherwise the old (maybe bad) PAT keeps winning
+ * over `az login` until a restart. Only what this function put there is taken
+ * back out, and a PAT the user had exported themselves is restored.
+ */
+export const applyConfigPat = (pat: string | undefined): void => {
+  if (pat) {
+    if (patFromConfig === undefined) envPatBefore = process.env.AZURE_DEVOPS_EXT_PAT;
+    process.env.AZURE_DEVOPS_EXT_PAT = pat;
+    patFromConfig = pat;
+    return;
+  }
+  if (patFromConfig === undefined) return;
+  // Leave alone anything that changed the variable since (it is not ours to undo).
+  if (process.env.AZURE_DEVOPS_EXT_PAT === patFromConfig) {
+    if (envPatBefore === undefined) delete process.env.AZURE_DEVOPS_EXT_PAT;
+    else process.env.AZURE_DEVOPS_EXT_PAT = envPatBefore;
+    clearAuthHeaderCache(); // the next request acquires an az token (or uses the restored PAT)
+  }
+  patFromConfig = undefined;
+  envPatBefore = undefined;
+};
 
 const resolveCurrentUser = async (organization: string): Promise<string | null> => {
   if (cachedUserEmail !== undefined) return cachedUserEmail;
@@ -150,9 +181,7 @@ export const loadInitialData = async (
     };
   }
 
-  if (configResult.config.pat) {
-    process.env.AZURE_DEVOPS_EXT_PAT = configResult.config.pat;
-  }
+  applyConfigPat(configResult.config.pat);
 
   if (allowCache) {
     const cachedData = await readAppCache(configResult.config);

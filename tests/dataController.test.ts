@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { resolvePrRef, resolvePrRefFromParts } from "../src/app/dataController";
+import { applyConfigPat, resolvePrRef, resolvePrRefFromParts } from "../src/app/dataController";
 import type { PullRequest } from "../src/domain/types";
 
 const parts = {
@@ -58,3 +58,57 @@ describe("resolvePrRef", () => {
     });
   });
 });
+
+describe("applyConfigPat", () => {
+  let savedPat: string | undefined;
+  beforeEach(() => {
+    savedPat = process.env.AZURE_DEVOPS_EXT_PAT;
+    delete process.env.AZURE_DEVOPS_EXT_PAT;
+  });
+  afterEach(() => {
+    applyConfigPat(undefined); // drop module state so tests do not leak into each other
+    if (savedPat === undefined) delete process.env.AZURE_DEVOPS_EXT_PAT;
+    else process.env.AZURE_DEVOPS_EXT_PAT = savedPat;
+  });
+
+  test("the config's PAT is exported for the requests to use", () => {
+    applyConfigPat("cfg-pat");
+    expect(process.env.AZURE_DEVOPS_EXT_PAT).toBe("cfg-pat");
+  });
+
+  test("a PAT deleted from the config leaves the environment on the next load (so az login is used)", () => {
+    applyConfigPat("cfg-pat");
+    applyConfigPat(undefined);
+    expect(process.env.AZURE_DEVOPS_EXT_PAT).toBeUndefined();
+  });
+
+  test("a changed PAT replaces the old one", () => {
+    applyConfigPat("old");
+    applyConfigPat("new");
+    expect(process.env.AZURE_DEVOPS_EXT_PAT).toBe("new");
+    applyConfigPat(undefined);
+    expect(process.env.AZURE_DEVOPS_EXT_PAT).toBeUndefined();
+  });
+
+  test("a PAT the user exported is restored, not deleted, when the config drops its own", () => {
+    process.env.AZURE_DEVOPS_EXT_PAT = "mine";
+    applyConfigPat("cfg-pat");
+    expect(process.env.AZURE_DEVOPS_EXT_PAT).toBe("cfg-pat");
+    applyConfigPat(undefined);
+    expect(process.env.AZURE_DEVOPS_EXT_PAT).toBe("mine");
+  });
+
+  test("without a config PAT ever applied, the user's own PAT is never touched", () => {
+    process.env.AZURE_DEVOPS_EXT_PAT = "mine";
+    applyConfigPat(undefined);
+    expect(process.env.AZURE_DEVOPS_EXT_PAT).toBe("mine");
+  });
+
+  test("a PAT changed by someone else in the meantime is not ours to undo", () => {
+    applyConfigPat("cfg-pat");
+    process.env.AZURE_DEVOPS_EXT_PAT = "rotated-elsewhere";
+    applyConfigPat(undefined);
+    expect(process.env.AZURE_DEVOPS_EXT_PAT).toBe("rotated-elsewhere");
+  });
+});
+

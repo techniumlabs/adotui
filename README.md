@@ -62,6 +62,8 @@ bun run start
 1. Credentials for your Azure DevOps organizations — either:
    - the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) signed in with `az login` (adotui only asks it for a token; the `azure-devops` extension is **not** needed), or
    - a personal access token, via `export AZURE_DEVOPS_EXT_PAT=<your-pat>` or `pat` in the config. Approving, rejecting, abandoning and completing PRs need the **Code (Read & write)** scope.
+
+   A PAT, when set, is used **instead of** `az login`. If you see "Azure DevOps rejected your personal access token", fix or remove it (also from the config's `pat`) and `az login` is used again — no restart needed.
 2. [Git](https://git-scm.com/downloads) on your `PATH` (adotui uses `git diff` to compute file diffs; this is what makes diffs work on Windows).
 
 ## Configuration

@@ -76,7 +76,9 @@ describe("loadAppData with an unknown organization", () => {
     expect(data.organizations[0]!.repositories).toHaveLength(0);
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain("Could not list projects for https://dev.azure.com/test");
-    expect(warnings[0]).toContain('organization "test" exists');
+    // The file's beforeEach authenticates with a PAT, so that is what gets blamed.
+    expect(warnings[0]).toContain("rejected your personal access token");
+    expect(warnings[0]).toContain('organization "test"');
     expect(warnings[0]).not.toContain("Unrecognized token");
   });
 });

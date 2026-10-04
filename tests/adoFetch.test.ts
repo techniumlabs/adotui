@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { clearAuthHeaderCache } from "../src/data/azureAuth";
 import { AdoHttpError, adoGet, adoGetText, adoPatch, adoPost, seg, __buildUrl } from "../src/data/adoFetch";
 
 const ORG = "https://dev.azure.com/acme";
@@ -147,11 +151,12 @@ describe("sign-in pages (unknown organization or bad credentials)", () => {
   // What dev.azure.com/<unknown-org>/_apis/... returns, after fetch follows the redirect.
   const SIGN_IN_HTML = "<html><head><title>Sign in to your account</title></head><body>…</body></html>";
   const html = (status = 200) => new Response(SIGN_IN_HTML, { status, headers: { "content-type": "text/html; charset=utf-8" } });
+  // These run with a PAT (the file's beforeEach sets one), which wins over az login.
   const expectSignInError = (error: unknown) => {
     expect(error).toBeInstanceOf(AdoHttpError);
     expect((error as AdoHttpError).status).toBe(401);
-    expect((error as AdoHttpError).detail).toContain('organization "acme" exists');
-    expect((error as AdoHttpError).detail).toContain("sign-in page");
+    expect((error as AdoHttpError).detail).toContain("rejected your personal access token");
+    expect((error as AdoHttpError).detail).toContain('organization "acme"');
     expect((error as AdoHttpError).detail).not.toContain("<html");
   };
 
@@ -207,3 +212,34 @@ describe("sign-in pages (unknown organization or bad credentials)", () => {
     expect((error as AdoHttpError).detail).toBe("Bad Request");
   });
 });
+
+// Without a PAT the token comes from `az`: the advice must be about signing in, not about a PAT.
+describe.skipIf(process.platform === "win32")("sign-in page when authenticating with az login", () => {
+  const dir = join(tmpdir(), `adotui-fetch-az-${Date.now()}`);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "az"), `#!/bin/sh\necho '{"accessToken":"tok","expires_on":9999999999}'\n`);
+  chmodSync(join(dir, "az"), 0o755);
+
+  let savedPath: string | undefined;
+  beforeEach(() => {
+    savedPath = process.env.PATH;
+    delete process.env.AZURE_DEVOPS_EXT_PAT; // the file-level afterEach restores it
+    process.env.PATH = `${dir}:${savedPath}`;
+    clearAuthHeaderCache();
+  });
+  afterEach(() => {
+    process.env.PATH = savedPath;
+    clearAuthHeaderCache();
+  });
+
+  test("tells you to check the organization and az login, not to fix a PAT", async () => {
+    globalThis.fetch = (async () =>
+      new Response("<html>Sign in</html>", { headers: { "content-type": "text/html" } })) as unknown as typeof fetch;
+    const error = await adoGet(ORG, "_apis/projects").catch((e: unknown) => e);
+    expect((error as AdoHttpError).status).toBe(401);
+    expect((error as AdoHttpError).detail).toContain('organization "acme" exists');
+    expect((error as AdoHttpError).detail).toContain("az login");
+    expect((error as AdoHttpError).detail).not.toContain("personal access token");
+  });
+});
+

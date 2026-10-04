@@ -61,6 +61,13 @@ const acquireToken = async (): Promise<string | null> => {
 };
 
 /**
+ * True when requests authenticate with a PAT (AZURE_DEVOPS_EXT_PAT, which the
+ * config's `pat` fills in). A PAT wins over `az login`, so a rejected one is
+ * the thing to report — telling the user to log in would be wrong.
+ */
+export const isUsingPat = (): boolean => !!process.env.AZURE_DEVOPS_EXT_PAT;
+
+/**
  * Returns an Authorization header value, or null when no credentials are
  * available. PATs are used verbatim; AAD tokens are cached until expiry.
  */

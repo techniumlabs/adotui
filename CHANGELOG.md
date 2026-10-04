@@ -60,7 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reports success when the installer download fails
 - An organization that does not exist or rejects your credentials now says so (a "sign-in page"
   error naming the organization, after one token refresh) instead of
-  `JSON Parse error: Unrecognized token '<'`; non-JSON and HTML error bodies are reported readably
+  `JSON Parse error: Unrecognized token '<'`; non-JSON and HTML error bodies are reported readably.
+  When a PAT is in use, the message blames the PAT (it is used instead of `az login`), not the login
+- Removing `pat` from the config now takes effect on the next refresh: a PAT that was copied from
+  the config into the environment is taken back out (and one you exported yourself is restored)
 
 ### Changed
 - PR loading is 7x faster on large configs: one paged project-wide PR listing
