@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-04
+
 ### Added
 - Mouse support: click a tree row, PR, tab label or file to select it, and scroll with the
   wheel. adotui runs full-screen (alternate screen) while the mouse is on; `--no-mouse` or
