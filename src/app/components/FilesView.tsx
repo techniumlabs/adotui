@@ -7,7 +7,7 @@ import { buildDiffRows } from "./diff/diffRender";
 import { handleDiffNavigation } from "./diff/diffKeyboard";
 import { useDiffComment } from "../hooks/useDiffComment";
 import { useLazyFileDiff } from "../hooks/useLazyFileDiff";
-import { computeScrollWindow } from "../utils";
+import { computeScrollWindow, getVisibleFiles } from "../utils";
 
 type FilesViewProps = {
   selectedPr?: PullRequest;
@@ -42,16 +42,10 @@ export const FilesView: React.FC<FilesViewProps> = ({
 }) => {
   const active = focus === "files";
 
-  const flatFiles = useMemo(() => {
-    if (!selectedPr) return [];
-    if (!fileFilter) return selectedPr.changedFiles;
-    try {
-      const regex = new RegExp(fileFilter.replace(/\*/g, '.*'), 'i');
-      return selectedPr.changedFiles.filter(f => regex.test(f.path));
-    } catch {
-      return selectedPr.changedFiles.filter(f => f.path.toLowerCase().includes(fileFilter.toLowerCase()));
-    }
-  }, [selectedPr, fileFilter]);
+  const flatFiles = useMemo(
+    () => getVisibleFiles(selectedPr, fileFilter ?? ""),
+    [selectedPr, fileFilter],
+  );
   const selectedFile = flatFiles[selectedFileIndex];
 
   const {
