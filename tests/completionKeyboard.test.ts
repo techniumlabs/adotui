@@ -49,14 +49,14 @@ test("toggles flip on left, right and space; other keys do nothing", () => {
   expect(opts().bypassPolicy).toBe(true);
 });
 
-test("text fields take typed characters and backspace (space is not accepted, as before)", () => {
+test("text fields take typed characters, spaces included, and backspace", () => {
   at(COMPLETION_CURSOR.COMMIT_MSG);
   for (const ch of ["a", "b", " ", "c"]) press(ch);
-  expect(opts().mergeCommitMessage).toBe("abc");
+  expect(opts().mergeCommitMessage).toBe("ab c");
   press("", { backspace: true });
-  expect(opts().mergeCommitMessage).toBe("ab");
+  expect(opts().mergeCommitMessage).toBe("ab ");
   press("z", { ctrl: true });
-  expect(opts().mergeCommitMessage).toBe("ab");
+  expect(opts().mergeCommitMessage).toBe("ab ");
   at(COMPLETION_CURSOR.BYPASS_REASON);
   press("r");
   expect(opts().bypassReason).toBe("r");

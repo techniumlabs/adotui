@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release tooling pinned: `softprops/action-gh-release` to a commit SHA, Bun to 1.3.14
 
 ### Fixed
+- The completion editor's merge commit message and bypass reason now accept spaces (the space
+  key was swallowed, so only single-word text could be typed)
 - Ctrl/Alt chords no longer trigger the plain-letter shortcuts: Ctrl+A / Ctrl+X / Ctrl+B used to
   open the approve / reject / abandon prompt, Ctrl+N a comment box, and **Ctrl+Y confirmed a pending
   action** (including complete & merge). Shortcuts are plain keys; a chord is ignored

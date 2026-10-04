@@ -19,7 +19,7 @@ const text =
   (field: "bypassReason" | "mergeCommitMessage"): FieldEditor =>
   (opts, input, key) => {
     if (key.backspace || key.delete) return { ...opts, [field]: opts[field].slice(0, -1) };
-    if (typesText(input, key) && input !== " ") return { ...opts, [field]: `${opts[field]}${input}` };
+    if (typesText(input, key)) return { ...opts, [field]: `${opts[field]}${input}` };
     return null;
   };
 
