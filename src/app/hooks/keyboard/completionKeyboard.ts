@@ -2,7 +2,62 @@ import type { Key } from "ink";
 import type { AppHandle } from "../useAppState";
 import { COMPLETION_FIELD_COUNT, COMPLETION_CURSOR } from "../../constants";
 import { clamp, cycleMergeStrategy } from "../../utils";
-import { updateState } from "../../store";
+import { getState, patchState, updateState } from "../../store";
+import type { CompletionOptions } from "../../types";
+
+/** Edits one completion field for a key press; null = the key does nothing on this field. */
+type FieldEditor = (opts: CompletionOptions, input: string, key: Key) => CompletionOptions | null;
+
+const togglesField = (input: string, key: Key): boolean => key.leftArrow || key.rightArrow || input === " ";
+const typesText = (input: string, key: Key): boolean => !key.ctrl && !key.meta && input !== "";
+
+const toggle =
+  (field: "deleteSourceBranch" | "transitionWorkItems" | "bypassPolicy"): FieldEditor =>
+  (opts, input, key) => (togglesField(input, key) ? { ...opts, [field]: !opts[field] } : null);
+
+const text =
+  (field: "bypassReason" | "mergeCommitMessage"): FieldEditor =>
+  (opts, input, key) => {
+    if (key.backspace || key.delete) return { ...opts, [field]: opts[field].slice(0, -1) };
+    if (typesText(input, key) && input !== " ") return { ...opts, [field]: `${opts[field]}${input}` };
+    return null;
+  };
+
+const mergeStrategy: FieldEditor = (opts, input, key) => {
+  const step = key.leftArrow || input === "h" ? -1 : key.rightArrow || input === "l" ? 1 : 0;
+  if (step === 0) return null;
+  const strategy = cycleMergeStrategy(opts.mergeStrategy, step);
+  return { ...opts, mergeStrategy: strategy, squashMerge: strategy === "squash" };
+};
+
+const ignoreIds: FieldEditor = (opts, input, key) => {
+  if (key.backspace || key.delete) {
+    return { ...opts, autoCompleteIgnoreConfigIds: opts.autoCompleteIgnoreConfigIds.slice(0, -1) };
+  }
+  if (!typesText(input, key) || !/[0-9,\s]/.test(input)) return null;
+  const typed = `${opts.autoCompleteIgnoreConfigIds.join(",")}${input}`.replace(/\s+/g, "");
+  const ids = typed.split(",").map((e) => Number(e.trim())).filter((e) => Number.isFinite(e));
+  return { ...opts, autoCompleteIgnoreConfigIds: ids };
+};
+
+const squash: FieldEditor = (opts, input, key) => {
+  if (!togglesField(input, key)) return null;
+  const squashMerge = !opts.squashMerge;
+  const fallback = opts.mergeStrategy === "squash" ? "noFastForward" : opts.mergeStrategy;
+  return { ...opts, squashMerge, mergeStrategy: squashMerge ? "squash" : fallback };
+};
+
+/** Field under the cursor → how a key edits it (the submit row has none). */
+const FIELD_EDITORS: Partial<Record<number, FieldEditor>> = {
+  [COMPLETION_CURSOR.MERGE_STRATEGY]: mergeStrategy,
+  [COMPLETION_CURSOR.DELETE_BRANCH]: toggle("deleteSourceBranch"),
+  [COMPLETION_CURSOR.TRANSITION_WI]: toggle("transitionWorkItems"),
+  [COMPLETION_CURSOR.BYPASS_POLICY]: toggle("bypassPolicy"),
+  [COMPLETION_CURSOR.BYPASS_REASON]: text("bypassReason"),
+  [COMPLETION_CURSOR.COMMIT_MSG]: text("mergeCommitMessage"),
+  [COMPLETION_CURSOR.IGNORE_IDS]: ignoreIds,
+  [COMPLETION_CURSOR.SQUASH]: squash,
+};
 
 export function handleCompletion(input: string, key: Key, app: AppHandle, _exitApp: () => void): void {
   const { state, actions } = app;
@@ -29,62 +84,8 @@ export function handleCompletion(input: string, key: Key, app: AppHandle, _exitA
     return;
   }
 
-  updateState((current) => {
-    const c = current.completionCursor;
-    const opts = current.completionOptions;
-
-    if (c === COMPLETION_CURSOR.MERGE_STRATEGY) {
-      if (key.leftArrow || input === "h") {
-        const s = cycleMergeStrategy(opts.mergeStrategy, -1);
-        return { completionOptions: { ...opts, mergeStrategy: s, squashMerge: s === "squash" } };
-      }
-      if (key.rightArrow || input === "l") {
-        const s = cycleMergeStrategy(opts.mergeStrategy, 1);
-        return { completionOptions: { ...opts, mergeStrategy: s, squashMerge: s === "squash" } };
-      }
-    }
-    if (c === COMPLETION_CURSOR.DELETE_BRANCH && (key.leftArrow || key.rightArrow || input === " "))
-      return { completionOptions: { ...opts, deleteSourceBranch: !opts.deleteSourceBranch } };
-    if (c === COMPLETION_CURSOR.TRANSITION_WI && (key.leftArrow || key.rightArrow || input === " "))
-      return { completionOptions: { ...opts, transitionWorkItems: !opts.transitionWorkItems } };
-    if (c === COMPLETION_CURSOR.BYPASS_POLICY && (key.leftArrow || key.rightArrow || input === " "))
-      return { completionOptions: { ...opts, bypassPolicy: !opts.bypassPolicy } };
-
-    if (c === COMPLETION_CURSOR.BYPASS_REASON) {
-      if (key.backspace || key.delete)
-        return { completionOptions: { ...opts, bypassReason: opts.bypassReason.slice(0, -1) } };
-      if (!key.ctrl && !key.meta && input && input !== " ")
-        return { completionOptions: { ...opts, bypassReason: `${opts.bypassReason}${input}` } };
-    }
-    if (c === COMPLETION_CURSOR.COMMIT_MSG) {
-      if (key.backspace || key.delete)
-        return { completionOptions: { ...opts, mergeCommitMessage: opts.mergeCommitMessage.slice(0, -1) } };
-      if (!key.ctrl && !key.meta && input && input !== " ")
-        return { completionOptions: { ...opts, mergeCommitMessage: `${opts.mergeCommitMessage}${input}` } };
-    }
-    if (c === COMPLETION_CURSOR.IGNORE_IDS) {
-      if (key.backspace || key.delete)
-        return { completionOptions: { ...opts, autoCompleteIgnoreConfigIds: opts.autoCompleteIgnoreConfigIds.slice(0, -1) } };
-      if (!key.ctrl && !key.meta && input && /[0-9,\s]/.test(input)) {
-        const text = `${opts.autoCompleteIgnoreConfigIds.join(",")}${input}`.replace(/\s+/g, "");
-        return {
-          completionOptions: {
-            ...opts,
-            autoCompleteIgnoreConfigIds: text.split(",").map((e) => Number(e.trim())).filter((e) => Number.isFinite(e)),
-          },
-        };
-      }
-    }
-    if (c === COMPLETION_CURSOR.SQUASH && (key.leftArrow || key.rightArrow || input === " ")) {
-      const nextSquash = !opts.squashMerge;
-      return {
-        completionOptions: {
-          ...opts,
-          squashMerge: nextSquash,
-          mergeStrategy: nextSquash ? "squash" : opts.mergeStrategy === "squash" ? "noFastForward" : opts.mergeStrategy,
-        },
-      };
-    }
-    return {};
-  });
+  const edit = FIELD_EDITORS[state.completionCursor];
+  const next = edit?.(getState().completionOptions, input, key);
+  // Keys that change nothing must not touch the store: every set is a full Ink frame.
+  if (next) patchState({ completionOptions: next });
 }

@@ -95,98 +95,70 @@ const configSearchPaths = (): string[] => {
   return [...new Set(paths)];
 };
 
+const invalid = (source: string, error: string): ConfigResult => ({
+  ok: false,
+  errorType: "invalid",
+  error,
+  searchedPaths: [source],
+});
+
+const optionalString = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
+
+/** One `projects` entry, or null when it lacks an organization (`org` is accepted as an alias). */
+const normalizeProject = (entry: unknown): AdoProjectConfig | null => {
+  if (typeof entry !== "object" || entry === null) return null;
+  const item = entry as Record<string, unknown>;
+  const organization = optionalString(item.organization) ?? optionalString(item.org);
+  if (!organization) return null;
+  const project = optionalString(item.project);
+  const repositories = Array.isArray(item.repositories)
+    ? item.repositories.filter((value): value is string => typeof value === "string")
+    : [];
+  return {
+    organization: organization.replace(/\/+$/, ""),
+    ...(project ? { project } : {}),
+    ...(repositories.length > 0 ? { repositories } : {}),
+  };
+};
+
+const STATUSES: readonly NonNullable<AdoConfig["status"]>[] = ["active", "completed", "abandoned", "all"];
+
+/** The optional top-level settings; anything missing or malformed is left out. */
+const normalizeSettings = (record: Record<string, unknown>): Omit<AdoConfig, "projects"> => {
+  const status = STATUSES.find((value) => value === record.status) ?? "active";
+  // `top` is an optional per-repository cap; when omitted, every PR is kept.
+  const top = typeof record.top === "number" && Number.isFinite(record.top) && record.top > 0 ? record.top : undefined;
+  const reviewer = optionalString(record.reviewer);
+  const creator = optionalString(record.creator);
+  const pat = optionalString(record.pat);
+  return {
+    status,
+    ...(top !== undefined ? { top } : {}),
+    ...(reviewer !== undefined ? { reviewer } : {}),
+    ...(creator !== undefined ? { creator } : {}),
+    ...(pat !== undefined ? { pat } : {}),
+  };
+};
+
 const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
   if (typeof raw !== "object" || raw === null) {
-    return {
-      ok: false,
-      errorType: "invalid",
-      error: `Config at ${source} is not a JSON object.`,
-      searchedPaths: [source],
-    };
+    return invalid(source, `Config at ${source} is not a JSON object.`);
   }
-
   const record = raw as Record<string, unknown>;
 
   // Support both the documented `projects` array and a shorthand where the
   // top level is directly an array of project configs.
-  const projectsRaw = Array.isArray(record.projects)
-    ? record.projects
-    : Array.isArray(raw)
-      ? (raw as unknown[])
-      : null;
-
-  if (!projectsRaw || projectsRaw.length === 0) {
-    return {
-      ok: false,
-      errorType: "invalid",
-      error: `Config at ${source} has no "projects". Add at least one { organization, project }.`,
-      searchedPaths: [source],
-    };
+  const projectsRaw = Array.isArray(raw) ? (raw as unknown[]) : Array.isArray(record.projects) ? record.projects : [];
+  if (projectsRaw.length === 0) {
+    return invalid(source, `Config at ${source} has no "projects". Add at least one { organization, project }.`);
   }
 
-  const projects: AdoProjectConfig[] = [];
-  for (const entry of projectsRaw) {
-    if (typeof entry !== "object" || entry === null) {
-      continue;
-    }
-    const item = entry as Record<string, unknown>;
-    const organization =
-      typeof item.organization === "string"
-        ? item.organization
-        : typeof item.org === "string"
-          ? (item.org as string)
-          : undefined;
-    const project = typeof item.project === "string" ? item.project : undefined;
-
-    if (!organization) {
-      continue;
-    }
-
-    const repositories = Array.isArray(item.repositories)
-      ? item.repositories.filter(
-        (value): value is string => typeof value === "string",
-      )
-      : undefined;
-
-    projects.push({
-      organization: organization.replace(/\/+$/, ""),
-      ...(project ? { project } : {}),
-      ...(repositories && repositories.length > 0 ? { repositories } : {}),
-    });
-  }
-
+  const projects = projectsRaw.map(normalizeProject).filter((p): p is AdoProjectConfig => p !== null);
   if (projects.length === 0) {
-    return {
-      ok: false,
-      errorType: "invalid",
-      error: `Config at ${source} has no valid projects (each needs at least "organization").`,
-      searchedPaths: [source],
-    };
+    return invalid(source, `Config at ${source} has no valid projects (each needs at least "organization").`);
   }
 
-  const status =
-    record.status === "completed" ||
-      record.status === "abandoned" ||
-      record.status === "all"
-      ? record.status
-      : "active";
-
-  // `top` is an optional per-repository cap; when omitted, every PR is kept.
-  const top =
-    typeof record.top === "number" && Number.isFinite(record.top) && record.top > 0
-      ? record.top
-      : undefined;
-
-  const config: AdoConfig = {
-    projects,
-    status,
-    ...(top !== undefined ? { top } : {}),
-    ...(typeof record.reviewer === "string" ? { reviewer: record.reviewer } : {}),
-    ...(typeof record.creator === "string" ? { creator: record.creator } : {}),
-    ...(typeof record.pat === "string" ? { pat: record.pat } : {}),
-  };
-
-  return { ok: true, config, source };
+  return { ok: true, config: { projects, ...normalizeSettings(record) }, source };
 };
 
 /**

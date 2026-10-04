@@ -4,6 +4,45 @@ import { useEffect, useRef } from "react";
 const PASTE_START = "\x1b[200~";
 const PASTE_END = "\x1b[201~";
 
+/** Paste state carried between stdin chunks (a paste can span several). */
+export interface PasteState {
+  isPasting: boolean;
+  buffer: string;
+}
+
+/**
+ * Splits one stdin chunk into typed input (`clean`) and completed pastes,
+ * carrying an unfinished paste over to the next chunk. Exported for tests.
+ */
+export const splitPastes = (
+  str: string,
+  state: PasteState,
+): PasteState & { clean: string; pasted: string[] } => {
+  let { isPasting, buffer } = state;
+  let clean = "";
+  const pasted: string[] = [];
+  let i = 0;
+  while (i < str.length) {
+    const marker = isPasting ? PASTE_END : PASTE_START;
+    const at = str.indexOf(marker, i);
+    if (at === -1) {
+      if (isPasting) buffer += str.slice(i);
+      else clean += str.slice(i);
+      break;
+    }
+    if (isPasting) {
+      pasted.push(buffer + str.slice(i, at));
+      buffer = "";
+    } else {
+      clean += str.slice(i, at);
+      buffer = "";
+    }
+    isPasting = !isPasting;
+    i = at + marker.length;
+  }
+  return { isPasting, buffer, clean, pasted };
+};
+
 export function usePasteHandler(onPaste: (text: string) => void) {
   const onPasteRef = useRef(onPaste);
   onPasteRef.current = onPaste;
@@ -23,37 +62,11 @@ export function usePasteHandler(onPaste: (text: string) => void) {
         const data = args[0] as Buffer;
         const str = data.toString("utf-8");
 
-        let i = 0;
-        let cleanStr = "";
-
-        while (i < str.length) {
-          if (!isPasting) {
-            const startIdx = str.indexOf(PASTE_START, i);
-            if (startIdx !== -1) {
-              cleanStr += str.slice(i, startIdx);
-              isPasting = true;
-              pasteBuffer = "";
-              i = startIdx + PASTE_START.length;
-            } else {
-              cleanStr += str.slice(i);
-              break;
-            }
-          } else {
-            const endIdx = str.indexOf(PASTE_END, i);
-            if (endIdx !== -1) {
-              pasteBuffer += str.slice(i, endIdx);
-              isPasting = false;
-              if (onPasteRef.current) {
-                onPasteRef.current(pasteBuffer);
-              }
-              pasteBuffer = "";
-              i = endIdx + PASTE_END.length;
-            } else {
-              pasteBuffer += str.slice(i);
-              break;
-            }
-          }
-        }
+        const result = splitPastes(str, { isPasting, buffer: pasteBuffer });
+        isPasting = result.isPasting;
+        pasteBuffer = result.buffer;
+        for (const text of result.pasted) onPasteRef.current?.(text);
+        const cleanStr = result.clean;
 
         // If there's non-paste data, pass it down to Ink
         if (cleanStr.length > 0) {

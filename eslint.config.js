@@ -32,11 +32,7 @@ const DEBT = {
   "src/app/components/OrganizationTree.tsx": { "max-lines-per-function": 159 },
   "src/app/components/PrDetails.tsx": { "max-lines-per-function": 218 },
   "src/app/components/SetupScreen.tsx": { "max-lines-per-function": 240 },
-  "src/app/hooks/keyboard/completionKeyboard.ts": { complexity: 45 },
-  "src/app/hooks/keyboard/globals.ts": { complexity: 28 },
-  "src/app/hooks/usePasteHandler.ts": { "max-depth": 5 },
   "src/app/hooks/usePrComments.ts": { "max-lines-per-function": 207 },
-  "src/data/config.ts": { complexity: 29 },
 };
 
 const layering = (group, message) => ({
