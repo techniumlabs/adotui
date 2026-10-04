@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadConfig, writeConfig as writeConfigUtil } from "../src/data/config";
@@ -192,6 +192,38 @@ describe("Config validation", () => {
       expect(content).toEqual(sampleConfig);
     } finally {
       process.chdir(originalCwd);
+    }
+  });
+
+  test("$ADOTUI_CONFIG is authoritative: a missing file does not fall back to another config", async () => {
+    const originalCwd = process.cwd();
+    const testDir = join(tmpdir(), `adotui-authoritative-test-${Date.now()}`);
+    mkdirSync(testDir, { recursive: true });
+    // A valid config the walk-up search would otherwise find.
+    writeFileSync(join(testDir, "adotui.config.json"), JSON.stringify({
+      projects: [{ organization: "https://dev.azure.com/other" }],
+    }));
+    process.chdir(testDir);
+    process.env.ADOTUI_CONFIG = join(testDir, "missing", "config.json");
+    try {
+      const result = await loadConfig();
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.errorType).toBe("missing");
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+
+  test("writeConfig defaults to $ADOTUI_CONFIG and makes a PAT owner-only", async () => {
+    const target = join(TMP_DIR, "env-target", "config.json");
+    process.env.ADOTUI_CONFIG = target;
+    await writeConfigUtil({
+      projects: [{ organization: "https://dev.azure.com/test" }],
+      pat: "secret",
+    });
+    expect((await Bun.file(target).json()).pat).toBe("secret");
+    if (process.platform !== "win32") {
+      expect(statSync(target).mode & 0o777).toBe(0o600);
     }
   });
 

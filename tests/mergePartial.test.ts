@@ -75,4 +75,26 @@ describe("mergeLoadPartials", () => {
     const next = mergeLoadPartials(empty, [partial({ currentUserEmail: "maya@example.com" })]);
     expect(next.currentUserEmail).toBe("maya@example.com");
   });
+
+  test("a refresh keeps loaded PR details, across repeated refreshes", () => {
+    // A refresh lists PRs without details; the loaded ones must survive.
+    const fresh = (title: string) =>
+      ({ name: "a", project: "core", pullRequests: [{ id: 1, title, changedFiles: [], checksPassed: 0 }] }) as never;
+    const loaded = {
+      name: "a",
+      project: "core",
+      pullRequests: [{ id: 1, title: "old", changedFiles: [{ path: "x", rawDiff: "d" }], checksPassed: 2, detailsLoaded: true }],
+    } as never;
+
+    let data = mergeLoadPartials(empty, [partial({ repositories: [loaded] })]);
+    data = mergeLoadPartials(data, [partial({ repositories: [fresh("renamed")] })]);
+    data = mergeLoadPartials(data, [partial({ repositories: [fresh("renamed again")] })]);
+
+    const pr = data.organizations[0]!.repositories[0]!.pullRequests[0]!;
+    expect(pr.title).toBe("renamed again");
+    expect(pr.changedFiles).toEqual([{ path: "x", rawDiff: "d" }] as never);
+    expect(pr.checksPassed).toBe(2);
+    // Cleared so the selected PR revalidates in the background.
+    expect(pr.detailsLoaded).toBe(false);
+  });
 });

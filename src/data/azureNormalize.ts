@@ -123,6 +123,7 @@ export const normalizeFileChanges = (
     .filter((change) => change.item && !change.item.isFolder && change.item.path)
     .map((change) => ({
       path: (change.item?.path ?? "").replace(/^\//, ""),
+      ...(change.originalPath ? { originalPath: change.originalPath.replace(/^\//, "") } : {}),
       status: changeTypeToStatus(change.changeType),
       additions: 0,
       deletions: 0,

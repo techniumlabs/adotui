@@ -75,13 +75,13 @@ bun run start
 
 adotui reads a JSON config describing which organizations and projects to
 monitor. Repositories are auto-discovered per project unless you list them
-explicitly. Config is searched in this order:
+explicitly. If `$ADOTUI_CONFIG` is set, that file is the only one read.
+Otherwise config is searched in this order:
 
-1. `$ADOTUI_CONFIG`
-2. `$XDG_CONFIG_HOME/adotui/config.json`
-3. `~/.config/adotui/config.json`
-4. `~/.adotui.json`
-5. `./adotui.config.json`
+1. `$XDG_CONFIG_HOME/adotui/config.json`
+2. `~/.config/adotui/config.json`
+3. `~/.adotui.json`
+4. `./adotui.config.json` (in the current directory or any parent)
 
 ### Interactive Configuration Wizard
 
@@ -101,7 +101,7 @@ Within the configuration wizard:
 - Press **Enter** on an existing project item to edit it.
 - Press **Backspace** or **Delete** on an existing project item in the list to remove it.
 - View keyboard instructions or general CLI tips by selecting **❓ Keyboard & CLI Help**.
-- Save and load the configuration by selecting **✓ Save & Load Configuration**.
+- Save and load the configuration by selecting **✓ Save & Load Configuration**. Edits are written back to the config file that was loaded, keeping settings the wizard doesn't edit (`status`, `top`, `reviewer`, `creator`). A new config goes to `$ADOTUI_CONFIG` if set, otherwise `./adotui.config.json`. A file holding a PAT is saved with owner-only permissions.
 
 Example (`adotui.config.example.json`):
 

@@ -1,10 +1,16 @@
-import { expect, test, describe } from "bun:test";
+import { afterEach, expect, test, describe } from "bun:test";
 import { render } from "ink-testing-library";
 import { SetupScreen } from "../src/app/components/SetupScreen";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+const savedConfigEnv = process.env.ADOTUI_CONFIG;
+afterEach(() => {
+  if (savedConfigEnv === undefined) delete process.env.ADOTUI_CONFIG;
+  else process.env.ADOTUI_CONFIG = savedConfigEnv;
+});
 
 describe("SetupScreen UI & Submission", () => {
   test("renders list mode, allows project addition, PAT configuration, and save", async () => {
@@ -16,6 +22,8 @@ describe("SetupScreen UI & Submission", () => {
 
     const originalCwd = process.cwd();
     process.chdir(testDir);
+    // Isolated: never reads or writes a real ~/.config/adotui/config.json.
+    process.env.ADOTUI_CONFIG = join(testDir, "adotui.config.json");
 
     try {
       const { stdin, lastFrame } = render(
@@ -146,6 +154,8 @@ describe("SetupScreen UI & Submission", () => {
 
     const originalCwd = process.cwd();
     process.chdir(testDir);
+    // Isolated: never reads or writes a real ~/.config/adotui/config.json.
+    process.env.ADOTUI_CONFIG = join(testDir, "adotui.config.json");
 
     try {
       const { stdin, lastFrame } = render(
@@ -241,6 +251,8 @@ describe("SetupScreen UI & Submission", () => {
 
     const originalCwd = process.cwd();
     process.chdir(testDir);
+    // Isolated: never reads or writes a real ~/.config/adotui/config.json.
+    process.env.ADOTUI_CONFIG = join(testDir, "adotui.config.json");
 
     try {
       const { stdin, lastFrame } = render(
@@ -276,6 +288,60 @@ describe("SetupScreen UI & Submission", () => {
     }
   });
 
+  test("saving edits the loaded config in place and keeps fields the wizard doesn't edit", async () => {
+    const { tmpdir } = await import("node:os");
+    const { mkdirSync, writeFileSync, statSync } = await import("node:fs");
+    const cwdDir = join(tmpdir(), `adotui-setup-inplace-cwd-${Date.now()}`);
+    const configDir = join(tmpdir(), `adotui-setup-inplace-cfg-${Date.now()}`);
+    mkdirSync(cwdDir, { recursive: true });
+    mkdirSync(configDir, { recursive: true });
+    const configPath = join(configDir, "config.json");
+    writeFileSync(configPath, JSON.stringify({
+      projects: [{ organization: "https://dev.azure.com/acme", project: "core" }],
+      status: "completed",
+      top: 10,
+      reviewer: "maya@example.com",
+      creator: "lee@example.com",
+      pat: "existing-pat",
+    }));
+
+    const originalCwd = process.cwd();
+    process.chdir(cwdDir);
+    process.env.ADOTUI_CONFIG = configPath;
+
+    try {
+      let completed = false;
+      const { stdin } = render(<SetupScreen onComplete={() => { completed = true; }} />);
+      await delay(100);
+
+      // Menu: core project, Add, PAT, Help, Save — Tab four times to Save.
+      for (let i = 0; i < 4; i += 1) {
+        stdin.write("\t");
+        await delay(50);
+      }
+      stdin.write("\r");
+      await delay(100);
+
+      expect(completed).toBe(true);
+      const saved = JSON.parse(readFileSync(configPath, "utf-8"));
+      expect(saved).toMatchObject({
+        status: "completed",
+        top: 10,
+        reviewer: "maya@example.com",
+        creator: "lee@example.com",
+        pat: "existing-pat",
+      });
+      expect(saved.projects).toEqual([{ organization: "https://dev.azure.com/acme", project: "core" }]);
+      // Nothing written to the cwd, where it would be shadowed anyway.
+      expect(existsSync(join(cwdDir, "adotui.config.json"))).toBe(false);
+      if (process.platform !== "win32") {
+        expect(statSync(configPath).mode & 0o777).toBe(0o600);
+      }
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+
   test("allows opening and returning from the setup help screen", async () => {
     let completed = false;
     const { tmpdir } = await import("node:os");
@@ -285,6 +351,8 @@ describe("SetupScreen UI & Submission", () => {
 
     const originalCwd = process.cwd();
     process.chdir(testDir);
+    // Isolated: never reads or writes a real ~/.config/adotui/config.json.
+    process.env.ADOTUI_CONFIG = join(testDir, "adotui.config.json");
 
     try {
       const { stdin, lastFrame } = render(

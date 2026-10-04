@@ -3,6 +3,8 @@ export type ReviewState = "pending" | "approved" | "changes-requested" | "missin
 
 export interface PullRequestFileChange {
   path: string;
+  /** Previous path when the file was renamed (the diff's old side lives there). */
+  originalPath?: string;
   status: "added" | "modified" | "deleted";
   additions: number;
   deletions: number;

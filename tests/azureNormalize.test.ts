@@ -140,6 +140,13 @@ describe("normalizeFileChanges", () => {
     expect(result[2]).toEqual({ path: "src/gone.ts", status: "deleted", additions: 0, deletions: 0, diff: [] });
   });
 
+  test("keeps a rename's original path (the diff's old side lives there)", () => {
+    const [renamed] = normalizeFileChanges([
+      { changeType: "edit, rename", item: { path: "/src/new-name.ts" }, originalPath: "/src/old-name.ts" },
+    ]);
+    expect(renamed).toMatchObject({ path: "src/new-name.ts", originalPath: "src/old-name.ts", status: "modified" });
+  });
+
   test("skips folders", () => {
     const changes: AzureIterationChange[] = [
       { changeType: "add", item: { path: "/src", isFolder: true } },

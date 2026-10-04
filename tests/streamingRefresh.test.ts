@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { useAppStore } from "../src/app/store";
 import { INITIAL_STATE } from "../src/app/constants";
 import { doRefresh, resetRefreshState } from "../src/app/actions/refreshActions";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { MOCK_DATA } from "../src/data/mock";
 import type { AppData } from "../src/domain/types";
 
@@ -89,5 +91,39 @@ describe("streaming refresh", () => {
 
     await Bun.sleep(400);
     expect(useAppStore.getState().data).toBe(before);
+  });
+
+  test("an auto refresh upserts like a manual one instead of replacing the tree", async () => {
+    doRefresh("initial");
+    await waitFor(() => useAppStore.getState().loadState === "ready");
+    // A row the refresh does not return - what a project failing mid-refresh
+    // looks like. Replacing the tree wholesale would drop it.
+    const { data } = useAppStore.getState();
+    const [org, ...rest] = data.organizations;
+    const ghost = { name: "ghost", project: "ghost-project", pullRequests: [] };
+    useAppStore.setState({ data: { ...data, organizations: [{ ...org!, repositories: [...org!.repositories, ghost] }, ...rest] } });
+
+    const before = useAppStore.getState().lastRefreshISO;
+    await Bun.sleep(5);
+    doRefresh("auto");
+    await waitFor(() => useAppStore.getState().lastRefreshISO !== before);
+
+    expect(useAppStore.getState().data.organizations[0]!.repositories.map((r) => r.name)).toContain("ghost");
+  });
+
+  test("a failed refresh keeps the tree on screen", async () => {
+    doRefresh("initial");
+    await waitFor(() => useAppStore.getState().loadState === "ready");
+    const repos = countRepos(useAppStore.getState().data);
+
+    // Leave mock mode with an unreadable config: the load fails.
+    const badConfig = join(tmpdir(), `adotui-bad-config-${Date.now()}.json`);
+    await Bun.write(badConfig, "not json");
+    process.env.ADOTUI_MOCK = "0";
+    setEnv("ADOTUI_CONFIG", badConfig);
+
+    doRefresh("manual");
+    await waitFor(() => useAppStore.getState().loadState === "error");
+    expect(countRepos(useAppStore.getState().data)).toBe(repos);
   });
 });

@@ -10,12 +10,42 @@ const repoKey = (repo: RepositoryNode): string =>
   `${repo.project.toLowerCase()}/${repo.name.toLowerCase()}`;
 
 /**
+ * A refresh lists PRs without their details (files, checks, work items,
+ * comment counts), which are fetched lazily per PR. Re-attach the ones
+ * already loaded so a refresh never blanks them, and clear `detailsLoaded`
+ * so the selected PR revalidates in the background (see usePrDetails).
+ */
+const keepDetails = (previous: RepositoryNode, fresh: RepositoryNode): RepositoryNode => {
+  const byId = new Map(previous.pullRequests.map((pr) => [pr.id, pr]));
+  return {
+    ...fresh,
+    pullRequests: fresh.pullRequests.map((pr) => {
+      const old = byId.get(pr.id);
+      if (!old || pr.detailsLoaded) return pr;
+      return {
+        ...pr,
+        changedFiles: old.changedFiles,
+        iterSourceCommit: old.iterSourceCommit,
+        iterTargetCommit: old.iterTargetCommit,
+        checksPassed: old.checksPassed,
+        checksTotal: old.checksTotal,
+        workItems: old.workItems,
+        comments: old.comments,
+        activeComments: old.activeComments,
+        detailsLoaded: false,
+      };
+    }),
+  };
+};
+
+/**
  * Folds streamed load partials into the tree.
  *
  * Upsert, not blind append: on the initial load every org starts empty so
  * repos simply append in arrival order (the one growth pattern that keeps the
- * positional selection indices pointing at the same nodes), while a manual
- * refresh replaces existing repos in place instead of duplicating them.
+ * positional selection indices pointing at the same nodes), while a refresh
+ * replaces existing repos in place (keeping loaded PR details) instead of
+ * duplicating them.
  *
  * Always returns a NEW AppData when something changed - the summary counters
  * in useAppState are memoized on `state.data` identity, so an in-place push
@@ -62,7 +92,7 @@ export const mergeLoadPartials = (data: AppData, partials: LoadPartial[]): AppDa
         positionByKey.set(key, repositories.length);
         repositories.push(repo);
       } else {
-        repositories[existing] = repo;
+        repositories[existing] = keepDetails(repositories[existing]!, repo);
       }
     }
     organizations[index] = { ...org, repositories };

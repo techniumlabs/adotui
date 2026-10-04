@@ -125,22 +125,22 @@ export const doRefresh = (reason: RefreshReason): void => {
   };
 
   // Auto refreshes run silently: progress updates would tick the banner
-  // (and force repaints) while the user is working, and a tree that re-orders
-  // itself under the cursor every 60s is worse than one that appears at once.
+  // (and force repaints) while the user is working. Their partials are still
+  // collected, but only folded in by the trailing flush - one commit - so they
+  // go through the same upsert as a manual refresh: repos keep their place,
+  // loaded PR details survive, and a project that fails to load keeps its rows.
   const streaming = reason !== "auto";
   const progressHandler = streaming ? onProgress : undefined;
 
-  const onPartial = streaming
-    ? (partial: LoadPartial): void => {
-        if (partial.requestId !== epoch || epoch !== loadEpoch) return;
-        partialQueue.push(partial);
-        if (flushTimer) return;
-        const delay = Math.max(0, PARTIAL_COMMIT_MS - (Date.now() - lastFlushAt));
-        flushTimer = setTimeout(() => flushPartials(epoch), delay);
-      }
-    : undefined;
+  const onPartial = (partial: LoadPartial): void => {
+    if (partial.requestId !== epoch || epoch !== loadEpoch) return;
+    partialQueue.push(partial);
+    if (!streaming || flushTimer) return;
+    const delay = Math.max(0, PARTIAL_COMMIT_MS - (Date.now() - lastFlushAt));
+    flushTimer = setTimeout(() => flushPartials(epoch), delay);
+  };
 
-  const stream = streaming ? { onPartial, requestId: epoch } : undefined;
+  const stream = { onPartial, requestId: epoch };
   const load = () =>
     reason === "initial"
       ? loadInitialData(true, progressHandler, stream)
@@ -163,14 +163,17 @@ export const doRefresh = (reason: RefreshReason): void => {
         // A streamed load's accumulated tree IS what the user just watched
         // build, in arrival order. Replacing it with result.data (config
         // order) would re-shuffle the rows at the very end and move the
-        // selection, so only adopt result.data when nothing streamed.
+        // selection, so only adopt result.data when nothing streamed. A failed
+        // load returns an empty tree: keep what is on screen instead.
         const keepStreamed = streamedAny && result.ok && !result.fromCache;
-        const nextData = keepStreamed
-          ? (result.data.currentUserEmail &&
-             result.data.currentUserEmail !== current.data.currentUserEmail
-              ? { ...current.data, currentUserEmail: result.data.currentUserEmail }
-              : current.data)
-          : result.data;
+        const nextData = !result.ok
+          ? current.data
+          : keepStreamed
+            ? (result.data.currentUserEmail &&
+               result.data.currentUserEmail !== current.data.currentUserEmail
+                ? { ...current.data, currentUserEmail: result.data.currentUserEmail }
+                : current.data)
+            : result.data;
 
         const isMissingConfig = (!result.ok && result.errorType === "missing") || process.env.ADOTUI_FORCE_SETUP === "1";
         const nextLoadState = isMissingConfig ? "setup" : (result.ok ? "ready" : "error");

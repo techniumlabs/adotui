@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { PullRequest, PullRequestFileChange } from "../../domain/types";
 
 type UpdateFileDiff = (
+  target: PullRequest,
   filePath: string,
   diffData: { rawDiff: string; additions: number; deletions: number } | null,
 ) => void;
@@ -14,12 +15,13 @@ export function useLazyFileDiff(
   selectedPr: PullRequest | undefined,
   selectedFile: PullRequestFileChange | undefined,
   updateFileDiff?: UpdateFileDiff,
-  setFileLoading?: (filePath: string) => void,
+  setFileLoading?: (target: PullRequest, filePath: string) => void,
 ): void {
   useEffect(() => {
-    if (selectedPr && selectedFile && !selectedFile.rawDiff && !selectedFile.loadingDiff && updateFileDiff && setFileLoading) {
+    // `rawDiff === undefined`, not falsy: an empty file's diff is "" and is loaded.
+    if (selectedPr && selectedFile && selectedFile.rawDiff === undefined && !selectedFile.loadingDiff && updateFileDiff && setFileLoading) {
       if (selectedPr.iterSourceCommit && selectedPr.iterTargetCommit) {
-        setFileLoading(selectedFile.path);
+        setFileLoading(selectedPr, selectedFile.path);
         import("../../data/azure").then(({ fetchFileDiff }) => {
           fetchFileDiff(
             selectedPr.organizationUrl,
@@ -29,7 +31,7 @@ export function useLazyFileDiff(
             selectedPr.iterSourceCommit!,
             selectedPr.iterTargetCommit!
           ).then(res => {
-            updateFileDiff(selectedFile.path, res);
+            updateFileDiff(selectedPr, selectedFile.path, res);
           });
         });
       }

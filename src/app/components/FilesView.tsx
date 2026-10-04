@@ -20,8 +20,8 @@ type FilesViewProps = {
   onInputModeChange: (active: boolean) => void;
   isLoading?: boolean;
   fileFilter?: string;
-  updateFileDiff?: (filePath: string, diffData: { rawDiff: string; additions: number; deletions: number } | null) => void;
-  setFileLoading?: (filePath: string) => void;
+  updateFileDiff?: (target: PullRequest, filePath: string, diffData: { rawDiff: string; additions: number; deletions: number } | null) => void;
+  setFileLoading?: (target: PullRequest, filePath: string) => void;
 };
 
 const okStatus = (msg: string | null) => msg === "Comment posted.";

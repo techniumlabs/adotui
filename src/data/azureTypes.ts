@@ -62,6 +62,8 @@ export interface AzurePolicyEvaluation {
 export interface AzureIterationChange {
   changeType?: string; // "add" | "edit" | "delete" | "rename" | ...
   item?: { path?: string; gitObjectType?: string; isFolder?: boolean };
+  /** Set on renames: the path the file had before. */
+  originalPath?: string;
 }
 
 export interface AzureIterationChanges {

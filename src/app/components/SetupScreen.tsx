@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { palette } from "../theme";
 import { writeConfig, loadConfig } from "../../data/config";
-import type { AdoProjectConfig } from "../../data/config";
+import type { AdoConfig, AdoProjectConfig } from "../../data/config";
 import { AsciiLogo } from "./setup/AsciiLogo";
 import { SetupListMenu, type SetupMenuItem } from "./setup/SetupListMenu";
 import { AddProjectForm } from "./setup/AddProjectForm";
@@ -38,6 +38,9 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [pat, setPat] = useState("");
+  // The config being edited and the file it came from: saving writes back
+  // there, so the edit is the config actually read on the next load.
+  const [loaded, setLoaded] = useState<{ config: AdoConfig; source: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -45,6 +48,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
     const fetchExistingConfig = async () => {
       const res = await loadConfig();
       if (res.ok) {
+        setLoaded({ config: res.config, source: res.source });
         if (res.config.projects) {
           setProjects(res.config.projects);
         }
@@ -151,12 +155,12 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
     setError(null);
 
     try {
-      await writeConfig({
-        status: "active",
-        top: 50,
-        projects,
-        ...(pat.trim() ? { pat: pat.trim() } : {}),
-      });
+      // Keep the fields the wizard doesn't edit (status, top, reviewer, creator).
+      const { pat: _oldPat, ...base }: Partial<AdoConfig> = loaded?.config ?? { status: "active", top: 50 };
+      await writeConfig(
+        { ...base, projects, ...(pat.trim() ? { pat: pat.trim() } : {}) },
+        loaded?.source,
+      );
       delete process.env.ADOTUI_FORCE_SETUP;
       onComplete();
     } catch (e) {

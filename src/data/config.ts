@@ -1,3 +1,4 @@
+import { chmod } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, parse } from "node:path";
 
@@ -69,12 +70,13 @@ const walkUpConfigPaths = (): string[] => {
 };
 
 const configSearchPaths = (): string[] => {
-  const paths: string[] = [];
-
+  // An explicit path is authoritative: no silent fallback to another file.
   const fromEnv = process.env[CONFIG_ENV];
   if (fromEnv) {
-    paths.push(fromEnv);
+    return [fromEnv];
   }
+
+  const paths: string[] = [];
 
   const xdg = process.env.XDG_CONFIG_HOME;
   if (xdg) {
@@ -188,7 +190,8 @@ const normalizeConfig = (raw: unknown, source: string): ConfigResult => {
 
 /**
  * Loads the adotui config from the first path that exists.
- * Searches (in order): $ADOTUI_CONFIG, $XDG_CONFIG_HOME/adotui/config.json,
+ * $ADOTUI_CONFIG, when set, is the only path considered. Otherwise searches
+ * (in order): $XDG_CONFIG_HOME/adotui/config.json,
  * ~/.config/adotui/config.json, ~/.adotui.json, ./adotui.config.json.
  */
 export const loadConfig = async (): Promise<ConfigResult> => {
@@ -231,7 +234,16 @@ export const loadConfig = async (): Promise<ConfigResult> => {
   };
 };
 
-export const writeConfig = async (config: AdoConfig): Promise<void> => {
-  const path = join(process.cwd(), "adotui.config.json");
+/**
+ * Writes the config to `path` — the setup wizard passes the file it loaded,
+ * so edits land where they will be read. Without one: $ADOTUI_CONFIG, else
+ * ./adotui.config.json.
+ */
+export const writeConfig = async (
+  config: AdoConfig,
+  path = process.env[CONFIG_ENV] || join(process.cwd(), "adotui.config.json"),
+): Promise<void> => {
   await Bun.write(path, JSON.stringify(config, null, 2));
+  // The PAT is a credential: owner-only. (Bun.write ignores `mode`.)
+  if (config.pat) await chmod(path, 0o600);
 };

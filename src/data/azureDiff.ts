@@ -46,6 +46,7 @@ const fetchFileAtCommit = async (
  * Works for both text files and empty files (added/deleted).
  */
 const buildUnifiedDiff = async (
+  oldFilePath: string,
   filePath: string,
   oldContent: string,
   newContent: string,
@@ -55,7 +56,7 @@ const buildUnifiedDiff = async (
       const proc = Bun.spawn([
         "diff",
         "-u",
-        "-L", `a/${filePath}`,
+        "-L", `a/${oldFilePath}`,
         "-L", `b/${filePath}`,
         oldPath, newPath,
       ], { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
@@ -89,19 +90,20 @@ export const fetchFileDiff = async (
   const authHeader = await getAdoAuthHeader();
   if (!authHeader) return null;
 
-  const filePath = `/${file.path}`;
+  // A renamed file's old content lives at its original path.
+  const oldFilePath = file.originalPath ?? file.path;
   try {
     const [oldContent, newContent] = await Promise.all([
       file.status === "added"
         ? Promise.resolve("")
-        : fetchFileAtCommit(organization, project, repositoryId, filePath, targetCommit, authHeader),
+        : fetchFileAtCommit(organization, project, repositoryId, `/${oldFilePath}`, targetCommit, authHeader),
       file.status === "deleted"
         ? Promise.resolve("")
-        : fetchFileAtCommit(organization, project, repositoryId, filePath, sourceCommit, authHeader),
+        : fetchFileAtCommit(organization, project, repositoryId, `/${file.path}`, sourceCommit, authHeader),
     ]);
 
     if (oldContent !== null && newContent !== null) {
-      return await buildUnifiedDiff(file.path, oldContent, newContent);
+      return await buildUnifiedDiff(oldFilePath, file.path, oldContent, newContent);
     }
   } catch (e) {
     console.error(`Error fetching diff for ${file.path}:`, e);
