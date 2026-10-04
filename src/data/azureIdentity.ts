@@ -4,6 +4,7 @@
  * nothing to say for a PAT), and gives the identity GUID that voting needs.
  */
 import { adoGet } from "./adoFetch";
+import { CONNECTION_DATA_API_VERSION } from "./constants";
 import { debugLog } from "../shared/debugLog";
 
 export interface AdoIdentity {
@@ -19,9 +20,6 @@ interface ConnectionData {
     properties?: { Account?: { $value?: string } };
   };
 }
-
-/** connectionData is preview-only: plain 7.1 answers HTTP 400 (checked live). */
-const CONNECTION_DATA_API_VERSION = "7.1-preview.1";
 
 const cache = new Map<string, Promise<AdoIdentity | null>>();
 

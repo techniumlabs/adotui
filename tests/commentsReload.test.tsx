@@ -13,9 +13,9 @@ const { getMockComments } = await import("../src/data/mock");
 // to put back in afterAll, or every later test would get the fake azureRest.
 const realAzureRest = { ...(await import("../src/data/azureRest")) };
 mock.module("../src/data/azureRest", () => ({
-  fetchPrComments: async (_org: string, _proj: string, _repo: string, prId: number) => {
+  fetchPrComments: async (scope: { prId: number }) => {
     fetchCalls += 1;
-    return getMockComments(prId);
+    return getMockComments(scope.prId);
   },
   postPrComment: async () => true,
   replyToPrThread: async () => true,

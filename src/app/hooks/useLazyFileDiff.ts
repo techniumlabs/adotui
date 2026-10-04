@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { PullRequest, PullRequestFileChange } from "../../domain/types";
+import { prScope } from "../../data/refs";
 
 type UpdateFileDiff = (
   target: PullRequest,
@@ -24,9 +25,7 @@ export function useLazyFileDiff(
         setFileLoading(selectedPr, selectedFile.path);
         import("../../data/azure").then(({ fetchFileDiff }) => {
           fetchFileDiff(
-            selectedPr.organizationUrl,
-            selectedPr.project,
-            selectedPr.repositoryId ?? selectedPr.repository,
+            prScope(selectedPr),
             selectedFile,
             selectedPr.iterSourceCommit!,
             selectedPr.iterTargetCommit!

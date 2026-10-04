@@ -53,13 +53,13 @@ Status: `[x]` done · `[~]` code done, awaiting commit · `[ ]` pending
 
 ## Phase 6 — Code standards debt (suggest a separate PR after #11 merges)
 Standards and the lint ratchet are in (see CLAUDE.md "Code Standards", `DEBT` in `eslint.config.js`). This phase pays the debt down; each fix deletes its `DEBT` entry.
-- [ ] 6.1 **Constants:** create `src/data/constants.ts` and move the tunables (`DEFAULT_TIMEOUT_MS` ×2, `MAX_ATTEMPTS`, `EXPIRY_MARGIN_MS`,
+- [x] 6.1 **Constants:** create `src/data/constants.ts` and move the tunables (`DEFAULT_TIMEOUT_MS` ×2, `MAX_ATTEMPTS`, `EXPIRY_MARGIN_MS`,
       `FALLBACK_TTL_MS`, `PR_LIST_PAGE_SIZE`, `CHANGES_*`, HTTP status codes); move `PARTIAL_COMMIT_MS`, `TOAST_DURATION_MS`,
       `IDENTITY_WAIT_MS` into `src/app/constants.ts`. Then enable `no-magic-numbers` for `src/data/**` (not `mock.ts`), `src/app/actions/**`, `src/app/hooks/**`.
-- [ ] 6.2 **Split `azureLoad.ts`** (521 code lines): discovery/identity/filters → `azureProjects.ts`; per-PR detail fetches → `azurePrDetails.ts`; `azureLoad.ts` keeps orchestration.
+- [x] 6.2 **Split `azureLoad.ts`** (521 code lines): discovery/identity/filters → `azureProjects.ts`; per-PR detail fetches → `azurePrDetails.ts`; `azureLoad.ts` keeps orchestration.
 - [ ] 6.3 **Shared UI primitives** in `src/app/components/ui/`: `Pane` (25 inline `borderStyle`s), `PanelHeader` (7 copies), `EmptyState` (8 copies).
 - [ ] 6.4 **Split the long components** to ≤ 150 lines each: `CommentsView` (296-line component, 320-line file), `FilesView`, `SetupScreen`, `App`, `PrDetails`, `OrganizationTree`, `usePrComments`.
-- [ ] 6.5 **Parameter objects:** `azureRest.ts` mutations (7 positional args → a `ThreadRef`), `azureDiff.fetchFileDiff`, `listPrFileChanges`.
+- [x] 6.5 **Parameter objects:** `azureRest.ts` mutations (7 positional args → a `ThreadRef`), `azureDiff.fetchFileDiff`, `listPrFileChanges`.
 - [x] 6.6 **Layering:** `debugLog` → `src/shared/`, `CompletionOptions`/`MergeStrategy` → `domain/`; `LAYERING_DEBT` deleted (done with Phase 3).
 - [ ] 6.7 **Complexity:** `completionKeyboard` (45), `CommentsView` (41), `FilesView` (32), `config.ts` (29), `globals.ts` (28) → lookup tables / smaller functions; fix `usePasteHandler` nesting.
 - [ ] 6.8 **Tighten the ratchet** once `DEBT` is empty: function 150 → 100, complexity 25 → 20; enable `no-nested-ternary` (44 today).

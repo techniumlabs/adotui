@@ -1,5 +1,9 @@
 import { useEffect, useRef } from "react";
 
+/** Bracketed-paste markers the terminal wraps pasted text in. */
+const PASTE_START = "\x1b[200~";
+const PASTE_END = "\x1b[201~";
+
 export function usePasteHandler(onPaste: (text: string) => void) {
   const onPasteRef = useRef(onPaste);
   onPasteRef.current = onPaste;
@@ -24,18 +28,18 @@ export function usePasteHandler(onPaste: (text: string) => void) {
 
         while (i < str.length) {
           if (!isPasting) {
-            const startIdx = str.indexOf("\x1b[200~", i);
+            const startIdx = str.indexOf(PASTE_START, i);
             if (startIdx !== -1) {
               cleanStr += str.slice(i, startIdx);
               isPasting = true;
               pasteBuffer = "";
-              i = startIdx + 6;
+              i = startIdx + PASTE_START.length;
             } else {
               cleanStr += str.slice(i);
               break;
             }
           } else {
-            const endIdx = str.indexOf("\x1b[201~", i);
+            const endIdx = str.indexOf(PASTE_END, i);
             if (endIdx !== -1) {
               pasteBuffer += str.slice(i, endIdx);
               isPasting = false;
@@ -43,7 +47,7 @@ export function usePasteHandler(onPaste: (text: string) => void) {
                 onPasteRef.current(pasteBuffer);
               }
               pasteBuffer = "";
-              i = endIdx + 6;
+              i = endIdx + PASTE_END.length;
             } else {
               pasteBuffer += str.slice(i);
               break;

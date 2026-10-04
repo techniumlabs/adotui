@@ -1,8 +1,7 @@
 import { updateState } from "../store";
+import { TOAST_DURATION_MS } from "../constants";
 
 export type ToastType = "info" | "success" | "error";
-
-const TOAST_DURATION_MS = 3000;
 
 /** Shows a toast for 3 seconds. Stable module-level action. */
 export const addToast = (message: string, type: ToastType = "info"): void => {

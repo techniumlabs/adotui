@@ -15,7 +15,7 @@ export const withTempFile = async <T>(
   const { prefix = "adotui", suffix = "" } = options;
   const path = join(
     tmpdir(),
-    `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}${suffix}`,
+    `${prefix}-${crypto.randomUUID()}${suffix}`,
   );
   await Bun.write(path, content);
   try {

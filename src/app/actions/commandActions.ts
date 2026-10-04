@@ -41,7 +41,7 @@ export const executeCommand = (rawCommand: string, exitApp: () => void): void =>
     return;
   }
   if (command.startsWith("filter ")) {
-    const query = command.slice(7).trim();
+    const query = command.slice("filter ".length).trim();
     patchState({ focus: "tree", commandText: "", treeFilter: query, banner: `Tree filter applied: ${query}` });
     return;
   }
@@ -50,7 +50,7 @@ export const executeCommand = (rawCommand: string, exitApp: () => void): void =>
     return;
   }
   if (command.startsWith("find ")) {
-    const query = command.slice(5).trim();
+    const query = command.slice("find ".length).trim();
     patchState({ focus: "files", commandText: "", fileFilter: query, selectedFileIndex: 0, banner: `File filter applied: ${query}` });
     return;
   }

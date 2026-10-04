@@ -7,7 +7,9 @@
 import { withTempFile } from "./tempFile";
 import type { PullRequestFileChange } from "../domain/types";
 import { adoGetText, seg } from "./adoFetch";
+import { FILE_CONTENT_TIMEOUT_MS } from "./constants";
 import { debugLog } from "../shared/debugLog";
+import type { RepoRef } from "./refs";
 
 /**
  * Fetches the raw text content of a file at a specific commit from the Azure
@@ -15,23 +17,21 @@ import { debugLog } from "../shared/debugLog";
  * network error, auth error).
  */
 const fetchFileAtCommit = async (
-  organization: string,
-  project: string,
-  repositoryId: string,
+  repo: RepoRef,
   filePath: string,
   commitId: string,
 ): Promise<string | null> => {
   try {
     return await adoGetText(
-      organization,
-      `${seg(project)}/_apis/git/repositories/${seg(repositoryId)}/items`,
+      repo.organizationUrl,
+      `${seg(repo.project)}/_apis/git/repositories/${seg(repo.repositoryId)}/items`,
       {
         query: {
           path: filePath,
           "versionDescriptor.version": commitId,
           "versionDescriptor.versionType": "commit",
         },
-        timeoutMs: 15_000,
+        timeoutMs: FILE_CONTENT_TIMEOUT_MS,
       },
     );
   } catch (e) {
@@ -96,9 +96,7 @@ const buildUnifiedDiff = async (
  * Fetches the raw diff for a single file on-demand to avoid rate-limiting.
  */
 export const fetchFileDiff = async (
-  organization: string,
-  project: string,
-  repositoryId: string,
+  repo: RepoRef,
   file: PullRequestFileChange,
   sourceCommit: string,
   targetCommit: string,
@@ -109,10 +107,10 @@ export const fetchFileDiff = async (
     const [oldContent, newContent] = await Promise.all([
       file.status === "added"
         ? Promise.resolve("")
-        : fetchFileAtCommit(organization, project, repositoryId, `/${oldFilePath}`, targetCommit),
+        : fetchFileAtCommit(repo, `/${oldFilePath}`, targetCommit),
       file.status === "deleted"
         ? Promise.resolve("")
-        : fetchFileAtCommit(organization, project, repositoryId, `/${file.path}`, sourceCommit),
+        : fetchFileAtCommit(repo, `/${file.path}`, sourceCommit),
     ]);
 
     if (oldContent !== null && newContent !== null) {
