@@ -3,8 +3,9 @@
  * (see adoFetch.ts). They throw AdoHttpError when Azure DevOps refuses; the
  * confirm flow turns that into a banner.
  */
-import type { CompletionOptions } from "../domain/types";
-import { AdoHttpError, adoGet, adoPatch, adoPut, seg } from "./adoFetch";
+import type { CompletionOptions, NewPullRequest } from "../domain/types";
+import type { RepoRef } from "./refs";
+import { AdoHttpError, adoGet, adoPatch, adoPost, adoPut, seg } from "./adoFetch";
 import { getCurrentIdentity } from "./azureIdentity";
 import { debugLog } from "../shared/debugLog";
 import type { AzurePullRequest } from "./azureTypes";
@@ -146,3 +147,21 @@ export const completePr = async (
   }
   return awaitCompletion(ref, accepted, pollIntervalMs);
 };
+
+/** Opens a pull request; throws AdoHttpError with Azure DevOps' reason when it refuses. */
+export const createPullRequest = async (repo: RepoRef, pr: NewPullRequest): Promise<{ id: number }> => {
+  if (process.env.ADOTUI_MOCK) return { id: (await import("./mock")).MOCK_CREATED_PR_ID };
+  const created = await adoPost<{ pullRequestId?: number }>(
+    repo.organizationUrl,
+    `${seg(repo.project)}/_apis/git/repositories/${seg(repo.repositoryId)}/pullrequests`,
+    {
+      sourceRefName: `refs/heads/${pr.sourceBranch}`,
+      targetRefName: `refs/heads/${pr.targetBranch}`,
+      title: pr.title,
+      description: pr.description,
+      isDraft: pr.draft,
+    },
+  );
+  return { id: created.pullRequestId ?? 0 };
+};
+

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Create pull requests: `N` opens a form for the selected repository with source/target branch pickers
+  (type to filter; the target defaults to the repo's default branch), title (defaults from the
+  source branch), description and draft. Azure DevOps' refusals (e.g. an active PR for the same
+  branches) are shown in the form
+
+### Fixed
+- The completion editor (`c`) is visible again: it was rendered below the footer, outside the
+  fixed-height frame, so its options could not be seen while completing a PR
+
 ## [0.2.0] - 2026-10-04
 
 ### Added

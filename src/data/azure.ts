@@ -11,6 +11,7 @@
  *   - azureActions.ts — PR mutations (vote / abandon / complete)
  */
 export { getCurrentIdentity } from "./azureIdentity";
+export { listBranches } from "./azureDiscovery";
 export { fetchFileDiff } from "./azureDiff";
 export {
   fetchPrDetails,
@@ -24,6 +25,7 @@ export {
   abandonPr,
   approvePr,
   completePr,
+  createPullRequest,
   rejectPr,
   type CompletionOutcome,
   type PrRef,

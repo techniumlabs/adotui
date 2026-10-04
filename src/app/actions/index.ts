@@ -3,6 +3,7 @@ import { doRefresh } from "./refreshActions";
 import { moveTreeSelection, changePrSelection, changeFileSelection, selectTreeNode, selectPr, selectFile } from "./selectionActions";
 import { armConfirm, runConfirmedAction } from "./confirmActions";
 import { openCompletionEditor, submitCompletion } from "./completionActions";
+import { openCreatePr, closeCreatePr, submitCreatePr } from "./createPrActions";
 import { executeCommand } from "./commandActions";
 import { setDiffScrollOffset, setDiffSelectedRow, setCommentInputActive, openPrTab } from "./uiActions";
 import { openFilterPrompt, editFilterText, applyFilter, cancelFilter } from "./filterActions";
@@ -27,6 +28,9 @@ export const appActions = {
   runConfirmedAction,
   openCompletionEditor,
   submitCompletion,
+  openCreatePr,
+  closeCreatePr,
+  submitCreatePr,
   executeCommand,
   openFilterPrompt,
   editFilterText,

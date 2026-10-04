@@ -144,3 +144,16 @@ export type CompletionOptions = {
   squashMerge: boolean;
   transitionWorkItems: boolean;
 };
+
+/** What the "new pull request" form sends. Branch names are short (`main`, not `refs/heads/main`). */
+export type NewPullRequest = {
+  sourceBranch: string;
+  targetBranch: string;
+  title: string;
+  description: string;
+  draft: boolean;
+};
+
+/** A repository's branches (short names, sorted) and its default branch, if it has one. */
+export type RepoBranches = { branches: string[]; defaultBranch: string | null };
+

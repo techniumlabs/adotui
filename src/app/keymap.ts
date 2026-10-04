@@ -41,6 +41,7 @@ export const KEYMAP: KeymapSection[] = [
       { keys: "b", description: "Abandon PR" },
       { keys: "c", description: "Complete & merge (options)" },
       { keys: "o", description: "Open PR in browser" },
+      { keys: "N", description: "New PR in the selected repo" },
     ],
   },
   {

@@ -40,6 +40,7 @@ export const INITIAL_STATE: AppState = {
   pendingConfirm: null,
   fileScrollStates: {},
   toasts: [],
+  createPr: null,
 };
 
 export const REFRESH_INTERVAL_MS = 60_000;
@@ -106,3 +107,17 @@ export const COMPLETION_CURSOR = {
   SQUASH:         7,
   SUBMIT:         8,
 } as const;
+
+/** Rows of the "new pull request" form, in cursor order. */
+export const CREATE_PR_FIELD = {
+  SOURCE: 0,
+  TARGET: 1,
+  TITLE: 2,
+  DESCRIPTION: 3,
+  DRAFT: 4,
+  SUBMIT: 5,
+} as const;
+export const CREATE_PR_FIELD_COUNT = 6;
+/** Branch matches listed under the active branch field. */
+export const BRANCH_MATCHES_SHOWN = 5;
+

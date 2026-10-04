@@ -3,7 +3,7 @@ import type { AppData, CompletionOptions, MergeStrategy } from "../domain/types"
 // Defined in domain/ (the data layer needs them); re-exported so app code is unchanged.
 export type { CompletionOptions, MergeStrategy };
 
-export type FocusArea = "tree" | "list" | "detail" | "command" | "completion" | "filter" | "files" | "comments" | "runs" | "help";
+export type FocusArea = "tree" | "list" | "detail" | "command" | "completion" | "filter" | "files" | "comments" | "runs" | "help" | "createPr";
 
 export type TreeFilter = string;
 
@@ -35,6 +35,24 @@ export type PendingConfirm =
     }
   | null;
 
+
+/** A branch field: the typed filter and which of its matches is chosen. */
+export type BranchPick = { query: string; pick: number };
+
+export type CreatePrForm = {
+  repo: { organizationUrl: string; project: string; name: string };
+  /** null while the branch list is loading. */
+  branches: string[] | null;
+  defaultBranch: string | null;
+  source: BranchPick;
+  target: BranchPick;
+  title: string;
+  description: string;
+  draft: boolean;
+  cursor: number;
+  submitting: boolean;
+  error: string | null;
+};
 
 export type AppState = {
   data: AppData;
@@ -70,4 +88,6 @@ export type AppState = {
   pendingConfirm: PendingConfirm;
   fileScrollStates: Record<string, { offset: number; row: number }>;
   toasts: { id: string; message: string; type: "info" | "success" | "error" }[];
+  /** The open "new pull request" form (focus "createPr"), or null. */
+  createPr: CreatePrForm | null;
 };

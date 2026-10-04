@@ -158,6 +158,7 @@ for the full reference. The canonical table lives in `src/app/keymap.ts`.
 - `:`: command mode (`filter <query>`, `find <query>`, `refresh`, `help`…)
 - `r`: refresh · `R` inside Comments/Pipelines: reload that view
 - `a` / `x` / `b` / `c`: approve / reject / abandon / complete the selected PR
+- `N`: new pull request in the selected repository (type to filter branches, ←/→ to pick; title defaults from the source branch; optional draft)
 - `o`: open the selected PR in the browser
 - Diff: `←`/`→` switch files · `g`/`G` top/bottom · `n` comment on a line
 - Comments: `n` new · `r` reply · `e` edit · `d` delete · `s` resolve
