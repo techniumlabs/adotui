@@ -50,3 +50,21 @@ test("example test", () => {
 - Run in Mock Mode (no Azure credentials needed):
   - **Linux / macOS**: `ADOTUI_MOCK=1 bun run start`
   - **Windows (PowerShell)**: `$env:ADOTUI_MOCK="1"; bun run start`
+
+## Code Standards
+Enforced by `bun run lint` (CI fails on a violation) unless marked *guideline*.
+
+- **Size limits** (`src/`, code lines only — blanks and comments don't count): file ≤ 300 · function or component ≤ 150 (guideline: ≤ 80) · cyclomatic complexity ≤ 25 (guideline: ≤ 15) · parameters ≤ 5 (more → a parameter object, like `PrTarget`) · nesting depth ≤ 4. Over a limit means split: extract a hook, a sub-component or a module. Files already over are pinned at today's value in `eslint.config.js` under `DEBT` — fix the file, then delete its entry; never add a file or raise a number. `src/data/mock.ts` (a fixture) is exempt.
+- **Layering**: `domain/` (pure types) ← `data/` (Azure REST, CLI, config; no React) ← `app/` (state, UI). Imports only point downward. Four `data/` files still import upward (PLAN.md 6.6).
+- **Constants**: no magic numbers or strings for tunables — timeouts, retry counts, page sizes, TTLs, limits, API versions, URLs. Name them `UPPER_SNAKE` with a unit suffix (`_MS`, `_SIZE`) and keep them in the layer's constants module: `src/app/constants.ts` for UI/app, `src/data/constants.ts` for REST/auth/config (to be created, PLAN.md 6.1; today 8 of them are spread over 7 files). Layout numbers inside one component's JSX are the only exception. *Not lint-enforced yet; `no-magic-numbers` is switched on for the logic layers when 6.1 lands.*
+- **Reusable components**: shared building blocks live in `src/app/components/ui/` (planned: `Pane`, `PanelHeader`, `EmptyState` — PLAN.md 6.3). Rule of three: the third copy of a JSX pattern becomes a shared component. Views compose primitives and take colours and glyphs only from `palette`/`glyph`. One exported component per file, `PascalCase.tsx`; hooks are `useThing.ts`.
+- **Design patterns** — use the ones already here; add a new one only for a concrete need:
+  - *Gateway*: `data/adoFetch.ts` is the only Azure DevOps HTTP entry point and `data/command.ts` runs every `az` call the data layer makes (`--diagnostic` in `main.tsx` is the one exception).
+  - *Adapter*: `data/azureNormalize.ts` maps Azure payloads to `domain/` types; the UI never sees raw Azure shapes.
+  - *Command/Action*: every state change is a module-level action (see State Management); components never touch the store directly.
+  - *Container/Presentational*: data hooks (`usePrComments`, …) own fetching, components own UI state.
+  - *Table over branching*: key→behaviour tables (like `keymap.ts`) instead of long `if`/`switch` chains — the usual fix for a complexity violation.
+  - Async results carry the thing they were fetched for (`PrTarget`), never "whatever is selected when they land".
+- **Errors and output**: no `console.*` in `src/` — Ink owns the terminal, so stray output paints over the frame; use `debugLog` (`main.tsx`, the CLI, is exempt). No `any`. Within one module, data functions either throw (`AdoHttpError`, `CommandError`) or return `null`/`false`, as its header says — don't mix.
+- **Tests**: every behaviour change gets a test that fails on the old code; tests never read or write the real home or config (use `ADOTUI_CONFIG` and temp dirs). Test files mirror module names under `tests/`.
+- *Guideline*: avoid nested ternaries in JSX (44 today) — early return or a lookup table. Comments say why, not what.

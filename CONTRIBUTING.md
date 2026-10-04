@@ -65,7 +65,8 @@ tests/                    # Bun test files
 
 ## Code Style
 
-- TypeScript strict mode — no `any` unless absolutely necessary.
+- TypeScript strict mode — no `any` in `src/` (lint-enforced).
+- Size limits, layering, constants, shared components and patterns are enforced by `bun run lint`; the full rules are under **Code Standards** in [CLAUDE.md](CLAUDE.md).
 - Pure functions over side effects. Keep data transformations testable.
 - Use `const` over `let`. No `var`.
 - Prefer explicit types on function signatures.
