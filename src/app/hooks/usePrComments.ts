@@ -32,6 +32,27 @@ export const resolveTargetComment = (
   return selectedCommentIndex === -1 ? comments[0] : comments[selectedCommentIndex + 1];
 };
 
+const cacheKeyFor = (pr: PullRequest): string =>
+  commentCacheKey(pr.organizationUrl, pr.project, pr.repositoryId ?? pr.repository, pr.id);
+
+/** Sends a new comment, reply or edit; false when there is nothing to send to, or the API refuses. */
+/** Exported for tests. */
+export const sendComment = async (
+  pr: PullRequest,
+  mode: CommentInputMode,
+  text: string,
+  thread: PrCommentThread | undefined,
+  selectedCommentIndex: number,
+): Promise<boolean> => {
+  const scope = prScope(pr);
+  if (mode === "new") return postPrComment(scope, text);
+  if (!thread) return false;
+  if (mode === "reply") return replyToPrThread(scope, thread.id, thread.comments[0]?.id ?? 1, text);
+  if (mode !== "edit") return false;
+  const comment = resolveTargetComment(thread, selectedCommentIndex);
+  return comment ? editPrComment(scope, thread.id, comment.id, text) : false;
+};
+
 /**
  * Data layer for the PR comments view: thread fetching (with cache),
  * new/reply/edit submission, deletion, and thread status toggling.
@@ -55,13 +76,7 @@ export function usePrComments(
   const loadComments = useCallback(
     async (force = false) => {
       if (!selectedPr) return;
-      const repoId = selectedPr.repositoryId ?? selectedPr.repository;
-      const key = commentCacheKey(
-        selectedPr.organizationUrl,
-        selectedPr.project,
-        repoId,
-        selectedPr.id,
-      );
+      const key = cacheKeyFor(selectedPr);
 
       // Cache hit: show it immediately, then revalidate in the background so
       // comments added elsewhere (web UI, another session) appear without
@@ -145,36 +160,14 @@ export function usePrComments(
       onAccepted?: () => void,
     ): Promise<void> => {
       if (!selectedPr || !text.trim() || isSubmittingRef.current) return;
-      const repoId = selectedPr.repositoryId ?? selectedPr.repository;
 
       isSubmittingRef.current = true;
       setSubmitting(true);
 
       try {
-        let ok = false;
-        if (mode === "new") {
-          ok = await postPrComment(prScope(selectedPr), text.trim());
-        } else if (mode === "reply") {
-          const thread = threads[selectedThreadIndex];
-          if (thread) {
-            ok = await replyToPrThread(prScope(selectedPr), thread.id, thread.comments[0]?.id ?? 1, text.trim());
-          }
-        } else if (mode === "edit") {
-          const thread = threads[selectedThreadIndex];
-          const commentToEdit = resolveTargetComment(thread, selectedCommentIndex);
-          if (thread && commentToEdit) {
-            ok = await editPrComment(prScope(selectedPr), thread.id, commentToEdit.id, text.trim());
-          }
-        }
-
+        const ok = await sendComment(selectedPr, mode, text.trim(), threads[selectedThreadIndex], selectedCommentIndex);
         if (ok) {
-          const key = commentCacheKey(
-            selectedPr.organizationUrl,
-            selectedPr.project,
-            repoId,
-            selectedPr.id,
-          );
-          invalidateCommentCache(key);
+          invalidateCommentCache(cacheKeyFor(selectedPr));
           setStatusMsg("Comment posted. Refreshing…");
           onAccepted?.();
           await loadComments(true);
@@ -192,33 +185,29 @@ export function usePrComments(
     [selectedPr, threads, loadComments],
   );
 
-  /** Deletes a comment (author guard is the caller's responsibility via canModifyComment). */
-  const deleteComment = (thread: PrCommentThread, comment: PrComment): void => {
+  /** Runs one mutation at a time, and reloads the threads when it succeeds. */
+  const mutate = (run: () => Promise<boolean>): void => {
     if (isSubmittingRef.current) return;
-    const repoId = selectedPr?.repositoryId ?? selectedPr?.repository;
-    if (!selectedPr || !repoId) return;
     isSubmittingRef.current = true;
     setSubmitting(true);
-    deletePrComment(prScope(selectedPr), thread.id, comment.id).then((ok) => {
+    void run().then((ok) => {
       isSubmittingRef.current = false;
       setSubmitting(false);
       if (ok) void loadComments(true);
     });
   };
 
+  /** Deletes a comment (author guard is the caller's responsibility via canModifyComment). */
+  const deleteComment = (thread: PrCommentThread, comment: PrComment): void => {
+    if (!selectedPr) return;
+    mutate(() => deletePrComment(prScope(selectedPr), thread.id, comment.id));
+  };
+
   /** Toggles a thread between active and fixed. */
   const toggleThreadStatus = (thread: PrCommentThread): void => {
-    if (!selectedPr || isSubmittingRef.current) return;
-    isSubmittingRef.current = true;
-    setSubmitting(true);
+    if (!selectedPr) return;
     const newStatus = thread.status === "active" ? 2 : 1; // 2=fixed, 1=active
-    updatePrThreadStatus(prScope(selectedPr), thread.id!, newStatus).then((ok) => {
-      isSubmittingRef.current = false;
-      setSubmitting(false);
-      if (ok) {
-        void loadComments(true);
-      }
-    });
+    mutate(() => updatePrThreadStatus(prScope(selectedPr), thread.id!, newStatus));
   };
 
   return {

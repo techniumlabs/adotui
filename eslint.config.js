@@ -27,10 +27,8 @@ const limitRule = (rule, max) => [
  */
 const DEBT = {
   "src/app/App.tsx": { "max-lines-per-function": 232 },
-  "src/app/components/CommentsView.tsx": { "max-lines": 320, "max-lines-per-function": 296, complexity: 41 },
   "src/app/components/FilesView.tsx": { "max-lines-per-function": 249, complexity: 32 },
   "src/app/components/SetupScreen.tsx": { "max-lines-per-function": 240 },
-  "src/app/hooks/usePrComments.ts": { "max-lines-per-function": 207 },
 };
 
 const layering = (group, message) => ({
