@@ -1,4 +1,5 @@
 import { updateState } from "../store";
+import { selectSelectedPr } from "../selectors";
 import { clamp, getVisiblePrs, getVisibleFiles, matchesTreeFilter } from "../utils";
 
 export const moveTreeSelection = (orgDelta: number, repoDelta: number, banner?: string): void => {
@@ -91,9 +92,8 @@ export const changePrSelection = (delta: number): void => {
 
 export const changeFileSelection = (delta: number): void => {
   updateState((current) => {
-    const org = current.data.organizations[current.selectedOrgIndex];
-    const repo = org?.repositories[current.selectedRepoIndex];
-    const pr = repo?.pullRequests[current.selectedPrIndex];
+    // selectedPrIndex indexes the FILTERED list, like everywhere else (selectSelectedPr).
+    const pr = selectSelectedPr(current);
     const visibleFiles = getVisibleFiles(pr, current.fileFilter);
     if (!pr || visibleFiles.length === 0) return {};
 
