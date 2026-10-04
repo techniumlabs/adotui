@@ -70,6 +70,7 @@ bun run start
    # or, for PAT-based auth:
    # export AZURE_DEVOPS_EXT_PAT=<your-pat>
    ```
+4. [Git](https://git-scm.com/downloads) on your `PATH` (adotui uses `git diff` to compute file diffs; this is what makes diffs work on Windows).
 
 ## Configuration
 

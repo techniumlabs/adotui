@@ -1,6 +1,7 @@
 import { render } from "ink";
 import { App } from "./app/App";
 import pkg from "../package.json";
+import { RELEASES_URL, fetchInstallScript } from "./update";
 
 /** Get the version from package.json. */
 const getVersion = (): string => {
@@ -77,12 +78,19 @@ const updateCli = async () => {
       return;
     }
 
+    // The installer is a bash script; plain Windows shells have no bash.
+    if (process.platform === "win32") {
+      console.error(
+        `Automatic update is not supported on Windows. Download the new binary from:\n  ${RELEASES_URL}/tag/${release.tag_name}`,
+      );
+      process.exit(1);
+    }
+
     console.log(`Updating adotui from version ${currentVersion} to ${latestVersion}...`);
-    
-    const installUrl = "https://raw.githubusercontent.com/techniumlabs/adotui/main/install.sh";
-    console.log(`Running installation script from ${installUrl}...`);
-    
-    const child = Bun.spawn(["bash", "-c", `curl -fsSL ${installUrl} | bash`], {
+    console.log(`Running the installer published with ${release.tag_name}...`);
+
+    const script = await fetchInstallScript(release.tag_name);
+    const child = Bun.spawn(["bash", "-c", script], {
       stdin: "inherit",
       stdout: "inherit",
       stderr: "inherit",
