@@ -40,3 +40,45 @@ test("a renamed file diffs its original path at the target against its new path"
   expect(result!.rawDiff).toContain("+++ b/src/new-name.ts");
   expect(result).toMatchObject({ additions: 1, deletions: 1 });
 });
+
+const FILE = { path: "src/a.ts", status: "modified" as const, additions: 0, deletions: 0, diff: [] };
+
+test("a transient 503 on a content fetch is retried instead of failing the diff", async () => {
+  let targetCalls = 0;
+  globalThis.fetch = (async (input: string | URL) => {
+    const url = new URL(String(input));
+    if (url.searchParams.get("versionDescriptor.version") === "target") {
+      targetCalls += 1;
+      if (targetCalls === 1) return new Response("", { status: 503 });
+      return new Response("a\n");
+    }
+    return new Response("b\n");
+  }) as unknown as typeof fetch;
+
+  const result = await fetchFileDiff("https://dev.azure.com/acme", "core", "repo", FILE, "source", "target");
+  expect(targetCalls).toBe(2);
+  expect(result).toMatchObject({ additions: 1, deletions: 1 });
+});
+
+test("a missing file yields null and prints nothing over the UI", async () => {
+  globalThis.fetch = (async () => new Response("", { status: 404 })) as unknown as typeof fetch;
+  const printed: unknown[][] = [];
+  const realError = console.error;
+  console.error = (...args: unknown[]) => { printed.push(args); };
+  try {
+    expect(await fetchFileDiff("https://dev.azure.com/acme", "core", "repo", FILE, "source", "target")).toBeNull();
+  } finally {
+    console.error = realError;
+  }
+  expect(printed).toEqual([]);
+});
+
+test("a project name with spaces is escaped in the items path", async () => {
+  const urls: string[] = [];
+  globalThis.fetch = (async (input: string | URL) => {
+    urls.push(String(input));
+    return new Response("x\n");
+  }) as unknown as typeof fetch;
+  await fetchFileDiff("https://dev.azure.com/acme", "My Project", "my repo", FILE, "source", "target");
+  expect(urls[0]).toContain("/My%20Project/_apis/git/repositories/my%20repo/items?");
+});

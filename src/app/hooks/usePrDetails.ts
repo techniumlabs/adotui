@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { PullRequest } from "../../domain/types";
 import { fetchPrDetails } from "../../data/azure";
 import type { PrTarget } from "../actions/prDataActions";
+import { debugLog } from "../utils";
 
 export function usePrDetails(
   selectedPr: PullRequest | undefined,
@@ -23,7 +24,7 @@ export function usePrDetails(
       // In case of error, mark it as loaded so we don't infinitely retry
       if (!isCancelled) {
         updatePr(selectedPr, { detailsLoaded: true });
-        console.error("Failed to load PR details lazily:", err);
+        debugLog("Failed to load PR details lazily", err);
       }
     });
 

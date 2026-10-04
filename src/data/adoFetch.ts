@@ -91,7 +91,7 @@ const requestUrl = async <T>(
   baseUrl: string,
   method: "GET" | "POST" | "PATCH" | "DELETE",
   path: string,
-  options: AdoRequestOptions & { body?: unknown } = {},
+  options: AdoRequestOptions & { body?: unknown; as?: "json" | "text" } = {},
 ): Promise<T> => {
   const url = buildUrl(baseUrl, path, options.query, options.apiVersion);
   // After a timeout, connection error or 5xx the server may already have
@@ -99,6 +99,7 @@ const requestUrl = async <T>(
   // would post the comment twice. 429 and 401 are rejected before anything
   // runs, so they are safe to retry for every method.
   const replaySafe = method !== "POST";
+  const asText = options.as === "text";
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     const authHeader = await getAdoAuthHeader();
@@ -106,7 +107,10 @@ const requestUrl = async <T>(
       throw new AdoHttpError(401, url, "no Azure DevOps credentials (az login or AZURE_DEVOPS_EXT_PAT)");
     }
 
-    const headers: Record<string, string> = { Authorization: authHeader, Accept: "application/json" };
+    const headers: Record<string, string> = {
+      Authorization: authHeader,
+      Accept: asText ? "text/plain" : "application/json",
+    };
     if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
     let resp: Response;
@@ -139,6 +143,7 @@ const requestUrl = async <T>(
       throw new AdoHttpError(resp.status, url, await describeFailure(resp));
     }
 
+    if (asText) return (resp.status === 204 ? "" : await resp.text()) as T;
     if (resp.status === 204) return {} as T;
     const text = await resp.text();
     if (!text.trim()) return {} as T;
@@ -159,6 +164,10 @@ export const adoPatch = <T>(organization: string, path: string, body: unknown, o
 
 export const adoDelete = <T>(organization: string, path: string, options?: AdoRequestOptions): Promise<T> =>
   requestUrl<T>(organization, "DELETE", path, options);
+
+/** GET returning the raw response body (e.g. file content from the git items API). */
+export const adoGetText = (organization: string, path: string, options?: AdoRequestOptions): Promise<string> =>
+  requestUrl<string>(organization, "GET", path, { ...options, as: "text" });
 
 /** For endpoints on a different host (e.g. the vssps identity service). */
 export const adoGetFrom = <T>(baseUrl: string, path: string, options?: AdoRequestOptions): Promise<T> =>

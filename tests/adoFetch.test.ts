@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { AdoHttpError, adoGet, adoPatch, adoPost, seg, __buildUrl } from "../src/data/adoFetch";
+import { AdoHttpError, adoGet, adoGetText, adoPatch, adoPost, seg, __buildUrl } from "../src/data/adoFetch";
 
 const ORG = "https://dev.azure.com/acme";
 const realFetch = globalThis.fetch;
@@ -120,6 +120,21 @@ describe("requests", () => {
     }) as unknown as typeof fetch;
     expect(await adoPatch<{ ok: boolean }>(ORG, "_apis/x", { status: 2 })).toEqual({ ok: true });
     expect(calls).toBe(2);
+  });
+
+  test("adoGetText returns the body verbatim and asks for text/plain", async () => {
+    let accept = "";
+    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+      accept = (init.headers as Record<string, string>).Accept!;
+      return new Response("line 1\n{not json}\n");
+    }) as unknown as typeof fetch;
+    expect(await adoGetText(ORG, "_apis/x")).toBe("line 1\n{not json}\n");
+    expect(accept).toBe("text/plain");
+  });
+
+  test("adoGetText returns an empty string for an empty file (not {})", async () => {
+    globalThis.fetch = (async () => new Response("")) as unknown as typeof fetch;
+    expect(await adoGetText(ORG, "_apis/x")).toBe("");
   });
 
   test("treats 204 and empty bodies as an empty object", async () => {
