@@ -26,8 +26,8 @@ Status: `[x]` done · `[~]` code done, awaiting commit · `[ ]` pending
 - [x] 2.4 **Windows:** `git diff --no-index` instead of system `diff` (keep the `a/<old>` / `b/<new>` headers);
       `--update` on Windows prints the releases URL instead of `bash -c`; fetch `install.sh` from the release tag, not `main`.
 - [x] 2.5 **PRs with >2000 files:** page iteration changes (`$top=2000`, follow `nextSkip`/`nextTop`, cap 10 pages).
-- [ ] 2.6 **Cache per config** (`cache.ts`): file name includes a hash of projects/status/top/reviewer/creator (never the PAT).
-- [ ] 2.7 **Details gap:** `fetchPrDetails` returns only the fields whose fetch succeeded, so a partial failure can't zero counts.
+- [x] 2.6 **Cache per config** (`cache.ts`): file name includes a hash of projects/status/top/reviewer/creator (never the PAT).
+- [x] 2.7 **Details gap:** `fetchPrDetails` returns only the fields whose fetch succeeded, so a partial failure can't zero counts.
 
 ## Phase 3 — PR actions over REST (drops the `azure-devops` extension)
 - [ ] 3.1 Identity from `GET _apis/connectionData` (cached per org); replaces `az account show`. Check the api-version on the live org first.

@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { useAppStore } from "../src/app/store";
 import { INITIAL_STATE } from "../src/app/constants";
-import { doRefresh, resetRefreshState } from "../src/app/actions/refreshActions";
+import { PARTIAL_COMMIT_MS, doRefresh, resetRefreshState } from "../src/app/actions/refreshActions";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MOCK_DATA } from "../src/data/mock";
@@ -9,6 +9,10 @@ import type { AppData } from "../src/domain/types";
 
 const countRepos = (data: AppData): number =>
   data.organizations.reduce((acc, org) => acc + org.repositories.length, 0);
+
+// The replay takes ~0.5s here but several seconds on a loaded CI runner; these
+// tests assert behaviour, not speed, so the default 5s timeout is too tight.
+setDefaultTimeout(30_000);
 
 const saved: Record<string, string | undefined> = {};
 const setEnv = (key: string, value: string) => {
@@ -67,8 +71,10 @@ describe("streaming refresh", () => {
     let commits = 0;
     const unsubscribe = useAppStore.subscribe(() => { commits += 1; });
 
+    const startedAt = Date.now();
     doRefresh("initial");
     await waitFor(() => useAppStore.getState().loadState === "ready");
+    const elapsedMs = Date.now() - startedAt;
     unsubscribe();
 
     // Mock mode emits one partial per project group (100+ of them). Ink
@@ -79,7 +85,12 @@ describe("streaming refresh", () => {
       0,
     );
     expect(projectGroups).toBeGreaterThan(20);
-    expect(commits).toBeLessThan(20);
+    // At most one streaming commit per coalescing window, plus the few fixed
+    // ones (loading, progress, final). Bounded by elapsed time rather than a
+    // constant: a slow runner stretches the replay over more windows (measured:
+    // 6 commits in 0.55s, 25 in 5.3s), but a lost coalescer gives one per group.
+    expect(commits).toBeLessThanOrEqual(Math.ceil(elapsedMs / PARTIAL_COMMIT_MS) + 5);
+    expect(commits).toBeLessThan(projectGroups);
   });
 
   test("a superseded load cannot write into the store", async () => {

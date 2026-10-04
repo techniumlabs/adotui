@@ -24,7 +24,7 @@ let loadEpoch = 0;
  * reintroduce the flicker that removing the spinners fixed; this matches the
  * progress throttle, giving a hard ceiling of 4 frames/second.
  */
-const PARTIAL_COMMIT_MS = 250;
+export const PARTIAL_COMMIT_MS = 250;
 
 let partialQueue: LoadPartial[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
