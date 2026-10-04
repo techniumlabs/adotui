@@ -33,6 +33,7 @@ export const seg = (value: string): string => encodeURIComponent(value);
 const DEFAULT_API_VERSION = "7.1";
 const DEFAULT_TIMEOUT_MS = 20_000;
 const MAX_ATTEMPTS = 3;
+const SIGN_IN_MAX_ATTEMPTS = 2;
 
 export interface AdoRequestOptions {
   query?: Record<string, string | number | undefined>;
@@ -54,6 +55,30 @@ const buildUrl = (
   url.searchParams.set("api-version", apiVersion);
   return url.toString();
 };
+
+/** How much of an unexpected body is quoted in an error message. */
+const SNIPPET_CHARS = 200;
+
+/**
+ * Azure DevOps answers an unauthenticated request — and a request for an
+ * organization that does not exist — with a sign-in page, not a 401: either a
+ * 203, or a 302 that fetch follows to an HTML page with status 200. Parsing
+ * that as JSON used to surface as "Unrecognized token '<'".
+ */
+const isSignInPage = (resp: Response, asText: boolean): boolean =>
+  resp.status === 203 ||
+  (resp.ok && resp.redirected && /\/_signin\b/i.test(resp.url)) ||
+  (resp.ok && !asText && (resp.headers.get("content-type") ?? "").includes("text/html"));
+
+/** `https://dev.azure.com/acme/...` → `acme` (or the host, for `<org>.visualstudio.com`). */
+const organizationOf = (url: string): string => {
+  const { hostname, pathname } = new URL(url);
+  return hostname.endsWith("dev.azure.com") ? (pathname.split("/")[1] ?? hostname) : hostname;
+};
+
+const signInMessage = (url: string): string =>
+  `Azure DevOps answered with a sign-in page instead of data. Check that the organization ` +
+  `"${organizationOf(url)}" exists and that you are signed in to it (run \`az login\`, or set AZURE_DEVOPS_EXT_PAT).`;
 
 /** Turns an error response body into a short, human-readable reason. */
 const describeFailure = async (resp: Response): Promise<string> => {
@@ -78,13 +103,28 @@ const describeFailure = async (resp: Response): Promise<string> => {
   if (resp.status === 404) {
     return "not found — check the organization, project and repository names";
   }
-  return body.trim().split("\n")[0]?.slice(0, 200) || resp.statusText || "unknown error";
+  // An HTML error page is not a reason; quoting its first tag helps nobody.
+  const firstLine = body.trim().startsWith("<") ? "" : body.trim().split("\n")[0]?.slice(0, SNIPPET_CHARS);
+  return firstLine || resp.statusText || "unknown error";
 };
 
 const retryDelayMs = (resp: Response, attempt: number): number => {
   const retryAfter = Number(resp.headers.get("retry-after"));
   if (Number.isFinite(retryAfter) && retryAfter > 0) return retryAfter * 1000;
   return 500 * attempt;
+};
+
+/** Reads a successful response: raw text, or parsed JSON ({} when there is no body). */
+const readBody = async <T>(resp: Response, url: string, asText: boolean): Promise<T> => {
+  if (asText) return (resp.status === 204 ? "" : await resp.text()) as T;
+  if (resp.status === 204) return {} as T;
+  const text = await resp.text();
+  if (!text.trim()) return {} as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new AdoHttpError(resp.status, url, `unexpected response (not JSON): ${text.trim().slice(0, SNIPPET_CHARS)}`);
+  }
 };
 
 const requestUrl = async <T>(
@@ -129,8 +169,14 @@ const requestUrl = async <T>(
       continue;
     }
 
-    // An expired cached token: drop it and let the next attempt re-acquire.
-    if (resp.status === 401 && attempt < MAX_ATTEMPTS) {
+    const signIn = isSignInPage(resp, asText);
+
+    // An expired cached token: drop it and let the next attempt re-acquire. A
+    // sign-in page gets one retry only: a second one will not change for a
+    // third token (a mistyped organization would otherwise cost several `az`
+    // processes before the error shows).
+    const authAttempts = signIn ? SIGN_IN_MAX_ATTEMPTS : MAX_ATTEMPTS;
+    if ((resp.status === 401 || signIn) && attempt < authAttempts) {
       clearAuthHeaderCache();
       continue;
     }
@@ -139,15 +185,12 @@ const requestUrl = async <T>(
       await Bun.sleep(retryDelayMs(resp, attempt));
       continue;
     }
+    if (signIn) throw new AdoHttpError(401, url, signInMessage(url));
     if (!resp.ok) {
       throw new AdoHttpError(resp.status, url, await describeFailure(resp));
     }
 
-    if (asText) return (resp.status === 204 ? "" : await resp.text()) as T;
-    if (resp.status === 204) return {} as T;
-    const text = await resp.text();
-    if (!text.trim()) return {} as T;
-    return JSON.parse(text) as T;
+    return readBody<T>(resp, url, asText);
   }
 
   throw new AdoHttpError(0, url, "exhausted retries");

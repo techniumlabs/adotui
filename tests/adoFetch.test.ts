@@ -142,3 +142,68 @@ describe("requests", () => {
     expect(await adoGet<Record<string, unknown>>(ORG, "_apis/x")).toEqual({});
   });
 });
+
+describe("sign-in pages (unknown organization or bad credentials)", () => {
+  // What dev.azure.com/<unknown-org>/_apis/... returns, after fetch follows the redirect.
+  const SIGN_IN_HTML = "<html><head><title>Sign in to your account</title></head><body>…</body></html>";
+  const html = (status = 200) => new Response(SIGN_IN_HTML, { status, headers: { "content-type": "text/html; charset=utf-8" } });
+  const expectSignInError = (error: unknown) => {
+    expect(error).toBeInstanceOf(AdoHttpError);
+    expect((error as AdoHttpError).status).toBe(401);
+    expect((error as AdoHttpError).detail).toContain('organization "acme" exists');
+    expect((error as AdoHttpError).detail).toContain("sign-in page");
+    expect((error as AdoHttpError).detail).not.toContain("<html");
+  };
+
+  test("an HTML answer with status 200 is a clear auth error, not 'Unrecognized token <'", async () => {
+    globalThis.fetch = (async () => html()) as unknown as typeof fetch;
+    expectSignInError(await adoGet(ORG, "_apis/projects").catch((e: unknown) => e));
+  });
+
+  test("a 203 is a sign-in page too (what a bad token or PAT gets)", async () => {
+    globalThis.fetch = (async () => html(203)) as unknown as typeof fetch;
+    expectSignInError(await adoGet(ORG, "_apis/projects").catch((e: unknown) => e));
+  });
+
+  test("a redirect to _signin is recognised in text mode as well", async () => {
+    globalThis.fetch = (async () => {
+      const resp = new Response(SIGN_IN_HTML, { status: 200, headers: { "content-type": "text/plain" } });
+      Object.defineProperty(resp, "redirected", { value: true });
+      Object.defineProperty(resp, "url", { value: "https://spsprodeus27.vssps.visualstudio.com/_signin?realm=dev.azure.com" });
+      return resp;
+    }) as unknown as typeof fetch;
+    expectSignInError(await adoGetText(ORG, "_apis/git/items").catch((e: unknown) => e));
+  });
+
+  test("retries once (a refreshed token may fix it), then stops", async () => {
+    let calls = 0;
+    globalThis.fetch = (async () => { calls += 1; return html(); }) as unknown as typeof fetch;
+    await adoGet(ORG, "_apis/projects").catch(() => {});
+    expect(calls).toBe(2);
+  });
+
+  test("an expired token recovers: the retry gets real data", async () => {
+    let calls = 0;
+    globalThis.fetch = (async () => (++calls === 1 ? html(203) : json({ value: [1] }))) as unknown as typeof fetch;
+    expect(await adoGet<{ value: number[] }>(ORG, "_apis/projects")).toEqual({ value: [1] });
+  });
+
+  test("a file whose CONTENT is HTML is not mistaken for a sign-in page", async () => {
+    globalThis.fetch = (async () => new Response("<html>my page</html>", { headers: { "content-type": "text/plain" } })) as unknown as typeof fetch;
+    expect(await adoGetText(ORG, "_apis/git/items")).toBe("<html>my page</html>");
+  });
+
+  test("a non-JSON 200 body is a readable error, not a raw SyntaxError", async () => {
+    globalThis.fetch = (async () => new Response("plain text, not json", { headers: { "content-type": "text/plain" } })) as unknown as typeof fetch;
+    const error = await adoGet(ORG, "_apis/x").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AdoHttpError);
+    expect((error as AdoHttpError).detail).toContain("not JSON");
+    expect((error as AdoHttpError).detail).toContain("plain text, not json");
+  });
+
+  test("an HTML error page does not become the error message", async () => {
+    globalThis.fetch = (async () => new Response("<html><h1>Bad Request</h1></html>", { status: 400, statusText: "Bad Request" })) as unknown as typeof fetch;
+    const error = await adoGet(ORG, "_apis/x").catch((e: unknown) => e);
+    expect((error as AdoHttpError).detail).toBe("Bad Request");
+  });
+});

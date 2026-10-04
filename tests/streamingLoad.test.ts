@@ -65,6 +65,22 @@ afterEach(() => {
   else process.env.AZURE_DEVOPS_EXT_PAT = savedPat;
 });
 
+describe("loadAppData with an unknown organization", () => {
+  test("project discovery says what is wrong instead of a JSON parse error", async () => {
+    // A config with no `project` discovers them; dev.azure.com/<unknown>/ answers with a sign-in page.
+    globalThis.fetch = (async () =>
+      new Response("<html>Sign in</html>", { headers: { "content-type": "text/html" } })) as unknown as typeof fetch;
+
+    const { data, warnings } = await loadAppData({ projects: [{ organization: "https://dev.azure.com/test" }] });
+
+    expect(data.organizations[0]!.repositories).toHaveLength(0);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("Could not list projects for https://dev.azure.com/test");
+    expect(warnings[0]).toContain('organization "test" exists');
+    expect(warnings[0]).not.toContain("Unrecognized token");
+  });
+});
+
 describe("loadAppData streaming", () => {
   test("emits the organization first, then one partial per project, before resolving", async () => {
     const partials: LoadPartial[] = [];

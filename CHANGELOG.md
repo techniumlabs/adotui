@@ -58,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   over the UI
 - `install.sh` no longer installs an error page when a download fails, and `--update` no longer
   reports success when the installer download fails
+- An organization that does not exist or rejects your credentials now says so (a "sign-in page"
+  error naming the organization, after one token refresh) instead of
+  `JSON Parse error: Unrecognized token '<'`; non-JSON and HTML error bodies are reported readably
 
 ### Changed
 - PR loading is 7x faster on large configs: one paged project-wide PR listing
