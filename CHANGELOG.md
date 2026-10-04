@@ -76,6 +76,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Screen flicker while loading: frame stays under the terminal height and
   animations are progress-driven instead of timer-driven
 - PRs beyond the first `--top` window are no longer silently dropped
+- The diff view no longer hides removed lines that start with `---` (e.g. a deleted markdown rule)
+  or added lines that start with `++`: they were mistaken for file headers inside a hunk, which also
+  shifted the line numbers of everything after them
 
 
 ## [0.1.0] - 2026-07-01

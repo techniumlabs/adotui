@@ -9,20 +9,26 @@ type ParsedLine =
   | { kind: "header" | "hunk"; text: string }
   | { kind: "add" | "del" | "ctx"; text: string; oldNo: number | null; newNo: number | null };
 
-const parseDiff = (raw: string): ParsedLine[] => {
+/** Exported for tests. */
+export const parseDiff = (raw: string): ParsedLine[] => {
   const lines = raw.replace(/\t/g, "    ").split(/\r?\n/);
   if (lines.length > 0 && lines[lines.length - 1] === "") {
     lines.pop();
   }
   const result: ParsedLine[] = [];
   let oldLine = 1, newLine = 1;
+  // `---` / `+++` only mean "file header" before the first hunk. Inside a hunk
+  // they are content: a removed line "---" (a markdown rule) is written "----",
+  // an added line "++x" is written "+++x" — and used to be swallowed as headers.
+  let inHunk = false;
 
   for (const l of lines) {
     if (l.length === 0) {
       result.push({ kind: "ctx", text: "", oldNo: oldLine++, newNo: newLine++ });
-    } else if (l.startsWith("---") || l.startsWith("+++")) {
+    } else if (!inHunk && (l.startsWith("---") || l.startsWith("+++"))) {
       result.push({ kind: "header", text: l });
     } else if (l.startsWith("@@")) {
+      inHunk = true;
       result.push({ kind: "hunk", text: l });
       const m = l.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
       oldLine = m ? parseInt(m[1]!, 10) : 1;
