@@ -15,6 +15,7 @@ import type { AdoConfig, AdoProjectConfig } from "./config";
 import type {
   AzureIdentityRef,
   AzureIteration,
+  AzureIterationChange,
   AzureIterationChanges,
   AzureIterationList,
   AzurePolicyEvaluation,
@@ -282,6 +283,33 @@ const listPrWorkItems = async (
   }
 };
 
+/** The iteration changes endpoint serves at most 2000 entries per request. */
+const CHANGES_PAGE_SIZE = 2000;
+/** Safety valve: 10 pages = 20000 changed entries. */
+const CHANGES_MAX_PAGES = 10;
+
+/** Pages through an iteration's change entries so large PRs are not truncated. */
+const listIterationChanges = async (
+  organization: string,
+  changesPath: string,
+): Promise<AzureIterationChange[]> => {
+  const entries: AzureIterationChange[] = [];
+  let skip = 0;
+  for (let page = 0; page < CHANGES_MAX_PAGES; page += 1) {
+    const result = await adoGet<AzureIterationChanges>(organization, changesPath, {
+      query: { "$top": CHANGES_PAGE_SIZE, ...(skip > 0 ? { "$skip": skip } : {}) },
+    });
+    const batch = result.changeEntries ?? [];
+    entries.push(...batch);
+    // Trust the server's cursor; failing that, a full page means there may be more.
+    const next = result.nextSkip || (batch.length >= CHANGES_PAGE_SIZE ? skip + batch.length : 0);
+    if (!next) return entries;
+    skip = next;
+  }
+  debugLog("iteration changes truncated at", entries.length, changesPath);
+  return entries;
+};
+
 /**
  * Fetches changed files for a PR from the latest iteration, along with the
  * commit pair the diff view needs to fetch file contents lazily.
@@ -310,13 +338,9 @@ const listPrFileChanges = async (
     const iterSourceCommit = sourceCommit ?? latestIter.sourceRefCommit?.commitId;
     const iterTargetCommit = targetCommit ?? latestIter.commonRefCommit?.commitId ?? latestIter.targetRefCommit?.commitId;
 
-    const changes = await adoGet<AzureIterationChanges>(
-      organization,
-      `${prPath}/iterations/${latest}/changes`,
-      { query: { "$top": 10000 } },
+    const files = normalizeFileChanges(
+      await listIterationChanges(organization, `${prPath}/iterations/${latest}/changes`),
     );
-
-    const files = normalizeFileChanges(changes.changeEntries ?? []);
 
     return { files, iterSourceCommit, iterTargetCommit };
   } catch (cause) {

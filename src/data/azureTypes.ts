@@ -68,6 +68,8 @@ export interface AzureIterationChange {
 
 export interface AzureIterationChanges {
   changeEntries?: AzureIterationChange[];
+  /** `$skip` for the next page; 0 or absent when there are no more. */
+  nextSkip?: number;
 }
 
 export interface AzureIteration {
