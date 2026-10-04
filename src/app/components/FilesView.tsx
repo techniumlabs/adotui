@@ -2,15 +2,17 @@ import React, { useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import type { PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
-import { fileChangeBadge, glyph, palette, truncate } from "../theme";
+import { glyph, palette } from "../theme";
 import { buildDiffRows } from "./diff/diffRender";
 import { handleDiffNavigation } from "./diff/diffKeyboard";
 import { useDiffComment } from "../hooks/useDiffComment";
 import { useLazyFileDiff } from "../hooks/useLazyFileDiff";
 import { isChord } from "../hooks/keyboard/keys";
-import { computeScrollWindow, getVisibleFiles } from "../utils";
+import { getVisibleFiles } from "../utils";
 import { PanelTitle } from "./ui/PanelTitle";
 import { TabPane } from "./ui/TabPane";
+import { FileList } from "./diff/FileList";
+import { DiffBody, DiffCommentBox } from "./diff/DiffBody";
 
 type FilesViewProps = {
   selectedPr?: PullRequest;
@@ -135,13 +137,8 @@ export const FilesView: React.FC<FilesViewProps> = ({
     );
   }
 
-  const hasDiff = !!selectedFile && (selectedFile.diff.length > 0 || typeof selectedFile.rawDiff === "string");
-
   const terminalHeight = process.stdout.rows ?? 40;
   const viewportH = Math.max(5, terminalHeight - 27);
-  const total = diffRows.length;
-  const { offset: clampedOffset, canScrollUp, canScrollDown } = computeScrollWindow(total, viewportH, diffScrollOffset);
-  const visibleRows = diffRows.slice(clampedOffset, clampedOffset + viewportH).map(r => r.element);
 
   return (
     <TabPane>
@@ -157,133 +154,24 @@ export const FilesView: React.FC<FilesViewProps> = ({
         </Text>
       </Box>
 
-      {/* File list */}
-      <Box marginTop={1} flexDirection="column">
-        {flatFiles.length === 0 ? (
-          <Text color={palette.danger}>No files match the filter "{fileFilter}".</Text>
-        ) : (
-          flatFiles.map((file, idx) => {
-            const show =
-              flatFiles.length <= 5
-                ? true
-                : selectedFileIndex < 2
-                  ? idx < 5
-                  : selectedFileIndex >= flatFiles.length - 2
-                    ? idx >= flatFiles.length - 5
-                    : Math.abs(idx - selectedFileIndex) <= 2;
-            if (!show) return null;
+      <FileList files={flatFiles} selectedIndex={selectedFileIndex} fileFilter={fileFilter} />
 
-            const isSelected = idx === selectedFileIndex;
-            const badge = fileChangeBadge(file.status);
-            const parts = file.path.split("/");
-            const fileName = parts[parts.length - 1] ?? file.path;
-            const dir = parts.slice(0, -1).join("/");
-
-            return (
-              <Text key={file.path} wrap="truncate-end">
-                <Text color={isSelected ? palette.accent : palette.muted}>
-                  {isSelected ? glyph.pointer : glyph.pointerIdle}{" "}
-                </Text>
-                <Text color={badge.color} bold>
-                  {badge.symbol}{" "}
-                </Text>
-                <Text color={isSelected ? palette.textBright : palette.text}>
-                  {dir ? (
-                    <Text color={palette.muted}>{dir}/</Text>
-                  ) : null}
-                  {fileName}
-                </Text>
-                {file.additions > 0 || file.deletions > 0 ? (
-                  <Text>
-                    {" "}
-                    <Text color={palette.ok}>+{file.additions}</Text>
-                    <Text color={palette.danger}> -{file.deletions}</Text>
-                  </Text>
-                ) : null}
-              </Text>
-            );
-          })
-        )}
-      </Box>
-
-      {/* Diff view for selected file */}
       {selectedFile && (
-        <Box marginTop={1} flexDirection="column">
-          {/* File header */}
-          <Text color={palette.accentDim} wrap="truncate-end">
-            {"  "}{truncate(selectedFile.path, filesInnerWidth - 16)}
-            {"  "}
-            <Text color={palette.ok}>+{selectedFile.additions ?? 0}</Text>
-            <Text color={palette.danger}> -{selectedFile.deletions ?? 0}</Text>
-          </Text>
-
-          {selectedFile.loadingDiff ? (
-            <Box marginY={1} marginLeft={2}>
-              <Text color={palette.accent}>{glyph.clock} Loading diff...</Text>
-            </Box>
-          ) : hasDiff ? (
-            <Box flexDirection="column">
-              {diffRows.length > 0 ? (
-                <>
-                  <Box flexDirection="column" height={commentMode ? viewportH - 3.5 : viewportH} overflow="hidden">{visibleRows}</Box>
-                  <Text color={palette.muted}>
-                    {canScrollUp ? "↑ " : "  "}
-                    {`row ${diffSelectedRow + 1} of ${total}`}
-                    {canScrollDown ? " ↓" : "  "}
-                  </Text>
-                </>
-              ) : (
-                <Text color={palette.muted}>
-                  {selectedFile.status === "added" ? "Empty file added." : selectedFile.status === "deleted" ? "Empty file deleted." : "No changes to display."}
-                </Text>
-              )}
-            </Box>
-          ) : isLoading ? (
-            <Text color={palette.muted}>
-              {glyph.clock} Loading diff...
-            </Text>
-          ) : (
-            <Text color={palette.muted}>
-              Diff content not loaded (Azure change list is metadata-only).
-            </Text>
-          )}
-
-          {active && !commentMode && (
-            <Box marginTop={1}>
-              <Text color={palette.muted}>
-
-                <Text color={palette.accentDim}>n</Text> comment{"  "}
-                <Text color={palette.accentDim}>←/→</Text> switch files{"  "}
-                <Text color={palette.accentDim}>↑/↓</Text> navigate{"  "}
-                <Text color={palette.accentDim}>g/G</Text> top/end
-              </Text>
-            </Box>
-          )}
-        </Box>
+        <DiffBody
+          file={selectedFile}
+          rows={diffRows}
+          selectedRow={diffSelectedRow}
+          scrollOffset={diffScrollOffset}
+          viewportH={viewportH}
+          innerWidth={filesInnerWidth}
+          commentMode={commentMode}
+          isLoading={isLoading}
+          showHint={active && !commentMode}
+        />
       )}
 
-      {/* Comment input box */}
-      {commentMode && (
-        <Box
-          marginTop={1}
-          borderStyle="round"
-          borderColor={palette.accent}
-          paddingX={1}
-          flexDirection="column"
-        >
-          <Text color={palette.accent} bold>
-            {glyph.added} New diff comment on {selectedFile ? truncate(selectedFile.path, 30) : ""}
-            {"  "}
-            <Text color={palette.muted}>(Enter to send · Esc to cancel)</Text>
-          </Text>
-          <Text color={submitting ? palette.muted : palette.textBright}>
-            {commentText || " "}
-            {!submitting && <Text color={palette.accent}>▌</Text>}
-          </Text>
-        </Box>
-      )}
+      {commentMode && <DiffCommentBox file={selectedFile} text={commentText} submitting={submitting} />}
 
-      {/* Status Msg */}
       {statusMsg && (
         <Box marginTop={1}>
           <Text color={okStatus(statusMsg) ? palette.ok : palette.danger}>{statusMsg}</Text>
