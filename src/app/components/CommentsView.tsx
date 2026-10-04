@@ -1,15 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { isChord } from "../hooks/keyboard/keys";
 import type { PrCommentThread, PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
 import { glyph, palette } from "../theme";
 import { usePasteHandler } from "../hooks/usePasteHandler";
-import {
-  usePrComments,
-  resolveTargetComment,
-  type CommentInputMode,
-  type PrComment,
-} from "../hooks/usePrComments";
+import { usePrComments, resolveTargetComment, type CommentInputMode, type PrComment } from "../hooks/usePrComments";
 import { ThreadCard } from "./comments/ThreadCard";
 import { computeScrollWindow, followSelection, moveSelection } from "../utils";
 
@@ -80,7 +76,8 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
 
   useInput(
     (input, key) => {
-      if (!active) return;
+      // Shortcuts (and the delete y/n) are plain keys; text input never takes chords either.
+      if (isChord(input, key)) return;
 
       // Text-input mode
       if (inputMode !== "none") {
@@ -173,7 +170,7 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
           // max index is thread.comments.length - 2
           setSelectedCommentIndex((i) => Math.min(i + 1, thread.comments.length - 2));
         }
-      } else if (input === "e" && !key.ctrl && stateRef.current.threads[stateRef.current.selectedThread]) {
+      } else if (input === "e" && stateRef.current.threads[stateRef.current.selectedThread]) {
         const thread = stateRef.current.threads[stateRef.current.selectedThread];
         const commentToEdit = resolveTargetComment(thread, stateRef.current.selectedCommentIndex);
         if (commentToEdit) {
@@ -181,22 +178,22 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
           setInputMode("edit");
           setInputText(commentToEdit.content.trim());
         }
-      } else if (input === "d" && !key.ctrl && stateRef.current.threads[stateRef.current.selectedThread]) {
+      } else if (input === "d" && stateRef.current.threads[stateRef.current.selectedThread]) {
         const thread = stateRef.current.threads[stateRef.current.selectedThread]!;
         const commentToDelete = resolveTargetComment(thread, stateRef.current.selectedCommentIndex);
         if (commentToDelete) {
           if (!canModifyComment(commentToDelete, "delete")) return;
           setPendingDelete({ thread, comment: commentToDelete });
         }
-      } else if (input === "n" && !key.ctrl) {
+      } else if (input === "n") {
         setInputMode("new");
         setInputText("");
-      } else if (input === "r" && !key.ctrl && stateRef.current.threads[stateRef.current.selectedThread]) {
+      } else if (input === "r" && stateRef.current.threads[stateRef.current.selectedThread]) {
         setInputMode("reply");
         setInputText("");
       } else if (input === "R") {
         void loadComments(true);
-      } else if (input === "s" && !key.ctrl && stateRef.current.threads[stateRef.current.selectedThread]) {
+      } else if (input === "s" && stateRef.current.threads[stateRef.current.selectedThread]) {
         const thread = stateRef.current.threads[stateRef.current.selectedThread]!;
         toggleThreadStatus(thread);
       }

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { isChord } from "../hooks/keyboard/keys";
 import type { PipelineRun, PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
 import { glyph, palette, truncate } from "../theme";
@@ -60,7 +61,7 @@ export const PipelineRunsView: React.FC<PipelineRunsViewProps> = ({
 
   useInput(
     (input, key) => {
-      if (!active) return;
+      if (isChord(input, key)) return;
 
       if (key.downArrow) {
         setSelectedIdx((i) => moveSelection(i, 1, runs.length));

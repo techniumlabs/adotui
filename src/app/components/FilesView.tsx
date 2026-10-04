@@ -7,6 +7,7 @@ import { buildDiffRows } from "./diff/diffRender";
 import { handleDiffNavigation } from "./diff/diffKeyboard";
 import { useDiffComment } from "../hooks/useDiffComment";
 import { useLazyFileDiff } from "../hooks/useLazyFileDiff";
+import { isChord } from "../hooks/keyboard/keys";
 import { computeScrollWindow, getVisibleFiles } from "../utils";
 
 type FilesViewProps = {
@@ -75,7 +76,7 @@ export const FilesView: React.FC<FilesViewProps> = ({
 
   useInput(
     (input, key) => {
-      if (!active) return;
+      if (isChord(input, key)) return;
 
       if (commentMode) {
         if (key.escape) { cancelComment(); return; }

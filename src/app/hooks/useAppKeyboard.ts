@@ -1,4 +1,5 @@
 import { useInput } from "ink";
+import { isChord } from "./keyboard/keys";
 import type { AppHandle } from "./useAppState";
 import { updateState } from "../store";
 import { handleGlobals } from "./keyboard/globals";
@@ -18,6 +19,10 @@ export function useAppKeyboard(app: AppHandle, exitApp: () => void, suppressed =
     (input, key) => {
       // 1. Ctrl+C always exits immediately
       if (key.ctrl && input === "c") { exitApp(); process.exit(0); return; }
+
+      // Every binding below is a plain key: a Ctrl/Alt chord fires none of
+      // them, and leaves a pending y/n prompt open (Ctrl+Y is not "yes").
+      if (isChord(input, key)) return;
 
       // 2. Confirmation gate — awaiting y/n for a destructive action
       if (state.pendingConfirm) {
