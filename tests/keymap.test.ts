@@ -25,3 +25,10 @@ describe("keymap", () => {
     }
   });
 });
+
+test("the footer advertises N (new pull request) with or without a selected PR", () => {
+  for (const hasPr of [true, false]) {
+    expect(footerHints(hasPr)).toContainEqual({ keys: "N", label: "new pr" });
+  }
+});
+

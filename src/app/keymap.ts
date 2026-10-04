@@ -116,5 +116,5 @@ export const footerHints = (hasSelectedPr: boolean): FooterHint[] => {
         { keys: "c", label: "complete" },
       ]
     : [{ keys: "enter", label: "open pr" }];
-  return [...base, ...actions, { keys: "?", label: "help" }, { keys: "q", label: "quit" }];
+  return [...base, ...actions, { keys: "N", label: "new pr" }, { keys: "?", label: "help" }, { keys: "q", label: "quit" }];
 };
