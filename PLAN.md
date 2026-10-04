@@ -43,11 +43,11 @@ Status: `[x]` done · `[~]` code done, awaiting commit · `[ ]` pending
 - [x] 4.1 `release.yml` runs typecheck and tests before building.
 - [x] 4.2 Pin `softprops/action-gh-release` to a commit SHA; pin Bun to `1.3.14` in all workflows.
 - [x] 4.3 Release publishes `SHA256SUMS`; `install.sh` verifies the download (warn and continue for older releases without it).
-- [ ] 4.4 `pr.yml` matrix: `ubuntu-latest` + `windows-latest` for lint/typecheck/test. If more than 5 Windows-only failures remain after one fix pass, stop and report.
+- [x] 4.4 `pr.yml` matrix: `ubuntu-latest` + `windows-latest` for lint/typecheck/test. If more than 5 Windows-only failures remain after one fix pass, stop and report.
 
 ## Phase 5 — Finish
-- [ ] 5.1 Run the app against `techium-labs-test`: renamed-file diff, one 60 s auto-refresh (details and diff stay), approve flow.
-- [ ] 5.2 CHANGELOG `[Unreleased]` entries; mark PR #11 ready for review; update memory.
+- [x] 5.1 Run the app against `techium-labs-test`: renamed-file diff, one 60 s auto-refresh (details and diff stay), approve flow.
+- [x] 5.2 CHANGELOG `[Unreleased]` entries; mark PR #11 ready for review; update memory.
 - [ ] 5.3 Before merge: decide where `PLAN.md` lives. CLAUDE.md and `eslint.config.js` point at its Phase 6 debt list, so move that list
       to a GitHub issue (and update the references) or keep the file.
 
@@ -77,6 +77,13 @@ Standards and the lint ratchet are in (see CLAUDE.md "Code Standards", `DEBT` in
   with conflicts, 219 and 220 completed — reseed with `bun dev/testdata.ts` when needed.
 - Completion is asynchronous: PATCH returning 200 does not mean merged (PR 218 was accepted but stayed active on conflicts), yet the
   banner says "PR completed and merged." Pre-existing with `az`; fix = poll the PR after completing, or word the banner "Completion requested".
+
+- Live TUI run (techium-labs-test, pty-driven): app starts REST-only, the "me" filter works through `connectionData`,
+  and after a real 60s auto-refresh ("Auto-refresh synced") the selected PR's file list and loaded diff body were still shown.
+  Rename PR 222: `fetchPrDetails` returns `originalPath`, `fetchFileDiff` renders `--- a/src/utils.ts` / `+++ b/src/helpers.ts` with the
+  real hunk (verified at the data layer; the pty script could not navigate to that PR, so it was not seen in the TUI).
+- CI: a Windows job found no Windows-only bugs. Its 4 failures (and some on Linux) were timer latency on slow runners: the streaming
+  replay did 106 sequential 5ms sleeps. Fixed with batching, polling helpers and a 30s timeout.
 
 ## Not fixing (noted)
 - With a PAT, a 401 is retried twice for nothing.
