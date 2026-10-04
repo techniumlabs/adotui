@@ -36,6 +36,63 @@ const groupByProject = (
   return groups;
 };
 
+/** One repository row under its project, in the tree's box-drawing layout. */
+const RepoRow: React.FC<{ repo: RepositoryNode; selected: boolean; isLastProject: boolean; isLastRepo: boolean }> = ({
+  repo,
+  selected,
+  isLastProject,
+  isLastRepo,
+}) => {
+  const vertPrefix = isLastProject ? "     " : `  ${glyph.vert}  `;
+  const connector = isLastRepo ? glyph.branchLast : glyph.branch;
+  return (
+    // One Text per row, truncated: a row that wraps to a second line makes the
+    // body taller than the number of rows the window budgeted, and Ink
+    // composites the surplus back over the header (and blanks rows mid-list).
+    <Text wrap="truncate-end">
+      {/* Colour alone was too easy to miss, so the selected repo gets the same
+          pointer the org row and PR list use. It replaces the connector to
+          keep the columns aligned. */}
+      <Text color={selected ? palette.accent : palette.muted} bold={selected}>
+        {vertPrefix}{selected ? glyph.pointer : connector}{" "}
+      </Text>
+      <Text color={selected ? palette.accent : palette.text} bold={selected}>
+        {truncate(repo.name, PANEL_WIDTH - 16)}
+      </Text>
+      <Text color={repo.pullRequests.length > 0 ? palette.ok : palette.muted}>
+        {" "}({repo.pullRequests.length})
+      </Text>
+    </Text>
+  );
+};
+
+/**
+ * Windows the tree rows to the panel: keeps the selection roughly centred and
+ * shows how many rows are hidden above/below.
+ * maxRows is the panel's TOTAL height budget from App, but two rows go to the
+ * border, one to the header and one to the "v switch view" hint. Handing the
+ * body more than that does not clip: Ink composites the surplus back over the
+ * first rows, which is why the title used to read "3 moretions" and rows under
+ * the cursor blanked out mid-navigation.
+ */
+const windowRows = (rows: React.ReactNode[], selectedRow: number, maxRows: number): React.ReactNode[] => {
+  const bodyRows = Math.max(3, maxRows - 4);
+  const total = rows.length;
+  if (total <= bodyRows) return rows;
+  const inner = Math.max(3, bodyRows - 2);
+  const start = clamp(selectedRow - Math.floor(inner / 2), 0, total - inner);
+  const end = start + inner;
+  return [
+    <Text key="tree-more-up" color={palette.muted}>
+      {start > 0 ? `  ${glyph.up} ${start} more` : " "}
+    </Text>,
+    ...rows.slice(start, end),
+    <Text key="tree-more-down" color={palette.muted}>
+      {end < total ? `  ${glyph.down} ${total - end} more` : " "}
+    </Text>,
+  ];
+};
+
 export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
   data,
   selectedOrgIndex,
@@ -136,34 +193,16 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
           );
 
           entries.forEach(({ repo, flatIndex }, entryIdx) => {
-            const repoSelected = orgSelected && flatIndex === selectedRepoIndex;
-            const isLastRepo = entryIdx === entries.length - 1;
-            const vertPrefix = isLastProject ? "     " : `  ${glyph.vert}  `;
-            const repoConnector = isLastRepo ? glyph.branchLast : glyph.branch;
-
-            if (repoSelected) selectedRow = rows.length;
+            const selected = flatIndex === selectedRepoIndex;
+            if (selected) selectedRow = rows.length;
             rows.push(
-              // One Text per row, truncated: a row that wraps to a second
-              // line makes the body taller than the number of rows the
-              // window budgeted, and Ink composites the surplus back over
-              // the header (and blanks rows out mid-list).
-              <Text key={`${orgKey}-repo-${flatIndex}`} wrap="truncate-end">
-                {/* Colour alone was too easy to miss, so the selected repo
-                    gets the same pointer the org row and PR list use. It
-                    replaces the connector to keep the columns aligned. */}
-                <Text color={repoSelected ? palette.accent : palette.muted} bold={repoSelected}>
-                  {vertPrefix}{repoSelected ? glyph.pointer : repoConnector}{" "}
-                </Text>
-                <Text
-                  color={repoSelected ? palette.accent : palette.text}
-                  bold={repoSelected}
-                >
-                  {truncate(repo.name, PANEL_WIDTH - 16)}
-                </Text>
-                <Text color={repo.pullRequests.length > 0 ? palette.ok : palette.muted}>
-                  {" "}({repo.pullRequests.length})
-                </Text>
-              </Text>,
+              <RepoRow
+                key={`${orgKey}-repo-${flatIndex}`}
+                repo={repo}
+                selected={selected}
+                isLastProject={isLastProject}
+                isLastRepo={entryIdx === entries.length - 1}
+              />,
             );
           });
         });
@@ -171,30 +210,7 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
     }
   });
 
-  // Window the rows: keep the selection roughly centered and show how many
-  // rows are hidden above/below.
-  // maxRows is the panel's TOTAL height budget from App, but two rows go to
-  // the border and one to the header, so only maxRows - 3 are left for the
-  // tree. Handing the body more than that does not clip: Ink composites the
-  // surplus back over the first rows, which is why the title used to read
-  // "3 moretions" and rows under the cursor blanked out mid-navigation.
-  const bodyRows = Math.max(3, maxRows - 4);
-  const total = rows.length;
-  let body = rows;
-  if (total > bodyRows) {
-    const inner = Math.max(3, bodyRows - 2);
-    const start = clamp(selectedRow - Math.floor(inner / 2), 0, total - inner);
-    const end = start + inner;
-    body = [
-      <Text key="tree-more-up" color={palette.muted}>
-        {start > 0 ? `  ${glyph.up} ${start} more` : " "}
-      </Text>,
-      ...rows.slice(start, end),
-      <Text key="tree-more-down" color={palette.muted}>
-        {end < total ? `  ${glyph.down} ${total - end} more` : " "}
-      </Text>,
-    ];
-  }
+  const body = windowRows(rows, selectedRow, maxRows);
 
   return (
     <Box
