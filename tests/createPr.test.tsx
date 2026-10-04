@@ -3,13 +3,27 @@ import { render } from "ink-testing-library";
 import { App } from "../src/app/App";
 import { useAppStore } from "../src/app/store";
 import { INITIAL_STATE } from "../src/app/constants";
-import { branchMatches, buildNewPr, defaultTitle, pickedBranch } from "../src/app/createPr";
+import {
+  acceptSuggestion,
+  branchMatches,
+  buildNewPr,
+  defaultTitle,
+  listWindowStart,
+  parseReviewers,
+  pickedBranch,
+  reviewerSuggestions,
+  validateCreatePr,
+} from "../src/app/createPr";
+import { submitCreatePr } from "../src/app/actions/createPrActions";
+import { CREATE_PR_FIELD } from "../src/app/constants";
 import { createPullRequest, listBranches } from "../src/data/azure";
 import { AdoHttpError } from "../src/data/adoFetch";
 import type { CreatePrForm } from "../src/app/types";
 import { pressUntil, until } from "./helpers/wait";
 
 const DOWN = "\x1b[B";
+const RIGHT = "\x1b[C";
+const TAB = "\t";
 const ESC = "\x1b";
 
 describe("form logic", () => {
@@ -31,6 +45,13 @@ describe("form logic", () => {
     target: { query: "", pick: 1 },
     title: "",
     description: "  why  ",
+    reviewers: "",
+    reviewerPick: 0,
+    people: [
+      { name: "Ram Patel", email: "ram@example.com" },
+      { name: "Nina Alvarez", email: "nina@example.com" },
+    ],
+    openPrs: [],
     draft: true,
     cursor: 0,
     submitting: false,
@@ -41,13 +62,43 @@ describe("form logic", () => {
   test("builds the request, defaulting the title and trimming the description", () => {
     expect(buildNewPr(form())).toEqual({
       pr: { sourceBranch: "feature/x", targetBranch: "main", title: "x", description: "why", draft: true },
+      reviewerEmails: [],
+    });
+    expect(buildNewPr(form({ reviewers: "Ram@Example.com, nina@example.com, " }))).toMatchObject({
+      reviewerEmails: ["ram@example.com", "nina@example.com"],
     });
   });
 
-  test("refuses: still loading, no match, same branch twice", () => {
+  test("refuses: still loading, no match, same branch twice, naming the field", () => {
     expect(buildNewPr(form({ branches: null }))).toEqual({ error: "Branches are still loading." });
-    expect(buildNewPr(form({ source: { query: "nope", pick: 0 } }))).toMatchObject({ error: expect.stringContaining("source branch") });
-    expect(buildNewPr(form({ source: { query: "", pick: 1 } }))).toMatchObject({ error: expect.stringContaining("different branches") });
+    expect(buildNewPr(form({ source: { query: "nope", pick: 0 } }))).toEqual({ error: 'no branch matches "nope"', field: "source" });
+    expect(buildNewPr(form({ source: { query: "", pick: 1 } }))).toEqual({ error: "must differ from the source branch", field: "target" });
+  });
+
+  test("validates every field: open duplicate, lengths, reviewer e-mails", () => {
+    expect(validateCreatePr(form())).toEqual({});
+    expect(validateCreatePr(form({ openPrs: [{ id: 7, source: "feature/x", target: "main" }] })).target).toBe(
+      "PR #7 is already open for these branches",
+    );
+    expect(validateCreatePr(form({ title: "t".repeat(401) })).title).toContain("401/400");
+    expect(validateCreatePr(form({ description: "d".repeat(4001) })).description).toContain("4001/4000");
+    expect(validateCreatePr(form({ reviewers: "ram@example.com, bob" })).reviewers).toBe('"bob" is not an e-mail address');
+    expect(validateCreatePr(form({ reviewers: "a@b.io; A@b.io" })).reviewers).toBe("A@b.io is listed twice");
+  });
+
+  test("reviewer suggestions match the entry being typed, by name or e-mail, minus those added", () => {
+    expect(parseReviewers(" a@b.io,c@d.io ;e@f.io ")).toEqual(["a@b.io", "c@d.io", "e@f.io"]);
+    expect(reviewerSuggestions(form({ reviewers: "nin" })).map((p) => p.email)).toEqual(["nina@example.com"]);
+    expect(reviewerSuggestions(form({ reviewers: "ram@example.com, EXAMPLE" })).map((p) => p.email)).toEqual(["nina@example.com"]);
+    expect(reviewerSuggestions(form({ reviewers: "ram@example.com, " }))).toEqual([]);
+    expect(acceptSuggestion("ram@example.com, ni", "nina@example.com")).toBe("ram@example.com, nina@example.com, ");
+  });
+
+  test("the branch list window keeps the pick in view", () => {
+    expect(listWindowStart(0, 20, 8)).toBe(0);
+    expect(listWindowStart(10, 20, 8)).toBe(6);
+    expect(listWindowStart(19, 20, 8)).toBe(12);
+    expect(listWindowStart(2, 3, 8)).toBe(0);
   });
 });
 
@@ -89,7 +140,7 @@ describe("REST requests", () => {
 
   test("createPullRequest: POSTs full ref names, title, description and draft; returns the id", async () => {
     serve(() => json({ pullRequestId: 321 }));
-    const pr = { sourceBranch: "feature/x", targetBranch: "main", title: "Add x", description: "d", draft: true };
+    const pr = { sourceBranch: "feature/x", targetBranch: "main", title: "Add x", description: "d", draft: true, reviewerIds: [] };
     expect(await createPullRequest(repo, pr)).toEqual({ id: 321 });
     expect(calls).toEqual([{
       method: "POST",
@@ -99,9 +150,34 @@ describe("REST requests", () => {
     }]);
   });
 
+  test("createPullRequest: sends reviewers by id", async () => {
+    serve(() => json({ pullRequestId: 5 }));
+    await createPullRequest(repo, { sourceBranch: "a", targetBranch: "b", title: "t", description: "", draft: false, reviewerIds: ["id-1", "id-2"] });
+    expect(calls[0]!.body).toMatchObject({ reviewers: [{ id: "id-1" }, { id: "id-2" }] });
+  });
+
+  test("submit: an e-mail no Azure DevOps user has stops it before anything is created", async () => {
+    serve((path) => (path.endsWith("/identities") ? json({ value: [] }) : json({ pullRequestId: 1 })));
+    useAppStore.setState({
+      ...INITIAL_STATE,
+      createPr: {
+        repo: { organizationUrl: "https://dev.azure.com/acme", project: "core", name: "web" },
+        branches: ["feature/x", "main"], defaultBranch: "main",
+        source: { query: "", pick: 0 }, target: { query: "", pick: 1 },
+        title: "", description: "", reviewers: "ghost-zq7@example.com", reviewerPick: 0, people: [], openPrs: [],
+        draft: false, cursor: CREATE_PR_FIELD.SUBMIT, submitting: false, error: null,
+      },
+    });
+    submitCreatePr();
+    await until(() => useAppStore.getState().createPr?.submitting === false && useAppStore.getState().createPr?.error != null, "the error");
+    expect(useAppStore.getState().createPr?.error).toBe("No Azure DevOps user has the e-mail ghost-zq7@example.com.");
+    expect(useAppStore.getState().createPr?.cursor).toBe(CREATE_PR_FIELD.REVIEWERS);
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
   test("createPullRequest: Azure DevOps' refusal reaches the caller", async () => {
     serve(() => json({ message: "TF401179: An active pull request for the source and target branch already exists." }, 409));
-    const error = await createPullRequest(repo, { sourceBranch: "a", targetBranch: "b", title: "t", description: "", draft: false }).catch((e: unknown) => e);
+    const error = await createPullRequest(repo, { sourceBranch: "a", targetBranch: "b", title: "t", description: "", draft: false, reviewerIds: [] }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(AdoHttpError);
     expect((error as AdoHttpError).message).toContain("already exists");
   });
@@ -145,10 +221,10 @@ describe("the form in the app (mock mode)", () => {
       await until(() => form()?.source.query === before + ch, `"${ch}" to be typed`);
     }
   };
-  const moveToCreate = async (stdin: { write: (d: string) => void }) => {
-    while ((form()?.cursor ?? 0) < 5) {
+  const moveTo = async (stdin: { write: (d: string) => void }, row: number) => {
+    while ((form()?.cursor ?? 0) < row) {
       const before = form()?.cursor;
-      stdin.write(DOWN);
+      stdin.write(TAB);
       await until(() => form()?.cursor !== before, "the cursor to move");
     }
   };
@@ -169,7 +245,7 @@ describe("the form in the app (mock mode)", () => {
     await typeQuery(stdin, "typo");
     const f = form()!;
     expect(pickedBranch(f.branches, f.source)).toBe("fix/typo");
-    await moveToCreate(stdin);
+    await moveTo(stdin, CREATE_PR_FIELD.SUBMIT);
     stdin.write("\r");
     await until(() => form() === null, "the form to close");
     const toasts = useAppStore.getState().toasts.map((t) => `${t.type}: ${t.message}`);
@@ -180,12 +256,43 @@ describe("the form in the app (mock mode)", () => {
     const { stdin, lastFrame } = await start();
     await openForm(stdin, lastFrame);
     await typeQuery(stdin, "main");
-    await moveToCreate(stdin);
+    await moveTo(stdin, CREATE_PR_FIELD.SUBMIT);
     stdin.write("\r");
-    await until(() => (form()?.error ?? "").includes("different branches"), "the validation message");
+    await until(() => form()?.error === "must differ from the source branch", "the validation message");
     expect(form()?.submitting).toBe(false); // nothing was sent
+    expect(form()?.cursor).toBe(CREATE_PR_FIELD.TARGET); // taken to the field to fix
+    expect(lastFrame()).toContain("must differ from the source branch");
     stdin.write(ESC);
     await until(() => form() === null && useAppStore.getState().focus !== "createPr", "the form to close");
+  });
+
+  test("↓ scrolls the branch list instead of leaving the field", async () => {
+    const { stdin, lastFrame } = await start();
+    await openForm(stdin, lastFrame);
+    const before = form()!.source.pick;
+    stdin.write(DOWN);
+    await until(() => form()!.source.pick === before + 1, "the pick to move");
+    expect(form()!.cursor).toBe(CREATE_PR_FIELD.SOURCE);
+  });
+
+  test("a reviewer is suggested from the org's PRs, taken with →, and a bad e-mail blocks create", async () => {
+    const { stdin, lastFrame } = await start();
+    await openForm(stdin, lastFrame);
+    await moveTo(stdin, CREATE_PR_FIELD.REVIEWERS);
+    for (const ch of "ram") {
+      const before = form()!.reviewers;
+      stdin.write(ch);
+      await until(() => form()!.reviewers === before + ch, `"${ch}" to be typed`);
+    }
+    await until(() => (lastFrame() ?? "").includes("Ram Patel <ram@example.com>"), "the suggestion on screen");
+    stdin.write(RIGHT);
+    await until(() => form()!.reviewers === "ram@example.com, ", "the suggestion taken");
+    stdin.write("x");
+    await until(() => form()!.reviewers.endsWith("x"), "x typed");
+    await moveTo(stdin, CREATE_PR_FIELD.SUBMIT);
+    stdin.write("\r");
+    await until(() => form()?.error === '"x" is not an e-mail address', "the reviewer error");
+    expect(form()?.cursor).toBe(CREATE_PR_FIELD.REVIEWERS);
   });
 
   test("the completion editor is visible (it used to render outside the frame)", async () => {

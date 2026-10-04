@@ -48,9 +48,18 @@ export type CreatePrForm = {
   target: BranchPick;
   title: string;
   description: string;
+  /** Comma-separated reviewer e-mails, as typed. */
+  reviewers: string;
+  /** Highlighted reviewer suggestion. */
+  reviewerPick: number;
+  /** People seen on this organization's PRs: reviewer suggestions. */
+  people: { name: string; email: string }[];
+  /** Active PRs of this repository, to catch a duplicate before sending. */
+  openPrs: { id: number; source: string; target: string }[];
   draft: boolean;
   cursor: number;
   submitting: boolean;
+  /** Why the last "create" did not go through (invalid field, unknown reviewer, Azure DevOps refusal). */
   error: string | null;
 };
 

@@ -114,10 +114,16 @@ export const CREATE_PR_FIELD = {
   TARGET: 1,
   TITLE: 2,
   DESCRIPTION: 3,
-  DRAFT: 4,
-  SUBMIT: 5,
+  REVIEWERS: 4,
+  DRAFT: 5,
+  SUBMIT: 6,
 } as const;
-export const CREATE_PR_FIELD_COUNT = 6;
-/** Branch matches listed under the active branch field. */
-export const BRANCH_MATCHES_SHOWN = 5;
+export const CREATE_PR_FIELD_COUNT = 7;
+/** Rows of the scrolled branch list under the active branch field. */
+export const BRANCH_LIST_ROWS = 8;
+/** Reviewer suggestions listed under the reviewers field. */
+export const REVIEWER_SUGGESTIONS = 5;
+/** Azure DevOps limits (Pull Requests - Create). */
+export const PR_TITLE_MAX_CHARS = 400;
+export const PR_DESCRIPTION_MAX_CHARS = 4_000;
 

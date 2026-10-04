@@ -9,9 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Create pull requests: `N` opens a form for the selected repository with source/target branch pickers
-  (type to filter; the target defaults to the repo's default branch), title (defaults from the
-  source branch), description and draft. Azure DevOps' refusals (e.g. an active PR for the same
-  branches) are shown in the form
+  (type to filter, ↑/↓ or the mouse wheel to scroll the list, click to pick; the target defaults to
+  the repo's default branch), title (defaults from the source branch), description, reviewers
+  (e-mails, suggested from people on the organization's PRs) and draft. Fields are checked as you
+  type — unmatched or identical branches, an already-open PR for the same branches, over-long title
+  or description, malformed or repeated reviewer e-mails — and `create` takes you to the first
+  problem. Reviewers no Azure DevOps user has are caught before anything is created; Azure DevOps'
+  own refusals are shown in the form
 
 ### Fixed
 - The completion editor (`c`) is visible again: it was rendered below the footer, outside the

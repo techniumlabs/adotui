@@ -152,6 +152,8 @@ export type NewPullRequest = {
   title: string;
   description: string;
   draft: boolean;
+  /** Azure DevOps identity ids of the people asked to review. */
+  reviewerIds: string[];
 };
 
 /** A repository's branches (short names, sorted) and its default branch, if it has one. */

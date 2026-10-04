@@ -54,6 +54,7 @@ const resolveIdentityId = async (
   value: string,
 ): Promise<string | null> => {
   if (GUID.test(value)) return value;
+  if (process.env.ADOTUI_MOCK) return value.includes("@") ? `mock-id:${value.toLowerCase()}` : null;
   const cacheKey = `${organization}|${value.toLowerCase()}`;
   const cached = identityCache.get(cacheKey);
   if (cached !== undefined) return cached;
@@ -223,4 +224,8 @@ export const listBranches = async (repo: RepoRef): Promise<RepoBranches> => {
   const branches = (refs.value ?? []).map((ref) => shortBranch(ref.name)).filter((name) => name !== "").sort();
   return { branches, defaultBranch: info.defaultBranch ? shortBranch(info.defaultBranch) : null };
 };
+
+/** An Azure DevOps identity id for an e-mail address, or null when there is no such user. */
+export const findIdentityId = (organization: string, email: string): Promise<string | null> =>
+  resolveIdentityId(organization, email);
 

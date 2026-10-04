@@ -160,6 +160,7 @@ export const createPullRequest = async (repo: RepoRef, pr: NewPullRequest): Prom
       title: pr.title,
       description: pr.description,
       isDraft: pr.draft,
+      ...(pr.reviewerIds.length > 0 ? { reviewers: pr.reviewerIds.map((id) => ({ id })) } : {}),
     },
   );
   return { id: created.pullRequestId ?? 0 };

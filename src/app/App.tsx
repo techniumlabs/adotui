@@ -113,7 +113,7 @@ export const App: React.FC<{ mouse?: boolean }> = ({ mouse = false }) => {
         ) : state.focus === "completion" ? (
           <CompletionEditor state={state} />
         ) : state.focus === "createPr" && state.createPr ? (
-          <CreatePrForm form={state.createPr} />
+          <CreatePrForm form={state.createPr} onClick={actions.clickCreatePr} />
         ) : (
           <>
             <OrganizationTree
