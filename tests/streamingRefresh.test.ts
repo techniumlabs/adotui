@@ -26,7 +26,14 @@ const waitFor = async (predicate: () => boolean, timeoutMs = 15_000): Promise<vo
     if (predicate()) return;
     await Bun.sleep(20);
   }
-  throw new Error("timed out waiting for condition");
+  // Say where the store got stuck: a bare timeout is useless on a remote runner.
+  const { loadState, banner, loadProgress, data } = useAppStore.getState();
+  throw new Error(
+    `timed out waiting for condition (loadState=${loadState}, banner=${JSON.stringify(banner)}, ` +
+      `progress=${JSON.stringify(loadProgress)}, repos=${countRepos(data)}, ` +
+      `ADOTUI_MOCK=${process.env.ADOTUI_MOCK}, ADOTUI_MOCK_STREAM=${process.env.ADOTUI_MOCK_STREAM}, ` +
+      `ADOTUI_MOCK_STREAM_MS=${process.env.ADOTUI_MOCK_STREAM_MS})`,
+  );
 };
 
 describe("streaming refresh", () => {
