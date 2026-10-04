@@ -71,7 +71,6 @@ describe("loadAppData streaming", () => {
     let resolved = false;
 
     const { data } = await loadAppData(config, {
-      fetchDetails: false,
       requestId: 42,
       onPartial: (partial) => {
         // Everything must arrive while the load is still running - that is
@@ -105,8 +104,8 @@ describe("loadAppData streaming", () => {
   });
 
   test("the resolved value is identical whether or not anything streams", async () => {
-    const withStream = await loadAppData(config, { fetchDetails: false, onPartial: () => {} });
-    const withoutStream = await loadAppData(config, { fetchDetails: false });
+    const withStream = await loadAppData(config, { onPartial: () => {} });
+    const withoutStream = await loadAppData(config);
     expect(withStream.data).toEqual(withoutStream.data);
     expect(withStream.warnings).toEqual(withoutStream.warnings);
     // Config order, not arrival order, is what callers still receive.
@@ -127,7 +126,7 @@ describe("loadAppData streaming", () => {
     }) as unknown as typeof fetch;
 
     const partials: LoadPartial[] = [];
-    const { warnings } = await loadAppData(config, { fetchDetails: false, onPartial: (p) => partials.push(p) });
+    const { warnings } = await loadAppData(config, { onPartial: (p) => partials.push(p) });
 
     const edge = partials.find((p) => p.project === "edge")!;
     expect(edge.repositories).toHaveLength(0);

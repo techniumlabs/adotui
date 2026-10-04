@@ -196,7 +196,6 @@ export const loadInitialData = async (
         onProgress,
         onPartial,
         requestId: stream?.requestId,
-        fetchDetails: false,
       }),
       identityPromise,
     ]);

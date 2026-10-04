@@ -121,7 +121,7 @@ describe("Azure Platform Integration", () => {
     };
 
     const before = recordedUrls.length;
-    const { data: appData } = await loadAppData(fakeConfig, { fetchDetails: false });
+    const { data: appData } = await loadAppData(fakeConfig);
     const prListCalls = recordedUrls.slice(before).filter((u) => u.includes("/_apis/git/pullrequests"));
 
     expect(prListCalls).toHaveLength(1);
@@ -152,7 +152,7 @@ describe("Azure Platform Integration", () => {
     };
 
     const before = recordedUrls.length;
-    const { data: appData } = await loadAppData(fakeConfig, { fetchDetails: false });
+    const { data: appData } = await loadAppData(fakeConfig);
     const prListCalls = recordedUrls.slice(before).filter((u) => u.includes("/_apis/git/pullrequests"));
 
     expect(prListCalls).toHaveLength(2);
@@ -171,7 +171,7 @@ describe("Azure Platform Integration", () => {
       projects: [{ organization: "https://dev.azure.com/test-org", project: "test-project" }],
     };
 
-    const { data: appData } = await loadAppData(fakeConfig, { fetchDetails: false });
+    const { data: appData } = await loadAppData(fakeConfig);
     expect(appData.organizations[0]!.repositories[0]!.pullRequests).toHaveLength(103);
   });
 });

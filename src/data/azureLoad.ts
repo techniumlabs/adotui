@@ -325,74 +325,23 @@ const listPrFileChanges = async (
   }
 };
 
-/** Wraps errors into a synthetic PR entry so one bad repo doesn't break all. */
-const hydratePullRequest = async (
+/**
+ * Maps a listed PR into the domain type. Listing carries no per-PR details
+ * (files, checks, work items, comment counts): those are fetched lazily for
+ * the selected PR by fetchPrDetails, so `detailsLoaded` starts false.
+ */
+const toPullRequest = (
   project: AdoProjectConfig,
   repository: string,
   raw: AzurePullRequest,
-  options: { fetchDetails: boolean },
-): Promise<PullRequest> => {
-  const prId = raw.pullRequestId ?? 0;
-  const repositoryId = raw.repository?.id ?? repository;
-  const sourceCommit = raw.lastMergeSourceCommit?.commitId;
-  const targetCommit = raw.lastMergeTargetCommit?.commitId;
-  const projectStr = project.project!;
-
-  let changedFiles: PullRequestFileChange[] = [];
-  let checksPassed = 0;
-  let checksTotal = 0;
-  let workItems: PullRequestWorkItem[] = [];
-  let commentCount = 0;
-  let activeCommentCount = 0;
-  let iterSourceCommit: string | undefined;
-  let iterTargetCommit: string | undefined;
-
-  if (options.fetchDetails && prId > 0) {
-    const [fileRes, policies, items, threads] = await Promise.all([
-      listPrFileChanges(
-        project.organization,
-        projectStr,
-        repositoryId,
-        prId,
-        sourceCommit,
-        targetCommit,
-      ),
-      listPrPolicies(project.organization, projectStr, raw.repository?.project?.id, prId),
-      listPrWorkItems(project.organization, projectStr, repositoryId, prId),
-      fetchPrComments(project.organization, projectStr, repositoryId, prId),
-    ]);
-    changedFiles = fileRes.files;
-    iterSourceCommit = fileRes.iterSourceCommit;
-    iterTargetCommit = fileRes.iterTargetCommit;
-    const checks = summarizeChecks(policies);
-    checksPassed = checks.passed;
-    checksTotal = checks.total;
-    workItems = items;
-    const threadList = threads ?? [];
-    commentCount = threadList.reduce((acc, t) => acc + t.comments.length, 0);
-    activeCommentCount = threadList.reduce(
-      (acc, t) => acc + (t.status === "active" || t.status === "pending" ? t.comments.length : 0),
-      0
-    );
-  }
-
-  return {
-    ...normalizePullRequest(raw, {
-      organization: project.organization,
-      project: projectStr,
-      repository,
-      changedFiles,
-      checksPassed,
-      checksTotal,
-      commentCount,
-      activeCommentCount,
-    }),
-    workItems,
-    iterSourceCommit,
-    iterTargetCommit,
-    detailsLoaded: options.fetchDetails,
-  };
-};
+): PullRequest => ({
+  ...normalizePullRequest(raw, {
+    organization: project.organization,
+    project: project.project!,
+    repository,
+  }),
+  detailsLoaded: false,
+});
 
 export const fetchPrDetails = async (pr: PullRequest): Promise<Partial<PullRequest>> => {
   const repositoryId = pr.repositoryId ?? pr.repository;
@@ -460,8 +409,6 @@ export interface LoadPartial {
 }
 
 export interface LoadOptions {
-  /** When true, fetch per-PR file changes and policy checks (slower). */
-  fetchDetails?: boolean;
   /** Callback fired to report current loading progress. */
   onProgress?: (msg: string, progress?: LoadProgress) => void;
   /**
@@ -544,7 +491,6 @@ export const loadAppData = async (
   options: LoadOptions = {},
 ): Promise<{ data: AppData; warnings: string[] }> => {
   const warnings: string[] = [];
-  const fetchDetails = options.fetchDetails ?? true;
 
   // Group projects by organization so the tree top level is per-org.
   const byOrg = new Map<string, AdoProjectConfig[]>();
@@ -670,20 +616,17 @@ export const loadAppData = async (
         prGroups = groupPrsByRepository(prListResult.value);
       }
 
-      const repoNodes = await Promise.all(
-        repoNames.map(async (repository): Promise<RepositoryNode> => {
-          // `top`, when configured, caps PRs per repository. The project
-          // listing is paged in full, so no cap means every PR is kept.
-          const grouped = prGroups.get(repository.toLowerCase()) ?? [];
-          const rawPrs = config.top ? grouped.slice(0, config.top) : grouped;
-          const pullRequests = await Promise.all(
-            rawPrs.map((raw) =>
-              hydratePullRequest(project, repository, raw, { fetchDetails }),
-            ),
-          );
-          return { name: repository, project: project.project!, pullRequests };
-        }),
-      );
+      const repoNodes = repoNames.map((repository): RepositoryNode => {
+        // `top`, when configured, caps PRs per repository. The project
+        // listing is paged in full, so no cap means every PR is kept.
+        const grouped = prGroups.get(repository.toLowerCase()) ?? [];
+        const rawPrs = config.top ? grouped.slice(0, config.top) : grouped;
+        return {
+          name: repository,
+          project: project.project!,
+          pullRequests: rawPrs.map((raw) => toPullRequest(project, repository, raw)),
+        };
+      });
 
       done("Loaded");
       emitPartial(project.organization, project.project!, repoNodes, taskWarnings);
