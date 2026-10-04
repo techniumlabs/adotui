@@ -40,6 +40,8 @@ const serve = (override: Handler = () => undefined) => {
       return json({ authenticatedUser: { id: "me-guid", properties: { Account: { $value: "me@example.com" } } } });
     }
     if (method === "GET" && url.pathname === PR_PATH) return json({ lastMergeSourceCommit: { commitId: "fresh" } });
+    // A PATCH echoes the PR back; completing it reads `completed`, so completePr stops at once.
+    if (method === "PATCH" && url.pathname === PR_PATH) return json({ status: (calls.at(-1)!.body as { status?: string }).status });
     return json({});
   }) as unknown as typeof fetch;
 };
@@ -59,6 +61,9 @@ const options = (extra: Partial<CompletionOptions> = {}): CompletionOptions => (
 });
 
 const mutation = () => calls.filter((c) => c.method !== "GET");
+
+/** completePr without the 1s pause between status checks. */
+const complete = (r: PrRef, o: CompletionOptions) => completePr(r, o, 0);
 
 describe("current identity", () => {
   test("reads the id and sign-in address from connectionData, on the preview api-version", async () => {
@@ -129,7 +134,7 @@ describe("abandon", () => {
 describe("complete", () => {
   test("sends the commit the user reviewed plus the completion options", async () => {
     serve();
-    await completePr({ ...ref, lastMergeSourceCommit: "reviewed" }, options());
+    await complete({ ...ref, lastMergeSourceCommit: "reviewed" }, options());
     expect(calls).toHaveLength(1); // no extra GET when the ref carries the commit
     expect(calls[0]).toMatchObject({
       method: "PATCH",
@@ -143,7 +148,7 @@ describe("complete", () => {
 
   test.each(["noFastForward", "squash", "rebase", "rebaseMerge"] as const)("passes the %s strategy through", async (mergeStrategy) => {
     serve();
-    await completePr({ ...ref, lastMergeSourceCommit: "c" }, options({ mergeStrategy }));
+    await complete({ ...ref, lastMergeSourceCommit: "c" }, options({ mergeStrategy }));
     expect((calls[0]!.body as { completionOptions: { mergeStrategy: string } }).completionOptions.mergeStrategy).toBe(mergeStrategy);
   });
 
@@ -151,7 +156,7 @@ describe("complete", () => {
     serve();
     const sent = async (extra: Partial<CompletionOptions>) => {
       calls = [];
-      await completePr({ ...ref, lastMergeSourceCommit: "c" }, options(extra));
+      await complete({ ...ref, lastMergeSourceCommit: "c" }, options(extra));
       return (calls[0]!.body as { completionOptions: Record<string, unknown> }).completionOptions;
     };
     expect(await sent({ bypassPolicy: true, bypassReason: "hotfix" })).toMatchObject({ bypassPolicy: true, bypassReason: "hotfix" });
@@ -165,14 +170,14 @@ describe("complete", () => {
 
   test("a ref without a commit falls back to the PR's current head", async () => {
     serve();
-    await completePr(ref, options());
+    await complete(ref, options());
     expect(calls.map((c) => c.method)).toEqual(["GET", "PATCH"]);
     expect(calls[1]!.body).toMatchObject({ lastMergeSourceCommit: { commitId: "fresh" } });
   });
 
   test("with no commit anywhere it refuses instead of sending a bad PATCH", async () => {
     serve(({ method }) => (method === "GET" ? json({}) : undefined));
-    await expect(completePr(ref, options())).rejects.toThrow("no merge source commit");
+    await expect(complete(ref, options())).rejects.toThrow("no merge source commit");
     expect(mutation()).toHaveLength(0);
   });
 });
@@ -185,16 +190,89 @@ describe("Azure DevOps refusing", () => {
         ? json({ message: "TF401192: The source branch has been modified since the last merge attempt." }, 409)
         : undefined,
     );
-    await expect(completePr({ ...ref, lastMergeSourceCommit: "stale" }, options())).rejects.toThrow(
+    await expect(complete({ ...ref, lastMergeSourceCommit: "stale" }, options())).rejects.toThrow(
       "source branch changed since you last loaded this PR",
     );
   });
 
   test("any other refusal surfaces Azure DevOps' own message", async () => {
     serve(({ method }) => (method === "PATCH" ? json({ message: "TF401027: You need the Contribute permission." }, 403) : undefined));
-    const error = await completePr({ ...ref, lastMergeSourceCommit: "c" }, options()).catch((e: unknown) => e);
+    const error = await complete({ ...ref, lastMergeSourceCommit: "c" }, options()).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(AdoHttpError);
     expect((error as AdoHttpError).status).toBe(403);
     expect((error as AdoHttpError).message).toContain("Contribute permission");
+  });
+});
+
+describe("complete: what Azure DevOps actually did", () => {
+  // Real shapes, measured on the test org: the PATCH answers "queued"; the result shows up on later reads.
+  const QUEUED = { status: "active", mergeStatus: "queued", completionQueueTime: "2026-10-04T05:00:00Z" };
+  const CONFLICTS = { status: "active", mergeStatus: "conflicts" }; // queue drained: no completionQueueTime
+  const DONE = { status: "completed", mergeStatus: "succeeded", completionQueueTime: "2026-10-04T05:00:00Z" };
+
+  /** PATCH answers `first`; each later read of the PR answers the next of `reads` (the last one repeats). */
+  const sequence = (first: object, reads: object[]) => {
+    let read = 0;
+    serve(({ method, url }) => {
+      if (url.pathname !== PR_PATH) return undefined;
+      if (method === "PATCH") return json(first);
+      return json(reads[Math.min(read++, reads.length - 1)]);
+    });
+    return () => calls.filter((c) => c.method === "GET" && c.url.pathname === PR_PATH).length;
+  };
+  const run = () => complete({ ...ref, lastMergeSourceCommit: "c" }, options());
+
+  test("queued, then completed: the merge really happened", async () => {
+    sequence(QUEUED, [QUEUED, DONE]);
+    expect(await run()).toEqual({ state: "completed" });
+  });
+
+  test("a PATCH that already reads completed needs no further looks", async () => {
+    const reads = sequence(DONE, [DONE]);
+    expect(await run()).toEqual({ state: "completed" });
+    expect(reads()).toBe(0);
+  });
+
+  test("queued, then back to active with conflicts: reported as failed (PR #218 live), and polling stops", async () => {
+    const reads = sequence(QUEUED, [CONFLICTS]);
+    const outcome = await run();
+    expect(outcome.state).toBe("failed");
+    expect((outcome as { reason: string }).reason).toContain("merge conflicts");
+    expect(reads()).toBe(1);
+  });
+
+  test("blocked by policy and a failed merge say so; Azure DevOps' own message wins", async () => {
+    sequence(QUEUED, [{ status: "active", mergeStatus: "rejectedByPolicy" }]);
+    expect(await run()).toMatchObject({ state: "failed", reason: expect.stringContaining("branch policy") });
+    sequence(QUEUED, [{ status: "active", mergeStatus: "failure", mergeFailureMessage: "Object too large" }]);
+    expect(await run()).toEqual({ state: "failed", reason: "Object too large" });
+  });
+
+  test("a stale 'conflicts' while the completion is still queued is NOT a failure", async () => {
+    // mergeStatus can lag; only a drained queue (no completionQueueTime) makes it final.
+    sequence(QUEUED, [{ ...QUEUED, mergeStatus: "conflicts" }, DONE]);
+    expect(await run()).toEqual({ state: "completed" });
+  });
+
+  test("abandoned in the meantime is a failure", async () => {
+    sequence(QUEUED, [{ status: "abandoned" }]);
+    expect(await run()).toMatchObject({ state: "failed", reason: expect.stringContaining("abandoned") });
+  });
+
+  test("still queued after the last look: pending, not a guess", async () => {
+    const reads = sequence(QUEUED, [QUEUED]);
+    expect(await run()).toEqual({ state: "pending" });
+    expect(reads()).toBe(15);
+  });
+
+  test("a failed status check never turns into a false failure", async () => {
+    let first = true;
+    serve(({ method, url }) => {
+      if (url.pathname !== PR_PATH) return undefined;
+      if (method === "PATCH") return json(QUEUED);
+      if (first) { first = false; return json({ message: "denied" }, 403); }
+      return undefined;
+    });
+    expect(await run()).toEqual({ state: "pending" });
   });
 });

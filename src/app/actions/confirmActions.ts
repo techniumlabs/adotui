@@ -7,12 +7,13 @@ import {
   approvePr,
   completePr,
   rejectPr,
-  type PrRef,
+  type CompletionOutcome,
 } from "../../data/azure";
 import { resolvePrRefFromParts } from "../dataController";
 import { getState, patchState, updateState } from "../store";
 import { selectSelectedPr } from "../selectors";
 import { doRefresh } from "./refreshActions";
+import { addToast } from "./toastActions";
 
 const transformPrById = (
   target: { organizationUrl: string; repository: string; prId: number },
@@ -48,6 +49,28 @@ const transformPrById = (
   });
 };
 
+/**
+ * What to tell the user once a completion has settled. Azure DevOps accepts a
+ * completion before it has merged anything, so "accepted" is not "merged".
+ */
+export const describeCompletion = (
+  outcome: CompletionOutcome,
+  target: Pick<PrTarget, "prId">,
+  options: CompletionOptions,
+): { banner: string; ok: boolean } => {
+  switch (outcome.state) {
+    case "completed":
+      return { banner: `PR completed and merged. ${serializeCompletionOptions(options)}`, ok: true };
+    case "failed":
+      return { banner: `Could not complete PR #${target.prId}: ${outcome.reason}.`, ok: false };
+    case "pending":
+      return {
+        banner: `Completion of PR #${target.prId} was requested but Azure DevOps has not finished — refresh (r) to see the result.`,
+        ok: true,
+      };
+  }
+};
+
 export const runConfirmedAction = (confirm: NonNullable<AppState["pendingConfirm"]>): void => {
   const { kind, target, completionOptions } = confirm;
 
@@ -69,15 +92,7 @@ export const runConfirmedAction = (confirm: NonNullable<AppState["pendingConfirm
   const successBanner =
     kind === "approve"  ? "PR approved."                              :
     kind === "reject"   ? "PR rejected (changes requested)."          :
-    kind === "abandon"  ? "PR abandoned."                             :
-    `PR completed and merged. ${serializeCompletionOptions(opts)}`;
-
-  transformPrById(
-    { organizationUrl: target.organizationUrl, repository: target.repository, prId: target.prId },
-    optimistic,
-    pendingBanner,
-    "loading",
-  );
+    "PR abandoned.";
 
   const ref = resolvePrRefFromParts({
     organizationUrl: target.organizationUrl,
@@ -86,29 +101,45 @@ export const runConfirmedAction = (confirm: NonNullable<AppState["pendingConfirm
     prId: target.prId,
     lastMergeSourceCommit: target.lastMergeSourceCommit,
   });
+  const locator = { organizationUrl: target.organizationUrl, repository: target.repository, prId: target.prId };
 
   if (!ref) {
+    // Mock mode: nothing to ask, so apply the outcome locally.
+    transformPrById(locator, optimistic, pendingBanner, "loading");
     patchState({ banner: "Applied locally (no live ref: mock mode or PR missing routing info)." });
     return;
   }
 
-  const action = (r: PrRef): Promise<void> =>
-    kind === "approve"  ? approvePr(r)  :
-    kind === "reject"   ? rejectPr(r)   :
-    kind === "abandon"  ? abandonPr(r)  :
-    completePr(r, opts);
+  if (kind === "complete") {
+    // Not applied optimistically: the merge may still fail, and a PR that
+    // showed "completed" and then reappeared as active would be a lie.
+    patchState({ banner: pendingBanner, loadState: "loading" });
+    completePr(ref, opts)
+      .then((outcome) => {
+        const { banner, ok } = describeCompletion(outcome, target, opts);
+        if (outcome.state === "completed") transformPrById(locator, optimistic, banner, "ready");
+        else patchState({ banner, loadState: "ready" });
+        if (!ok) addToast(banner, "error");
+        doRefresh("auto");
+      })
+      .catch(reportActionFailure);
+    return;
+  }
 
-  action(ref)
+  transformPrById(locator, optimistic, pendingBanner, "loading");
+  (kind === "approve" ? approvePr(ref) : kind === "reject" ? rejectPr(ref) : abandonPr(ref))
     .then(() => {
       patchState({ banner: successBanner, loadState: "ready" });
       doRefresh("auto");
     })
-    .catch((cause: unknown) => {
-      patchState({
-        banner: `Action failed: ${cause instanceof Error ? cause.message : String(cause)}`,
-        loadState: "error",
-      });
-    });
+    .catch(reportActionFailure);
+};
+
+const reportActionFailure = (cause: unknown): void => {
+  patchState({
+    banner: `Action failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+    loadState: "error",
+  });
 };
 
 export const armConfirm = (kind: ConfirmKind, completionOptions?: CompletionOptions): void => {

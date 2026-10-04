@@ -166,6 +166,13 @@ for the full reference. The canonical table lives in `src/app/keymap.ts`.
 All mutating actions (approve, reject, abandon, complete/merge, comment
 delete) require an explicit `y` confirmation — Enter does not confirm.
 
+Completing a PR is asynchronous on Azure DevOps: it accepts the request first
+and merges afterwards. adotui watches the PR for up to 15 seconds and reports
+what happened — merged, or why it was not (merge conflicts, blocked by branch
+policy) — and only shows the PR as completed once it is. If Azure DevOps has
+not decided by then, the banner says the completion was requested; press `r`
+to check.
+
 ## How it works
 
 - `src/data/config.ts` — loads and validates the multi-org/project config.

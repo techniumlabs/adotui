@@ -76,6 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Screen flicker while loading: frame stays under the terminal height and
   animations are progress-driven instead of timer-driven
 - PRs beyond the first `--top` window are no longer silently dropped
+- Completing a PR no longer says "PR completed and merged" the moment Azure DevOps accepts the request:
+  the merge runs afterwards and can still fail. adotui now watches the PR (up to 15 s) and reports
+  the real result: merged, failed (merge conflicts, blocked by branch policy; with an error toast), or
+  "requested, not finished yet". The PR is only shown as completed once it is
 - The diff view no longer hides removed lines that start with `---` (e.g. a deleted markdown rule)
   or added lines that start with `++`: they were mistaken for file headers inside a hunk, which also
   shifted the line numbers of everything after them

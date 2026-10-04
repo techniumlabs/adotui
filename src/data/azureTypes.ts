@@ -36,6 +36,9 @@ export interface AzurePullRequest {
   reviewers?: AzureIdentityRef[];
   repository?: AzureRepositoryRef;
   mergeStatus?: string;
+  /** Set while a completion is queued; cleared once Azure DevOps has decided. */
+  completionQueueTime?: string;
+  mergeFailureMessage?: string;
   labels?: { id?: string; name?: string; active?: boolean }[];
   lastMergeSourceCommit?: { commitId?: string };
   lastMergeTargetCommit?: { commitId?: string };

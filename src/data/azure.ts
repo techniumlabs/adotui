@@ -25,5 +25,6 @@ export {
   approvePr,
   completePr,
   rejectPr,
+  type CompletionOutcome,
   type PrRef,
 } from "./azureActions";
