@@ -4,7 +4,7 @@ set -e
 # Configuration
 REPO="techniumlabs/adotui"
 BIN_NAME="adotui"
-INSTALL_DIR="/usr/local/bin"
+INSTALL_DIR="${ADOTUI_INSTALL_DIR:-/usr/local/bin}"
 
 # Detect OS and Architecture
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -28,7 +28,7 @@ elif [ "$OS" = "darwin" ]; then
     fi
 elif [ "$OS" = "windows" ]; then
     BIN_NAME="adotui.exe"
-    INSTALL_DIR="/usr/bin"
+    INSTALL_DIR="${ADOTUI_INSTALL_DIR:-/usr/bin}"
     if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
         TARGET="adotui-windows-arm64.exe"
     else
@@ -89,6 +89,7 @@ if [ "$RELEASE_STATUS" != "200" ]; then
 fi
 
 LATEST_URL=$(grep "browser_download_url.*$TARGET" "$RELEASE_BODY" | cut -d '"' -f 4)
+SUMS_URL=$(grep "browser_download_url.*SHA256SUMS" "$RELEASE_BODY" | cut -d '"' -f 4)
 rm -f "$RELEASE_HEADERS" "$RELEASE_BODY"
 
 if [ -z "$LATEST_URL" ]; then
@@ -97,7 +98,41 @@ if [ -z "$LATEST_URL" ]; then
 fi
 
 echo "Downloading $BIN_NAME from $LATEST_URL..."
-curl -sL "$LATEST_URL" -o "$BIN_NAME"
+# -f: a failed download must stop here, not be installed as the "binary".
+curl -fsSL "$LATEST_URL" -o "$BIN_NAME"
+
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{print $1}'
+    else
+        return 1
+    fi
+}
+
+if [ -n "$SUMS_URL" ]; then
+    EXPECTED=$(curl -fsSL "$SUMS_URL" | awk -v t="$TARGET" '$2 == t || $2 == "*" t { print $1 }')
+    if [ -z "$EXPECTED" ]; then
+        echo "SHA256SUMS has no entry for $TARGET; refusing to install." >&2
+        rm -f "$BIN_NAME"
+        exit 1
+    fi
+    ACTUAL=$(sha256_of "$BIN_NAME") || {
+        echo "Neither sha256sum nor shasum is available, so the download cannot be verified; refusing to install." >&2
+        rm -f "$BIN_NAME"
+        exit 1
+    }
+    if [ "$EXPECTED" != "$ACTUAL" ]; then
+        echo "Checksum mismatch for $TARGET (expected $EXPECTED, got $ACTUAL); refusing to install." >&2
+        rm -f "$BIN_NAME"
+        exit 1
+    fi
+    echo "Checksum OK ($ACTUAL)"
+else
+    # Releases before SHA256SUMS existed have nothing to verify against.
+    echo "Warning: this release publishes no SHA256SUMS; skipping checksum verification." >&2
+fi
 
 echo "Making $BIN_NAME executable..."
 chmod +x "$BIN_NAME"

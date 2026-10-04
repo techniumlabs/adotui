@@ -40,9 +40,9 @@ Status: `[x]` done · `[~]` code done, awaiting commit · `[ ]` pending
 - [x] 3.7 **Live check on `techium-labs-test`** (disposable org): approve, reject, abandon, complete (squash and rebase); reseed with `dev/testdata.ts` if needed.
 
 ## Phase 4 — CI and release
-- [ ] 4.1 `release.yml` runs typecheck and tests before building.
-- [ ] 4.2 Pin `softprops/action-gh-release` to a commit SHA; pin Bun to `1.3.14` in all workflows.
-- [ ] 4.3 Release publishes `SHA256SUMS`; `install.sh` verifies the download (warn and continue for older releases without it).
+- [x] 4.1 `release.yml` runs typecheck and tests before building.
+- [x] 4.2 Pin `softprops/action-gh-release` to a commit SHA; pin Bun to `1.3.14` in all workflows.
+- [x] 4.3 Release publishes `SHA256SUMS`; `install.sh` verifies the download (warn and continue for older releases without it).
 - [ ] 4.4 `pr.yml` matrix: `ubuntu-latest` + `windows-latest` for lint/typecheck/test. If more than 5 Windows-only failures remain after one fix pass, stop and report.
 
 ## Phase 5 — Finish
