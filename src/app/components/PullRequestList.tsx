@@ -4,6 +4,7 @@ import type { PullRequest } from "../../domain/types";
 import type { FocusArea } from "../types";
 import { glyph, palette, reviewBadge, statusBadge, truncate } from "../theme";
 import { isAssignedReviewer, isMyPr } from "../utils";
+import { PanelTitle } from "./ui/PanelTitle";
 
 type PullRequestListProps = {
   pullRequests: PullRequest[];
@@ -122,9 +123,9 @@ export const PullRequestList: React.FC<PullRequestListProps> = ({
     >
       {/* Header */}
       <Box justifyContent="space-between">
-        <Text color={active ? palette.accent : palette.muted} bold>
+        <PanelTitle active={active}>
           {glyph.dot} Pull Requests {glyph.arrow} {repoName ?? "—"}
-        </Text>
+        </PanelTitle>
         <Text color={palette.muted}>
           {visiblePrs.length > 0
             ? `${selectedPrIndex + 1} of ${visiblePrs.length}${visiblePrs.length !== pullRequests.length ? ` (${pullRequests.length} total)` : ""}`

@@ -17,6 +17,8 @@ import {
   isCurrentUser,
   isMyPr,
 } from "../utils";
+import { PanelTitle } from "./ui/PanelTitle";
+import { TabPane } from "./ui/TabPane";
 
 type PrDetailsProps = {
   selectedPr?: PullRequest;
@@ -48,20 +50,11 @@ export const PrDetails: React.FC<PrDetailsProps> = ({
     : false;
 
   return (
-    <Box
-      borderStyle="single"
-      borderTop={true}
-      borderBottom={false}
-      borderLeft={false}
-      borderRight={false}
-      borderColor={palette.border}
-      paddingX={1}
-      flexDirection="column"
-    >
+    <TabPane>
       <Box>
-        <Text color={active ? palette.accent : palette.muted} bold>
+        <PanelTitle active={active}>
           {glyph.dot} Details
-        </Text>
+        </PanelTitle>
         {selectedPr && !selectedPr.detailsLoaded && (
           <Text color={palette.muted}>
             {"  "}{glyph.clock} loading details...
@@ -260,6 +253,6 @@ export const PrDetails: React.FC<PrDetailsProps> = ({
       ) : (
         <Text color={palette.muted}>Select a PR to inspect details.</Text>
       )}
-    </Box>
+    </TabPane>
   );
 };

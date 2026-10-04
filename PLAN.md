@@ -57,7 +57,7 @@ Standards and the lint ratchet are in (see CLAUDE.md "Code Standards", `DEBT` in
       `FALLBACK_TTL_MS`, `PR_LIST_PAGE_SIZE`, `CHANGES_*`, HTTP status codes); move `PARTIAL_COMMIT_MS`, `TOAST_DURATION_MS`,
       `IDENTITY_WAIT_MS` into `src/app/constants.ts`. Then enable `no-magic-numbers` for `src/data/**` (not `mock.ts`), `src/app/actions/**`, `src/app/hooks/**`.
 - [x] 6.2 **Split `azureLoad.ts`** (521 code lines): discovery/identity/filters → `azureProjects.ts`; per-PR detail fetches → `azurePrDetails.ts`; `azureLoad.ts` keeps orchestration.
-- [ ] 6.3 **Shared UI primitives** in `src/app/components/ui/`: `Pane` (25 inline `borderStyle`s), `PanelHeader` (7 copies), `EmptyState` (8 copies).
+- [x] 6.3 **Shared UI primitives** in `src/app/components/ui/`: `Pane` (25 inline `borderStyle`s), `PanelHeader` (7 copies), `EmptyState` (8 copies).
 - [ ] 6.4 **Split the long components** to ≤ 150 lines each: `CommentsView` (296-line component, 320-line file), `FilesView`, `SetupScreen`, `App`, `PrDetails`, `OrganizationTree`, `usePrComments`.
 - [x] 6.5 **Parameter objects:** `azureRest.ts` mutations (7 positional args → a `ThreadRef`), `azureDiff.fetchFileDiff`, `listPrFileChanges`.
 - [x] 6.6 **Layering:** `debugLog` → `src/shared/`, `CompletionOptions`/`MergeStrategy` → `domain/`; `LAYERING_DEBT` deleted (done with Phase 3).

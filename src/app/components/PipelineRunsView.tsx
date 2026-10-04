@@ -7,6 +7,8 @@ import { glyph, palette, truncate } from "../theme";
 import { formatRelativeAge, openInBrowser } from "../utils";
 import { usePipelineRuns } from "../hooks/usePipelineRuns";
 import { moveSelection } from "../utils";
+import { PanelTitle } from "./ui/PanelTitle";
+import { TabPane } from "./ui/TabPane";
 
 type PipelineRunsViewProps = {
   selectedPr?: PullRequest;
@@ -85,23 +87,13 @@ export const PipelineRunsView: React.FC<PipelineRunsViewProps> = ({
   const inProgress = runs.filter((r) => r.state === "inProgress").length;
 
   return (
-    <Box
-      marginTop={1}
-      borderStyle="single"
-      borderTop={true}
-      borderBottom={false}
-      borderLeft={false}
-      borderRight={false}
-      borderColor={palette.border}
-      paddingX={1}
-      flexDirection="column"
-    >
+    <TabPane marginTop={1}>
       {/* Header */}
       <Box justifyContent="space-between">
-        <Text color={active ? palette.accent : palette.muted} bold>
+        <PanelTitle active={active}>
           {glyph.clock} Pipeline Runs
           {selectedPr ? ` — ${selectedPr.project}` : ""}
-        </Text>
+        </PanelTitle>
         <Text color={palette.muted}>
           {loading ? (
             <Text color={palette.muted}>
@@ -191,6 +183,6 @@ export const PipelineRunsView: React.FC<PipelineRunsViewProps> = ({
       })}
 
       {/* Hints moved to App.tsx */}
-    </Box>
+    </TabPane>
   );
 };

@@ -9,6 +9,8 @@ import { useDiffComment } from "../hooks/useDiffComment";
 import { useLazyFileDiff } from "../hooks/useLazyFileDiff";
 import { isChord } from "../hooks/keyboard/keys";
 import { computeScrollWindow, getVisibleFiles } from "../utils";
+import { PanelTitle } from "./ui/PanelTitle";
+import { TabPane } from "./ui/TabPane";
 
 type FilesViewProps = {
   selectedPr?: PullRequest;
@@ -125,9 +127,9 @@ export const FilesView: React.FC<FilesViewProps> = ({
         paddingX={1}
         flexDirection="column"
       >
-        <Text color={active ? palette.accent : palette.muted} bold>
+        <PanelTitle active={active}>
           {glyph.files} Files
-        </Text>
+        </PanelTitle>
         <Text color={palette.muted}>No changed files for this PR.</Text>
       </Box>
     );
@@ -142,20 +144,11 @@ export const FilesView: React.FC<FilesViewProps> = ({
   const visibleRows = diffRows.slice(clampedOffset, clampedOffset + viewportH).map(r => r.element);
 
   return (
-    <Box
-      borderStyle="single"
-      borderTop={true}
-      borderBottom={false}
-      borderLeft={false}
-      borderRight={false}
-      borderColor={palette.border}
-      paddingX={1}
-      flexDirection="column"
-    >
+    <TabPane>
       <Box justifyContent="space-between">
-        <Text color={active ? palette.accent : palette.muted} bold>
+        <PanelTitle active={active}>
           {glyph.files} Files
-        </Text>
+        </PanelTitle>
         <Text color={palette.muted}>
           {fileFilter && (
             <Text color={palette.accentDim}> Filtered: "{fileFilter}" </Text>
@@ -297,6 +290,6 @@ export const FilesView: React.FC<FilesViewProps> = ({
         </Box>
       )}
 
-    </Box>
+    </TabPane>
   );
 };

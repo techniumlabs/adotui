@@ -8,6 +8,8 @@ import { usePasteHandler } from "../hooks/usePasteHandler";
 import { usePrComments, resolveTargetComment, type CommentInputMode, type PrComment } from "../hooks/usePrComments";
 import { ThreadCard } from "./comments/ThreadCard";
 import { computeScrollWindow, followSelection, moveSelection } from "../utils";
+import { PanelTitle } from "./ui/PanelTitle";
+import { TabPane } from "./ui/TabPane";
 
 type CommentsViewProps = {
   selectedPr?: PullRequest;
@@ -207,21 +209,12 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
   const viewportH = Math.max(5, terminalHeight - 20);
 
   return (
-    <Box
-      borderStyle="single"
-      borderTop={true}
-      borderBottom={false}
-      borderLeft={false}
-      borderRight={false}
-      borderColor={palette.border}
-      paddingX={1}
-      flexDirection="column"
-    >
+    <TabPane>
       {/* Header */}
       <Box justifyContent="space-between">
-        <Text color={active ? palette.accent : palette.muted} bold>
+        <PanelTitle active={active}>
           {glyph.dot} Comments
-        </Text>
+        </PanelTitle>
         <Box>
           {loading ? (
             <Text color={palette.muted}>
@@ -352,6 +345,6 @@ export const CommentsView: React.FC<CommentsViewProps> = ({
         )}
       </Box>
 
-    </Box>
+    </TabPane>
   );
 };

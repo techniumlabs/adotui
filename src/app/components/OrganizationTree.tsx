@@ -4,6 +4,7 @@ import type { AppData, RepositoryNode } from "../../domain/types";
 import type { FocusArea, TreeFilter } from "../types";
 import { glyph, palette, truncate } from "../theme";
 import { matchesTreeFilter, clamp } from "../utils";
+import { PanelTitle } from "./ui/PanelTitle";
 
 type OrganizationTreeProps = {
   data: AppData;
@@ -210,9 +211,9 @@ export const OrganizationTree: React.FC<OrganizationTreeProps> = ({
           allots it, and Ink composites the overflow back over this line
           instead of clipping (a garbled title once the tree scrolls). */}
       <Box justifyContent="space-between">
-        <Text color={active ? palette.accent : palette.muted} bold>
+        <PanelTitle active={active}>
           {glyph.files} Organizations
-        </Text>
+        </PanelTitle>
         <Text
           color={filteringByPrs || isCustomFilter ? palette.warn : palette.muted}
           wrap="truncate-end"
