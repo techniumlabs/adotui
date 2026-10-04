@@ -1,12 +1,8 @@
 import React from "react";
 import { Box, Text, useApp } from "ink";
 import { CommandBar } from "./components/CommandBar";
-import { CommentsView } from "./components/CommentsView";
 import { CompletionEditor } from "./components/CompletionEditor";
-import { FilesView } from "./components/FilesView";
 import { OrganizationTree } from "./components/OrganizationTree";
-import { PipelineRunsView } from "./components/PipelineRunsView";
-import { PrDetails } from "./components/PrDetails";
 import { PrTabs } from "./components/PrTabs";
 import { PullRequestList } from "./components/PullRequestList";
 import { StatusLoader } from "./components/StatusLoader";
@@ -15,63 +11,26 @@ import { ToastContainer } from "./components/ToastContainer";
 import { formatRelativeAge } from "./utils";
 import { glyph, palette } from "./theme";
 import { useAppState } from "./hooks/useAppState";
-import { footerHints } from "./keymap";
 import { useAppKeyboard } from "./hooks/useAppKeyboard";
 import { usePrDetails } from "./hooks/usePrDetails";
 import { useTerminalSize } from "./hooks/useTerminalSize";
 import { Splash } from "./components/Splash";
 import { HelpView } from "./components/HelpView";
 import { SetupScreen } from "./components/SetupScreen";
+import { TabContent } from "./components/TabContent";
+import { BannerLine, FooterHints } from "./components/AppChrome";
+import { useStartupScreens } from "./hooks/useStartupScreens";
 
 export const App: React.FC = () => {
-  const [showSplash, setShowSplash] = React.useState(process.env.NODE_ENV !== "test");
-  // Keeps the setup screen mounted while the load it kicked off is running,
-  // so it can display fetch progress before handing over to the main UI.
-  const [setupLoading, setSetupLoading] = React.useState(false);
   const { exit } = useApp();
   const size = useTerminalSize();
   const app = useAppState();
+  const { showSplash, setupLoading, beginSetupLoad } = useStartupScreens(app.state);
   // Suppress the main keyboard while the setup screen is still showing
   // (including the load it kicked off).
   useAppKeyboard(app, exit, setupLoading);
   usePrDetails(app.selectedPr, app.actions.updatePr);
 
-  // The load streams in, so the tree can be shown the moment real
-  // repositories land. Dismissing on the first ORGANIZATION would swap the
-  // splash for an empty tree, which is worse than the splash itself.
-  const hasRepositories = React.useMemo(
-    () => app.state.data.organizations.some((org) => org.repositories.length > 0),
-    [app.state.data],
-  );
-
-  React.useEffect(() => {
-    if (app.state.loadState === "setup") {
-      setShowSplash(false);
-      return;
-    }
-    if (!showSplash) return;
-    if (hasRepositories) {
-      setShowSplash(false);
-      return;
-    }
-    // Nothing arrived at all (empty config, or an error): dismiss shortly
-    // after the load settles rather than holding a splash over a finished
-    // screen.
-    if (app.state.loadState !== "loading") {
-      const t = setTimeout(() => setShowSplash(false), 600);
-      return () => clearTimeout(t);
-    }
-  }, [app.state.loadState, hasRepositories, showSplash]);
-
-  // Once the setup-initiated load settles, hand over to the main UI.
-  React.useEffect(() => {
-    if (
-      setupLoading &&
-      (app.state.loadState === "ready" || app.state.loadState === "error")
-    ) {
-      setSetupLoading(false);
-    }
-  }, [app.state.loadState, setupLoading]);
 
   const {
     state,
@@ -104,7 +63,7 @@ export const App: React.FC = () => {
     return (
       <SetupScreen
         onComplete={() => {
-          setSetupLoading(true);
+          beginSetupLoad();
           actions.doRefresh("initial");
         }}
         loading={setupLoading && state.loadState === "loading"}
@@ -127,25 +86,7 @@ export const App: React.FC = () => {
         </Text>
       </Box>
 
-      {/* Banner / Status line */}
-      <Box paddingX={1} flexShrink={0} borderStyle="single" borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} borderColor={palette.border}>
-        <Text
-          wrap="truncate-end"
-          color={
-            state.loadState === "error"
-              ? palette.danger
-              : state.pendingConfirm
-                ? palette.warn
-                : state.loadState === "loading"
-                  ? palette.warn
-                  : palette.text
-          }
-        >
-          {state.loadState === "loading"
-            ? "Loading pull requests from Azure DevOps..."
-            : state.banner}
-        </Text>
-      </Box>
+      <BannerLine state={state} />
 
       <Box paddingX={1} flexShrink={0}>
         <SummaryBar
@@ -192,55 +133,7 @@ export const App: React.FC = () => {
                 currentUserEmail={state.data.currentUserEmail}
               />
               {selectedPr && <PrTabs focus={state.focus} />}
-              {(() => {
-                const renderFocus = (state.focus === "command" || state.focus === "completion" || state.focus === "filter")
-                  ? (state.previousFocus ?? "detail")
-                  : state.focus;
-
-                if (renderFocus === "files") {
-                  return (
-                    <FilesView
-                      selectedPr={selectedPr}
-                      selectedFileIndex={state.selectedFileIndex}
-                      diffScrollOffset={state.diffScrollOffset}
-                      onScrollOffsetChange={actions.setDiffScrollOffset}
-                      diffSelectedRow={state.diffSelectedRow}
-                      onSelectedRowChange={actions.setDiffSelectedRow}
-                      focus={state.focus}
-                      onInputModeChange={actions.setCommentInputActive}
-                      isLoading={state.loadState === "loading"}
-                      fileFilter={state.fileFilter}
-                      updateFileDiff={actions.updateFileDiff}
-                      setFileLoading={actions.setFileLoading}
-                    />
-                  );
-                }
-
-                if (renderFocus === "comments") {
-                  return (
-                    <CommentsView
-                      selectedPr={selectedPr}
-                      focus={state.focus}
-                      currentUserEmail={state.data.currentUserEmail}
-                      onInputModeChange={actions.setCommentInputActive}
-                    />
-                  );
-                }
-
-                if (renderFocus === "runs") {
-                  if (process.env.NODE_ENV === "debug") {
-                    return <PipelineRunsView selectedPr={selectedPr} focus={state.focus} />;
-                  }
-                }
-
-                return (
-                  <PrDetails
-                    selectedPr={selectedPr}
-                    focus={state.focus}
-                    currentUserEmail={state.data.currentUserEmail}
-                  />
-                );
-              })()}
+              <TabContent app={app} />
             </Box>
           </>
         )}
@@ -265,25 +158,7 @@ export const App: React.FC = () => {
       {state.loadState === "loading" ? (
         <StatusLoader message={state.banner} progress={state.loadProgress} />
       ) : (
-      <Box
-        flexShrink={0}
-        borderStyle="single"
-        borderTop={true}
-        borderLeft={false}
-        borderRight={false}
-        borderBottom={false}
-        borderColor={palette.border}
-        paddingX={2}
-      >
-        <Text color={palette.muted} wrap="truncate-end">
-          {footerHints(!!selectedPr).map((hint, index) => (
-            <Text key={hint.keys}>
-              {index > 0 ? "   " : ""}
-              <Text color={palette.accent} bold>{hint.keys}</Text> {hint.label}
-            </Text>
-          ))}
-        </Text>
-      </Box>
+        <FooterHints hasPr={!!selectedPr} />
       )}
 
       <CompletionEditor state={state} />

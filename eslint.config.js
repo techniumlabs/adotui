@@ -26,7 +26,6 @@ const limitRule = (rule, max) => [
  * file and never raise a number — split the code instead (PLAN.md, Phase 6).
  */
 const DEBT = {
-  "src/app/App.tsx": { "max-lines-per-function": 232 },
 };
 
 const layering = (group, message) => ({

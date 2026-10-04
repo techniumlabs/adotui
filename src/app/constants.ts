@@ -64,6 +64,9 @@ export const CACHE_REVALIDATE_DELAY_MS = 50;
  */
 export const IDENTITY_WAIT_MS = 500;
 
+/** With nothing to show after a load (empty config, error), the splash leaves this much later. */
+export const SPLASH_EMPTY_DISMISS_MS = 600;
+
 export const TOAST_DURATION_MS = 3_000;
 /** A transient status line in a view (e.g. "Comment posted."). */
 export const STATUS_FLASH_MS = 3_000;
