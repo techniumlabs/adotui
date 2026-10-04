@@ -148,7 +148,7 @@ export const loadInitialData = async (
   }
 
   if (allowCache) {
-    const cachedData = await readAppCache();
+    const cachedData = await readAppCache(configResult.config);
     if (cachedData) {
       return {
         data: cachedData,
@@ -209,7 +209,7 @@ export const loadInitialData = async (
     const base = `Loaded ${countTotalPrs(data)} PR(s) from ${data.organizations.length} org(s).`;
     
     // Save live data to cache so next launch is instant
-    await writeAppCache(data);
+    await writeAppCache(data, configResult.config);
 
     return {
       data,

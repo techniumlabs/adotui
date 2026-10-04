@@ -28,6 +28,7 @@ ENVIRONMENT:
   ADOTUI_CONFIG            Path to config file
   ADOTUI_MOCK=1            Use mock data (offline/demo mode)
   AZURE_DEVOPS_EXT_PAT     Azure DevOps personal access token
+  ADOTUI_CACHE_DIR         Directory for the on-disk data cache (default: ~/.cache/adotui)
   ADOTUI_DEBUG=1           Append debug log entries (off by default)
   ADOTUI_DEBUG_FILE        Debug log path (default: <tmpdir>/adotui-debug.log)
 
