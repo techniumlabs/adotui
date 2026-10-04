@@ -8,6 +8,8 @@ import {
   deletePrComment,
   editPrComment,
 } from "../../data/azureRest";
+import { prScope } from "../../data/refs";
+import { RELOAD_STATUS_MS, STATUS_FLASH_MS } from "../constants";
 import {
   commentCacheKey,
   getCommentCache,
@@ -79,12 +81,7 @@ export function usePrComments(
       // say so explicitly instead of flashing the spinner and stopping.
       if (force) setStatusMsg("Reloading comments…");
       try {
-        const data = await fetchPrComments(
-          selectedPr.organizationUrl,
-          selectedPr.project,
-          repoId,
-          selectedPr.id,
-        );
+        const data = await fetchPrComments(prScope(selectedPr));
         if (data === null) {
           // Transient az failure — keep whatever is shown, never cache it,
           // and only surface an error when there is nothing on screen.
@@ -98,7 +95,7 @@ export function usePrComments(
           // Keep the reader where they were; only a first load resets to the
           // top (onFreshLoad).
           setStatusMsg(`Reloaded — ${data.length} thread${data.length === 1 ? "" : "s"}.`);
-          setTimeout(() => setStatusMsg(null), 2000);
+          setTimeout(() => setStatusMsg(null), RELOAD_STATUS_MS);
         } else {
           onFreshLoadRef.current?.();
         }
@@ -123,7 +120,7 @@ export function usePrComments(
   /** Shows a transient status message that clears after 3 seconds. */
   const flashStatus = (msg: string) => {
     setStatusMsg(msg);
-    setTimeout(() => setStatusMsg(null), 3000);
+    setTimeout(() => setStatusMsg(null), STATUS_FLASH_MS);
   };
 
   /** Author guard shared by edit and delete. Flashes a status when denied. */
@@ -156,39 +153,17 @@ export function usePrComments(
       try {
         let ok = false;
         if (mode === "new") {
-          ok = await postPrComment(
-            selectedPr.organizationUrl,
-            selectedPr.project,
-            repoId,
-            selectedPr.id,
-            text.trim(),
-          );
+          ok = await postPrComment(prScope(selectedPr), text.trim());
         } else if (mode === "reply") {
           const thread = threads[selectedThreadIndex];
           if (thread) {
-            ok = await replyToPrThread(
-              selectedPr.organizationUrl,
-              selectedPr.project,
-              repoId,
-              selectedPr.id,
-              thread.id,
-              thread.comments[0]?.id ?? 1,
-              text.trim(),
-            );
+            ok = await replyToPrThread(prScope(selectedPr), thread.id, thread.comments[0]?.id ?? 1, text.trim());
           }
         } else if (mode === "edit") {
           const thread = threads[selectedThreadIndex];
           const commentToEdit = resolveTargetComment(thread, selectedCommentIndex);
           if (thread && commentToEdit) {
-            ok = await editPrComment(
-              selectedPr.organizationUrl,
-              selectedPr.project,
-              repoId,
-              selectedPr.id,
-              thread.id,
-              commentToEdit.id,
-              text.trim(),
-            );
+            ok = await editPrComment(prScope(selectedPr), thread.id, commentToEdit.id, text.trim());
           }
         }
 
@@ -224,14 +199,7 @@ export function usePrComments(
     if (!selectedPr || !repoId) return;
     isSubmittingRef.current = true;
     setSubmitting(true);
-    deletePrComment(
-      selectedPr.organizationUrl,
-      selectedPr.project,
-      repoId,
-      selectedPr.id,
-      thread.id,
-      comment.id
-    ).then((ok) => {
+    deletePrComment(prScope(selectedPr), thread.id, comment.id).then((ok) => {
       isSubmittingRef.current = false;
       setSubmitting(false);
       if (ok) void loadComments(true);
@@ -243,16 +211,8 @@ export function usePrComments(
     if (!selectedPr || isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     setSubmitting(true);
-    const repoId = selectedPr.repositoryId ?? selectedPr.repository;
     const newStatus = thread.status === "active" ? 2 : 1; // 2=fixed, 1=active
-    updatePrThreadStatus(
-      selectedPr.organizationUrl,
-      selectedPr.project,
-      repoId,
-      selectedPr.id,
-      thread.id!,
-      newStatus
-    ).then((ok) => {
+    updatePrThreadStatus(prScope(selectedPr), thread.id!, newStatus).then((ok) => {
       isSubmittingRef.current = false;
       setSubmitting(false);
       if (ok) {

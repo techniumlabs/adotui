@@ -6,6 +6,7 @@
  * as JSON. Non-zero exit codes and JSON parse failures surface as CommandError.
  */
 import { spawn } from "node:child_process";
+import { COMMAND_TIMEOUT_MS } from "./constants";
 
 export interface CommandResult {
   stdout: string;
@@ -26,8 +27,6 @@ export class CommandError extends Error {
     this.detail = detail;
   }
 }
-
-const DEFAULT_TIMEOUT_MS = 20_000;
 
 const readStream = async (
   stream: NodeJS.ReadableStream | null,
@@ -55,7 +54,7 @@ export const run = async (
   args: readonly string[],
   options: RunOptions = {},
 ): Promise<CommandResult> => {
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = options.timeoutMs ?? COMMAND_TIMEOUT_MS;
 
   let proc: ReturnType<typeof spawn>;
   try {

@@ -44,6 +44,36 @@ export const INITIAL_STATE: AppState = {
 
 export const REFRESH_INTERVAL_MS = 60_000;
 
+/**
+ * Streamed partials are buffered and committed at most this often. Ink rewrites
+ * the whole frame on every render, so committing per API response would
+ * reintroduce the flicker that removing the spinners fixed; this matches the
+ * progress throttle, giving a hard ceiling of 4 frames/second.
+ */
+export const PARTIAL_COMMIT_MS = 250;
+/** Load-progress banner updates are throttled to this (final ones always pass). */
+export const PROGRESS_THROTTLE_MS = 250;
+/** After showing cached data, the background re-sync starts this much later. */
+export const CACHE_REVALIDATE_DELAY_MS = 50;
+
+/**
+ * How long streamed partials wait for the identity before being released
+ * anyway. The default "me" tree filter needs `currentUserEmail`: releasing
+ * partials without it shows every repo and then visibly drops rows when it
+ * lands, so a brief wait buys a stable first paint.
+ */
+export const IDENTITY_WAIT_MS = 500;
+
+export const TOAST_DURATION_MS = 3_000;
+/** A transient status line in a view (e.g. "Comment posted."). */
+export const STATUS_FLASH_MS = 3_000;
+/** The "Reloaded — N threads." confirmation after R in the comments view. */
+export const RELOAD_STATUS_MS = 2_000;
+
+/** Used until the terminal reports its size. */
+export const DEFAULT_TERMINAL_COLUMNS = 80;
+export const DEFAULT_TERMINAL_ROWS = 24;
+
 export const FOCUS_ORDER: FocusArea[] = ["tree", "list", "detail", "files", "comments", "runs", "command"];
 
 export const COMPLETION_FIELD_LABELS = [

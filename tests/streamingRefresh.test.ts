@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { useAppStore } from "../src/app/store";
 import { INITIAL_STATE } from "../src/app/constants";
-import { PARTIAL_COMMIT_MS, doRefresh, resetRefreshState } from "../src/app/actions/refreshActions";
+import { doRefresh, resetRefreshState } from "../src/app/actions/refreshActions";
+import { PARTIAL_COMMIT_MS } from "../src/app/constants";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MOCK_DATA } from "../src/data/mock";

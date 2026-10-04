@@ -1,6 +1,7 @@
 import { chmod } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, parse } from "node:path";
+import { CONFIG_SEARCH_MAX_DEPTH, OWNER_ONLY_FILE_MODE } from "./constants";
 
 /**
  * A single Azure DevOps organization + project to monitor.
@@ -52,7 +53,7 @@ const walkUpConfigPaths = (): string[] => {
   const { root } = parse(dir);
 
   // Guard against pathological loops with a generous depth cap.
-  for (let depth = 0; depth < 64; depth += 1) {
+  for (let depth = 0; depth < CONFIG_SEARCH_MAX_DEPTH; depth += 1) {
     for (const name of LOCAL_CONFIG_NAMES) {
       paths.push(join(dir, name));
     }
@@ -245,5 +246,5 @@ export const writeConfig = async (
 ): Promise<void> => {
   await Bun.write(path, JSON.stringify(config, null, 2));
   // The PAT is a credential: owner-only. (Bun.write ignores `mode`.)
-  if (config.pat) await chmod(path, 0o600);
+  if (config.pat) await chmod(path, OWNER_ONLY_FILE_MODE);
 };

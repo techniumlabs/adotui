@@ -10,6 +10,7 @@ import type {
   AzurePolicyEvaluation,
   AzurePullRequest,
 } from "./azureTypes";
+import { VOTE } from "./constants";
 
 /** Strip the refs/heads/ prefix from an Azure ref name. */
 export const shortBranch = (ref: string | undefined): string => {
@@ -47,7 +48,7 @@ export const deriveReviewState = (pr: AzurePullRequest): ReviewState => {
   const reviewers = pr.reviewers ?? [];
 
   // If anyone rejected, it's changes-requested regardless
-  if (reviewers.some((r) => (r.vote ?? 0) <= -10)) {
+  if (reviewers.some((r) => (r.vote ?? VOTE.NONE) <= VOTE.REJECT)) {
     return "changes-requested";
   }
 
@@ -55,14 +56,14 @@ export const deriveReviewState = (pr: AzurePullRequest): ReviewState => {
   const requiredReviewers = reviewers.filter((r) => r.isRequired);
 
   if (requiredReviewers.length > 0) {
-    const allRequiredApproved = requiredReviewers.every((r) => (r.vote ?? 0) >= 5);
+    const allRequiredApproved = requiredReviewers.every((r) => (r.vote ?? VOTE.NONE) >= VOTE.APPROVE_WITH_SUGGESTIONS);
     if (!allRequiredApproved) {
       return "missing-required";
     }
   }
 
   // If there are no required reviewers or they all approved, we just need ANY approval to be "approved"
-  if (reviewers.some((r) => (r.vote ?? 0) >= 5)) {
+  if (reviewers.some((r) => (r.vote ?? VOTE.NONE) >= VOTE.APPROVE_WITH_SUGGESTIONS)) {
     return "approved";
   }
 

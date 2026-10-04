@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { fetchFileDiff } from "../src/data/azureDiff";
 import type { PullRequestFileChange } from "../src/domain/types";
 
+const REPO = { organizationUrl: "https://dev.azure.com/acme", project: "core", repositoryId: "repo" };
 const realFetch = globalThis.fetch;
 let savedPat: string | undefined;
 
@@ -30,9 +31,7 @@ test("a renamed file diffs its original path at the target against its new path"
   }) as unknown as typeof fetch;
 
   const result = await fetchFileDiff(
-    "https://dev.azure.com/acme",
-    "core",
-    "repo",
+    REPO,
     { path: "src/new-name.ts", originalPath: "src/old-name.ts", status: "modified", additions: 0, deletions: 0, diff: [] },
     "source",
     "target",
@@ -58,7 +57,7 @@ test("a transient 503 on a content fetch is retried instead of failing the diff"
     return new Response("b\n");
   }) as unknown as typeof fetch;
 
-  const result = await fetchFileDiff("https://dev.azure.com/acme", "core", "repo", FILE, "source", "target");
+  const result = await fetchFileDiff(REPO, FILE, "source", "target");
   expect(targetCalls).toBe(2);
   expect(result).toMatchObject({ additions: 1, deletions: 1 });
 });
@@ -69,7 +68,7 @@ test("a missing file yields null and prints nothing over the UI", async () => {
   const realError = console.error;
   console.error = (...args: unknown[]) => { printed.push(args); };
   try {
-    expect(await fetchFileDiff("https://dev.azure.com/acme", "core", "repo", FILE, "source", "target")).toBeNull();
+    expect(await fetchFileDiff(REPO, FILE, "source", "target")).toBeNull();
   } finally {
     console.error = realError;
   }
@@ -82,7 +81,7 @@ test("a project name with spaces is escaped in the items path", async () => {
     urls.push(String(input));
     return new Response("x\n");
   }) as unknown as typeof fetch;
-  await fetchFileDiff("https://dev.azure.com/acme", "My Project", "my repo", FILE, "source", "target");
+  await fetchFileDiff({ organizationUrl: "https://dev.azure.com/acme", project: "My Project", repositoryId: "my repo" }, FILE, "source", "target");
   expect(urls[0]).toContain("/My%20Project/_apis/git/repositories/my%20repo/items?");
 });
 
@@ -92,7 +91,7 @@ const diffOf = (oldText: string, newText: string, file = FILE) => {
     const version = new URL(String(input)).searchParams.get("versionDescriptor.version");
     return new Response(version === "target" ? oldText : newText);
   }) as unknown as typeof fetch;
-  return fetchFileDiff("https://dev.azure.com/acme", "core", "repo", file, "source", "target");
+  return fetchFileDiff(REPO, file, "source", "target");
 };
 
 test("identical content yields an empty diff, not an error", async () => {

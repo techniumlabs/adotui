@@ -173,7 +173,8 @@ delete) require an explicit `y` confirmation — Enter does not confirm.
 - `src/data/azureCommon.ts` — constants for the `az` CLI (used only to obtain a token).
 - `src/data/azureIdentity.ts` — the signed-in identity (`connectionData`), used by votes and the "me" filter.
 - `src/data/adoFetch.ts` — REST client (cached auth, 429/401 retries, readable errors).
-- `src/data/azure.ts` — barrel over `azureLoad` / `azureRest` / `azureDiff` / `azureActions`.
+- `src/data/azure.ts` — barrel over `azureLoad` (tree orchestration) / `azureDiscovery` (projects, repos, PR listing) / `azurePrDetails` (lazy per-PR details) / `azureRest` / `azureDiff` / `azureActions`.
+- `src/data/constants.ts` — data-layer tunables (timeouts, retries, page sizes, HTTP statuses); `src/data/refs.ts` — `PrScope` / `RepoRef` addressing.
 - `src/data/azureNormalize.ts` — maps Azure DevOps JSON to the domain model.
 - `src/app/dataController.ts` — orchestrates loading, refresh, and mock fallback.
 - `src/app/store.ts` + `src/app/actions/` — module-global Zustand store with stable, module-level action functions (toasts, refresh, selection, confirm pipeline, completion editor, command dispatch).

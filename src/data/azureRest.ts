@@ -13,6 +13,8 @@ import type {
 } from "../domain/types";
 import { adoDelete, adoGet, adoPatch, adoPost, seg, type AdoList } from "./adoFetch";
 import { debugLog } from "../shared/debugLog";
+import type { PrScope } from "./refs";
+import { PIPELINE_RUNS_TIMEOUT_MS, PIPELINE_RUNS_TOP } from "./constants";
 
 // ─── PR Comment types ─────────────────────────────────────────────────────────
 
@@ -68,9 +70,9 @@ export const normalizeThreads = (rawThreads: RawThread[]): PrCommentThread[] =>
     }))
     .filter((t) => t.comments.length > 0);
 
-/** `.../pullRequests/{id}/threads` for a repo (id or name both resolve). */
-const threadsPath = (project: string, repositoryId: string, prId: number): string =>
-  `${seg(project)}/_apis/git/repositories/${seg(repositoryId)}/pullRequests/${prId}/threads`;
+/** `.../pullRequests/{id}/threads` for a PR (repo id or name both resolve). */
+const threadsPath = (scope: PrScope): string =>
+  `${seg(scope.project)}/_apis/git/repositories/${seg(scope.repositoryId)}/pullRequests/${scope.prId}/threads`;
 
 // ─── PR Comments ──────────────────────────────────────────────────────────────
 
@@ -79,22 +81,14 @@ const threadsPath = (project: string, repositoryId: string, prId: number): strin
  * network/auth error) so callers can distinguish "could not load" from "no
  * comments" — a silent [] used to get cached and shown as empty.
  */
-export const fetchPrComments = async (
-  organizationUrl: string,
-  project: string,
-  repositoryId: string,
-  prId: number,
-): Promise<PrCommentThread[] | null> => {
+export const fetchPrComments = async (scope: PrScope): Promise<PrCommentThread[] | null> => {
   if (process.env.ADOTUI_MOCK) {
     const { getMockComments } = await import("./mock");
-    return getMockComments(prId);
+    return getMockComments(scope.prId);
   }
 
   try {
-    const data = await adoGet<AdoList<RawThread>>(
-      organizationUrl,
-      threadsPath(project, repositoryId, prId),
-    );
+    const data = await adoGet<AdoList<RawThread>>(scope.organizationUrl, threadsPath(scope));
     if (!data?.value) return null;
     return normalizeThreads(data.value);
   } catch (e) {
@@ -104,10 +98,7 @@ export const fetchPrComments = async (
 };
 
 export const postPrComment = async (
-  organizationUrl: string,
-  project: string,
-  repositoryId: string,
-  prId: number,
+  scope: PrScope,
   content: string,
   threadContext?: { filePath?: string; rightFileStart?: { line?: number, offset?: number }; rightFileEnd?: { line?: number, offset?: number }; leftFileStart?: { line?: number, offset?: number }; leftFileEnd?: { line?: number, offset?: number } },
   pullRequestThreadContext?: { changeTrackingId?: number; iterationContext?: { firstComparingIteration?: number; secondComparingIteration?: number } }
@@ -120,7 +111,7 @@ export const postPrComment = async (
   };
 
   try {
-    await adoPost(organizationUrl, threadsPath(project, repositoryId, prId), body);
+    await adoPost(scope.organizationUrl, threadsPath(scope), body);
     return true;
   } catch (e) {
     debugLog("postPrComment error", e);
@@ -129,18 +120,15 @@ export const postPrComment = async (
 };
 
 export const replyToPrThread = async (
-  organizationUrl: string,
-  project: string,
-  repositoryId: string,
-  prId: number,
+  scope: PrScope,
   threadId: number,
   parentCommentId: number,
   content: string,
 ): Promise<boolean> => {
   try {
     await adoPost(
-      organizationUrl,
-      `${threadsPath(project, repositoryId, prId)}/${threadId}/comments`,
+      scope.organizationUrl,
+      `${threadsPath(scope)}/${threadId}/comments`,
       { parentCommentId, content, commentType: 1 },
     );
     return true;
@@ -151,19 +139,12 @@ export const replyToPrThread = async (
 };
 
 export const updatePrThreadStatus = async (
-  organizationUrl: string,
-  project: string,
-  repositoryId: string,
-  prId: number,
+  scope: PrScope,
   threadId: number,
   statusId: number, // 1: Active, 2: Fixed, 3: WontFix, 4: Closed, 5: ByDesign, 6: Pending
 ): Promise<boolean> => {
   try {
-    await adoPatch(
-      organizationUrl,
-      `${threadsPath(project, repositoryId, prId)}/${threadId}`,
-      { status: statusId },
-    );
+    await adoPatch(scope.organizationUrl, `${threadsPath(scope)}/${threadId}`, { status: statusId });
     return true;
   } catch (e) {
     debugLog("updatePrThreadStatus error", e);
@@ -172,18 +153,15 @@ export const updatePrThreadStatus = async (
 };
 
 export const editPrComment = async (
-  organizationUrl: string,
-  project: string,
-  repositoryId: string,
-  prId: number,
+  scope: PrScope,
   threadId: number,
   commentId: number,
   content: string,
 ): Promise<boolean> => {
   try {
     await adoPatch(
-      organizationUrl,
-      `${threadsPath(project, repositoryId, prId)}/${threadId}/comments/${commentId}`,
+      scope.organizationUrl,
+      `${threadsPath(scope)}/${threadId}/comments/${commentId}`,
       { content },
     );
     return true;
@@ -194,18 +172,12 @@ export const editPrComment = async (
 };
 
 export const deletePrComment = async (
-  organizationUrl: string,
-  project: string,
-  repositoryId: string,
-  prId: number,
+  scope: PrScope,
   threadId: number,
   commentId: number,
 ): Promise<boolean> => {
   try {
-    await adoDelete(
-      organizationUrl,
-      `${threadsPath(project, repositoryId, prId)}/${threadId}/comments/${commentId}`,
-    );
+    await adoDelete(scope.organizationUrl, `${threadsPath(scope)}/${threadId}/comments/${commentId}`);
     return true;
   } catch (e) {
     debugLog("deletePrComment error", e);
@@ -237,7 +209,7 @@ export const fetchPipelineRuns = async (
     const data = await adoGet<AdoList<RawRun>>(
       organizationUrl,
       `${seg(project)}/_apis/build/builds`,
-      { query: { "$top": 30, queryOrder: "queueTimeDescending" }, timeoutMs: 25_000 },
+      { query: { "$top": PIPELINE_RUNS_TOP, queryOrder: "queueTimeDescending" }, timeoutMs: PIPELINE_RUNS_TIMEOUT_MS },
     );
     rows = data.value ?? [];
   } catch (e) {

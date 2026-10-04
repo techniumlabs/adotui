@@ -1,4 +1,5 @@
 import { loadInitialData, reloadData } from "../dataController";
+import { CACHE_REVALIDATE_DELAY_MS, PARTIAL_COMMIT_MS, PROGRESS_THROTTLE_MS } from "../constants";
 import { getState, patchState, updateState } from "../store";
 import { clampSelection } from "../selectors";
 import { addToast } from "./toastActions";
@@ -17,14 +18,6 @@ let pendingReason: "manual" | "initial" | null = null;
  * every streamed event is checked against this before it reaches the store.
  */
 let loadEpoch = 0;
-
-/**
- * Streamed partials are buffered and committed at most this often. Ink rewrites
- * the whole frame on every render, so committing per API response would
- * reintroduce the flicker that removing the spinners fixed; this matches the
- * progress throttle, giving a hard ceiling of 4 frames/second.
- */
-export const PARTIAL_COMMIT_MS = 250;
 
 let partialQueue: LoadPartial[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -114,7 +107,7 @@ export const doRefresh = (reason: RefreshReason): void => {
   const onProgress = (msg: string, progress?: { current: number; total: number }) => {
     const now = Date.now();
     const isFinal = progress !== undefined && progress.current >= progress.total;
-    if (!isFinal && now - lastProgressAt < 250) {
+    if (!isFinal && now - lastProgressAt < PROGRESS_THROTTLE_MS) {
       return;
     }
     lastProgressAt = now;
@@ -157,7 +150,7 @@ export const doRefresh = (reason: RefreshReason): void => {
         addToast(result.banner, "error");
       }
       if (result.fromCache) {
-        setTimeout(() => doRefresh("auto"), 50);
+        setTimeout(() => doRefresh("auto"), CACHE_REVALIDATE_DELAY_MS);
       }
       updateState((current) => {
         // A streamed load's accumulated tree IS what the user just watched

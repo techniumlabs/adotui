@@ -36,10 +36,6 @@ const DEBT = {
   "src/app/hooks/keyboard/globals.ts": { complexity: 28 },
   "src/app/hooks/usePasteHandler.ts": { "max-depth": 5 },
   "src/app/hooks/usePrComments.ts": { "max-lines-per-function": 207 },
-  "src/data/azureDiff.ts": { "max-params": 6 },
-  // 560: headroom for the PLAN.md 2.7 change; the file is to be split in Phase 6.
-  "src/data/azureLoad.ts": { "max-lines": 560, "max-params": 6 },
-  "src/data/azureRest.ts": { "max-params": 7 },
   "src/data/config.ts": { complexity: 29 },
 };
 
@@ -78,6 +74,15 @@ export default [
       "@typescript-eslint/no-explicit-any": "error",
       // Ink owns the terminal: stray console output paints over the frame. Use debugLog.
       "no-console": "error",
+    },
+  },
+  // Constants: no bare numbers in the logic layers; tunables live in the
+  // constants modules (src/data/constants.ts, src/app/constants.ts).
+  {
+    files: ["src/data/**/*.ts", "src/app/actions/**/*.ts", "src/app/hooks/**/*.ts"],
+    ignores: ["src/data/mock.ts"],
+    rules: {
+      "no-magic-numbers": ["error", { ignore: [-1, 0, 1, 2], ignoreArrayIndexes: true, ignoreDefaultValues: true, enforceConst: true }],
     },
   },
   // Layering: shared <- domain <- data <- app. Imports only point downward.

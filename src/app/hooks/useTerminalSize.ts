@@ -1,18 +1,19 @@
 import { useEffect, useState } from "react";
 import { useStdout } from "ink";
+import { DEFAULT_TERMINAL_COLUMNS, DEFAULT_TERMINAL_ROWS } from "../constants";
 
 export function useTerminalSize() {
   const { stdout } = useStdout();
   const [size, setSize] = useState({
-    columns: stdout.columns ?? 80,
-    rows: stdout.rows ?? 24,
+    columns: stdout.columns ?? DEFAULT_TERMINAL_COLUMNS,
+    rows: stdout.rows ?? DEFAULT_TERMINAL_ROWS,
   });
 
   useEffect(() => {
     const onResize = () => {
       setSize({
-        columns: stdout.columns ?? 80,
-        rows: stdout.rows ?? 24,
+        columns: stdout.columns ?? DEFAULT_TERMINAL_COLUMNS,
+        rows: stdout.rows ?? DEFAULT_TERMINAL_ROWS,
       });
     };
 

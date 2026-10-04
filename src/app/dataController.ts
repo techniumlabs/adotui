@@ -10,6 +10,7 @@ import { clearAuthHeaderCache } from "../data/azureAuth";
 import { MOCK_DATA } from "../data/mock";
 import type { AppData, PullRequest, RepositoryNode } from "../domain/types";
 import { countTotalPrs } from "./utils";
+import { IDENTITY_WAIT_MS } from "./constants";
 
 export interface LoadResult {
   data: AppData;
@@ -73,14 +74,6 @@ const resolveCurrentUser = async (organization: string): Promise<string | null> 
   cachedUserEmail = (await getCurrentIdentity(organization))?.email ?? null;
   return cachedUserEmail;
 };
-
-/**
- * How long streamed partials wait for the identity before being released
- * anyway. The default "me" tree filter needs `currentUserEmail`: releasing
- * partials without it shows every repo and then visibly drops rows when it
- * lands, so a brief wait buys a stable first paint.
- */
-const IDENTITY_WAIT_MS = 500;
 
 /**
  * Replays MOCK_DATA as timed partials so streaming is demoable offline:

@@ -4,10 +4,9 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AppData, PrCommentThread, PipelineRun } from "../domain/types";
 import type { AdoConfig } from "./config";
+import { CACHE_KEY_HASH_CHARS, VIEW_CACHE_TTL_MS } from "./constants";
 
 type CacheEntry<T> = { value: T; expiresAt: number };
-
-const TTL_MS = 2 * 60 * 1000; // 2 minutes
 
 const commentCache = new Map<string, CacheEntry<PrCommentThread[]>>();
 const runsCache = new Map<string, CacheEntry<PipelineRun[]>>();
@@ -17,7 +16,7 @@ const isAlive = <T>(entry: CacheEntry<T> | undefined): entry is CacheEntry<T> =>
 
 const makeEntry = <T>(value: T): CacheEntry<T> => ({
   value,
-  expiresAt: Date.now() + TTL_MS,
+  expiresAt: Date.now() + VIEW_CACHE_TTL_MS,
 });
 
 // ─── Comments ────────────────────────────────────────────────────────────────
@@ -71,7 +70,7 @@ const appCacheFile = (config: AdoConfig): string => {
   const key = createHash("sha256")
     .update(JSON.stringify([config.projects, config.status, config.top, config.reviewer, config.creator]))
     .digest("hex")
-    .slice(0, 16);
+    .slice(0, CACHE_KEY_HASH_CHARS);
   return join(appCacheDir(), `data_cache-${key}.json`);
 };
 

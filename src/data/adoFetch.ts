@@ -6,6 +6,16 @@
  * CLI (or a PAT) via azureAuth, cached between calls.
  */
 import { getAdoAuthHeader, clearAuthHeaderCache, isUsingPat } from "./azureAuth";
+import {
+  ADO_API_VERSION,
+  ADO_MAX_ATTEMPTS,
+  ADO_REQUEST_TIMEOUT_MS,
+  ADO_RETRY_BASE_DELAY_MS,
+  ADO_SIGN_IN_MAX_ATTEMPTS,
+  ERROR_SNIPPET_CHARS,
+  HTTP,
+  MS_PER_SECOND,
+} from "./constants";
 
 /** Standard Azure DevOps list envelope. */
 export interface AdoList<T> {
@@ -30,11 +40,6 @@ export class AdoHttpError extends Error {
 /** Escapes a single URL path segment (project/repo names may contain spaces). */
 export const seg = (value: string): string => encodeURIComponent(value);
 
-const DEFAULT_API_VERSION = "7.1";
-const DEFAULT_TIMEOUT_MS = 20_000;
-const MAX_ATTEMPTS = 3;
-const SIGN_IN_MAX_ATTEMPTS = 2;
-
 export interface AdoRequestOptions {
   query?: Record<string, string | number | undefined>;
   apiVersion?: string;
@@ -45,7 +50,7 @@ const buildUrl = (
   baseUrl: string,
   path: string,
   query: Record<string, string | number | undefined> = {},
-  apiVersion = DEFAULT_API_VERSION,
+  apiVersion = ADO_API_VERSION,
 ): string => {
   const base = baseUrl.replace(/\/+$/, "");
   const url = new URL(`${base}/${path.replace(/^\/+/, "")}`);
@@ -56,9 +61,6 @@ const buildUrl = (
   return url.toString();
 };
 
-/** How much of an unexpected body is quoted in an error message. */
-const SNIPPET_CHARS = 200;
-
 /**
  * Azure DevOps answers an unauthenticated request — and a request for an
  * organization that does not exist — with a sign-in page, not a 401: either a
@@ -66,7 +68,7 @@ const SNIPPET_CHARS = 200;
  * that as JSON used to surface as "Unrecognized token '<'".
  */
 const isSignInPage = (resp: Response, asText: boolean): boolean =>
-  resp.status === 203 ||
+  resp.status === HTTP.NON_AUTHORITATIVE ||
   (resp.ok && resp.redirected && /\/_signin\b/i.test(resp.url)) ||
   (resp.ok && !asText && (resp.headers.get("content-type") ?? "").includes("text/html"));
 
@@ -106,36 +108,36 @@ const describeFailure = async (resp: Response): Promise<string> => {
   } catch {
     /* not JSON */
   }
-  if (resp.status === 401) {
+  if (resp.status === HTTP.UNAUTHORIZED) {
     return "not authenticated — run `az login` or set AZURE_DEVOPS_EXT_PAT";
   }
-  if (resp.status === 403) {
+  if (resp.status === HTTP.FORBIDDEN) {
     return "access denied — the signed-in identity lacks permission for this resource";
   }
-  if (resp.status === 404) {
+  if (resp.status === HTTP.NOT_FOUND) {
     return "not found — check the organization, project and repository names";
   }
   // An HTML error page is not a reason; quoting its first tag helps nobody.
-  const firstLine = body.trim().startsWith("<") ? "" : body.trim().split("\n")[0]?.slice(0, SNIPPET_CHARS);
+  const firstLine = body.trim().startsWith("<") ? "" : body.trim().split("\n")[0]?.slice(0, ERROR_SNIPPET_CHARS);
   return firstLine || resp.statusText || "unknown error";
 };
 
 const retryDelayMs = (resp: Response, attempt: number): number => {
   const retryAfter = Number(resp.headers.get("retry-after"));
-  if (Number.isFinite(retryAfter) && retryAfter > 0) return retryAfter * 1000;
-  return 500 * attempt;
+  if (Number.isFinite(retryAfter) && retryAfter > 0) return retryAfter * MS_PER_SECOND;
+  return ADO_RETRY_BASE_DELAY_MS * attempt;
 };
 
 /** Reads a successful response: raw text, or parsed JSON ({} when there is no body). */
 const readBody = async <T>(resp: Response, url: string, asText: boolean): Promise<T> => {
-  if (asText) return (resp.status === 204 ? "" : await resp.text()) as T;
-  if (resp.status === 204) return {} as T;
+  if (asText) return (resp.status === HTTP.NO_CONTENT ? "" : await resp.text()) as T;
+  if (resp.status === HTTP.NO_CONTENT) return {} as T;
   const text = await resp.text();
   if (!text.trim()) return {} as T;
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new AdoHttpError(resp.status, url, `unexpected response (not JSON): ${text.trim().slice(0, SNIPPET_CHARS)}`);
+    throw new AdoHttpError(resp.status, url, `unexpected response (not JSON): ${text.trim().slice(0, ERROR_SNIPPET_CHARS)}`);
   }
 };
 
@@ -153,10 +155,10 @@ const requestUrl = async <T>(
   const replaySafe = method !== "POST";
   const asText = options.as === "text";
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= ADO_MAX_ATTEMPTS; attempt += 1) {
     const authHeader = await getAdoAuthHeader();
     if (!authHeader) {
-      throw new AdoHttpError(401, url, "no Azure DevOps credentials (az login or AZURE_DEVOPS_EXT_PAT)");
+      throw new AdoHttpError(HTTP.UNAUTHORIZED, url, "no Azure DevOps credentials (az login or AZURE_DEVOPS_EXT_PAT)");
     }
 
     const headers: Record<string, string> = {
@@ -171,13 +173,13 @@ const requestUrl = async <T>(
         method,
         headers,
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
-        signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(options.timeoutMs ?? ADO_REQUEST_TIMEOUT_MS),
       });
     } catch (cause) {
-      if (attempt === MAX_ATTEMPTS || !replaySafe) {
+      if (attempt === ADO_MAX_ATTEMPTS || !replaySafe) {
         throw new AdoHttpError(0, url, cause instanceof Error ? cause.message : String(cause));
       }
-      await Bun.sleep(500 * attempt);
+      await Bun.sleep(ADO_RETRY_BASE_DELAY_MS * attempt);
       continue;
     }
 
@@ -187,17 +189,17 @@ const requestUrl = async <T>(
     // sign-in page gets one retry only: a second one will not change for a
     // third token (a mistyped organization would otherwise cost several `az`
     // processes before the error shows).
-    const authAttempts = signIn ? SIGN_IN_MAX_ATTEMPTS : MAX_ATTEMPTS;
-    if ((resp.status === 401 || signIn) && attempt < authAttempts) {
+    const authAttempts = signIn ? ADO_SIGN_IN_MAX_ATTEMPTS : ADO_MAX_ATTEMPTS;
+    if ((resp.status === HTTP.UNAUTHORIZED || signIn) && attempt < authAttempts) {
       clearAuthHeaderCache();
       continue;
     }
     // Throttled or a transient server fault: honour Retry-After when given.
-    if ((resp.status === 429 || (resp.status >= 500 && replaySafe)) && attempt < MAX_ATTEMPTS) {
+    if ((resp.status === HTTP.TOO_MANY_REQUESTS || (resp.status >= HTTP.SERVER_ERROR && replaySafe)) && attempt < ADO_MAX_ATTEMPTS) {
       await Bun.sleep(retryDelayMs(resp, attempt));
       continue;
     }
-    if (signIn) throw new AdoHttpError(401, url, signInMessage(url));
+    if (signIn) throw new AdoHttpError(HTTP.UNAUTHORIZED, url, signInMessage(url));
     if (!resp.ok) {
       throw new AdoHttpError(resp.status, url, await describeFailure(resp));
     }

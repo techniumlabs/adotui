@@ -9,14 +9,10 @@
  */
 import { runJson } from "./command";
 import { AZ, jsonOutput } from "./azureCommon";
+import { AZ_TOKEN_TIMEOUT_MS, MS_PER_SECOND, TOKEN_EXPIRY_MARGIN_MS, TOKEN_FALLBACK_TTL_MS } from "./constants";
 
 /** Azure DevOps resource id — constant across tenants. */
 const ADO_RESOURCE = "499b84ac-1321-427f-aa17-267ca6975798";
-
-/** Refresh this long before the token actually expires. */
-const EXPIRY_MARGIN_MS = 60_000;
-/** Used when the CLI reports no usable expiry. */
-const FALLBACK_TTL_MS = 45 * 60_000;
 
 let cached: { header: string; expiresAt: number } | null = null;
 
@@ -30,13 +26,13 @@ interface AccessTokenResult {
 
 const expiryFrom = (result: AccessTokenResult): number => {
   if (typeof result.expires_on === "number" && Number.isFinite(result.expires_on)) {
-    return result.expires_on * 1000;
+    return result.expires_on * MS_PER_SECOND;
   }
   if (result.expiresOn) {
     const parsed = Date.parse(result.expiresOn);
     if (Number.isFinite(parsed)) return parsed;
   }
-  return Date.now() + FALLBACK_TTL_MS;
+  return Date.now() + TOKEN_FALLBACK_TTL_MS;
 };
 
 /** The `az` call currently running, shared by every caller that arrives meanwhile. */
@@ -50,9 +46,9 @@ const acquireToken = async (): Promise<string | null> => {
       "--resource",
       ADO_RESOURCE,
       ...jsonOutput,
-    ], { timeoutMs: 10_000 });
+    ], { timeoutMs: AZ_TOKEN_TIMEOUT_MS });
     const header = `Bearer ${result.accessToken}`;
-    cached = { header, expiresAt: expiryFrom(result) - EXPIRY_MARGIN_MS };
+    cached = { header, expiresAt: expiryFrom(result) - TOKEN_EXPIRY_MARGIN_MS };
     return header;
   } catch {
     cached = null;

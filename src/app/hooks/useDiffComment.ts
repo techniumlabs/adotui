@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { PullRequest, PullRequestFileChange } from "../../domain/types";
 import { postPrComment } from "../../data/azureRest";
+import { prScope } from "../../data/refs";
 import { usePasteHandler } from "./usePasteHandler";
+import { STATUS_FLASH_MS } from "../constants";
 
 export type DiffRowPosition = { oldNo: number | null; newNo: number | null };
 
@@ -46,7 +48,6 @@ export function useDiffComment(
 
     isSubmittingRef.current = true;
     setSubmitting(true);
-    const repoId = selectedPr.repositoryId ?? selectedPr.repository;
 
     interface FilePosition { line: number; offset: number }
     let threadContext: {
@@ -76,15 +77,7 @@ export function useDiffComment(
       pullRequestThreadContext = { changeTrackingId: 1, iterationContext: { firstComparingIteration: 1, secondComparingIteration: 1 } };
     }
 
-    postPrComment(
-      selectedPr.organizationUrl,
-      selectedPr.project,
-      repoId,
-      selectedPr.id,
-      commentText.trim(),
-      threadContext,
-      pullRequestThreadContext
-    ).then((ok) => {
+    postPrComment(prScope(selectedPr), commentText.trim(), threadContext, pullRequestThreadContext).then((ok) => {
       isSubmittingRef.current = false;
       setSubmitting(false);
       if (ok) {
@@ -96,7 +89,7 @@ export function useDiffComment(
         // Don't close comment mode on failure so they don't lose their text,
         // but we need to ensure the status message is visible!
       }
-      setTimeout(() => setStatusMsg(null), 3000);
+      setTimeout(() => setStatusMsg(null), STATUS_FLASH_MS);
     });
   };
 
