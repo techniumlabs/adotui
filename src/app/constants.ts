@@ -1,7 +1,7 @@
 import type { AppData } from "../domain/types";
 import type { AppState, CompletionOptions, FocusArea, TreeFilter } from "./types";
 
-export const EMPTY_DATA: AppData = { organizations: [] };
+const EMPTY_DATA: AppData = { organizations: [] };
 
 export const DEFAULT_COMPLETION_OPTIONS: CompletionOptions = {
   autoCompleteIgnoreConfigIds: [],

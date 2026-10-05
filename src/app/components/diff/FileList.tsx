@@ -5,7 +5,7 @@ import { fileChangeBadge, glyph, palette } from "../../theme";
 import { ClickableBox } from "../ui/ClickableBox";
 
 /** How many file rows the list shows around the selection. */
-export const FILE_WINDOW = 5;
+const FILE_WINDOW = 5;
 const FILE_WINDOW_HALF = 2;
 
 /**

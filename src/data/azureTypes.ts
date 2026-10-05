@@ -14,7 +14,7 @@ export interface AzureIdentityRef {
   isRequired?: boolean;
 }
 
-export interface AzureRepositoryRef {
+interface AzureRepositoryRef {
   id?: string;
   name?: string;
   project?: { id?: string; name?: string };

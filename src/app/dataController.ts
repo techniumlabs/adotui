@@ -7,8 +7,9 @@ import {
   type PrRef,
 } from "../data/azure";
 import { clearAuthHeaderCache } from "../data/azureAuth";
+import { readAppCache, writeAppCache } from "../data/cache";
 import { MOCK_DATA } from "../data/mock";
-import type { AppData, PullRequest, RepositoryNode } from "../domain/types";
+import type { AppData, RepositoryNode } from "../domain/types";
 import { countTotalPrs } from "./utils";
 import { IDENTITY_WAIT_MS } from "./constants";
 
@@ -136,14 +137,12 @@ const streamMockData = async (stream: StreamOptions): Promise<void> => {
   }
 };
 
-import { readAppCache, writeAppCache } from "../data/cache";
+export type LoadProgressHandler = (msg: string, progress?: LoadProgress) => void;
 
 /**
  * Resolves config and loads live data from Azure DevOps. Falls back to mock
  * data when ADOTUI_MOCK is set. Never throws — errors are returned as banners.
  */
-export type LoadProgressHandler = (msg: string, progress?: LoadProgress) => void;
-
 export const loadInitialData = async (
   allowCache = false,
   onProgress?: LoadProgressHandler,
@@ -290,17 +289,3 @@ export const resolvePrRefFromParts = (parts: {
     ...(parts.lastMergeSourceCommit ? { lastMergeSourceCommit: parts.lastMergeSourceCommit } : {}),
   };
 };
-
-/**
- * Builds a PrRef for a pull request directly from the routing info carried on
- * the PR itself. Returns null in mock mode (no live target) or when routing
- * info is missing (e.g. legacy/mock PRs).
- */
-export const resolvePrRef = (pr: PullRequest): PrRef | null =>
-  resolvePrRefFromParts({
-    organizationUrl: pr.organizationUrl,
-    project: pr.project,
-    repository: pr.repository,
-    prId: pr.id,
-    lastMergeSourceCommit: pr.lastMergeSourceCommit,
-  });

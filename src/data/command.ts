@@ -8,7 +8,7 @@
 import { spawn } from "node:child_process";
 import { COMMAND_TIMEOUT_MS } from "./constants";
 
-export interface CommandResult {
+interface CommandResult {
   stdout: string;
   stderr: string;
   exitCode: number;

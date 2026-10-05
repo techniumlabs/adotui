@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { applyConfigPat, resolvePrRef, resolvePrRefFromParts } from "../src/app/dataController";
-import type { PullRequest } from "../src/domain/types";
+import { applyConfigPat, resolvePrRefFromParts } from "../src/app/dataController";
 
 const parts = {
   organizationUrl: "https://dev.azure.com/acme",
@@ -39,23 +38,6 @@ describe("resolvePrRefFromParts", () => {
   test("returns null in mock mode (no live target)", () => {
     process.env.ADOTUI_MOCK = "1";
     expect(resolvePrRefFromParts(parts)).toBeNull();
-  });
-});
-
-describe("resolvePrRef", () => {
-  test("reads routing info from the PR itself", () => {
-    const pr = {
-      organizationUrl: parts.organizationUrl,
-      project: "core",
-      repository: "web",
-      id: 42,
-    } as PullRequest;
-    expect(resolvePrRef(pr)).toEqual({
-      organization: parts.organizationUrl,
-      project: "core",
-      repository: "web",
-      prId: 42,
-    });
   });
 });
 
@@ -111,4 +93,3 @@ describe("applyConfigPat", () => {
     expect(process.env.AZURE_DEVOPS_EXT_PAT).toBe("rotated-elsewhere");
   });
 });
-
