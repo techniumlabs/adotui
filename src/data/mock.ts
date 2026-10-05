@@ -327,7 +327,7 @@ const STRESS_AUTHORS = ["maya", "ram", "sanjay", "nina", "lee", "ivy"];
 const STRESS_REVIEWS: ReviewState[] = ["pending", "approved", "changes-requested"];
 
 /** The user mock mode pretends is logged in (drives the "My PRs" tree filter). */
-export const MOCK_CURRENT_USER_EMAIL = "maya@example.com";
+const MOCK_CURRENT_USER_EMAIL = "maya@example.com";
 
 const MOCK_CURRENT_USER_REVIEWER = {
   displayName: "Maya Iyer",

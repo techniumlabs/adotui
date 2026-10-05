@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useAppStore } from "../store";
-import { selectSelectedOrg, selectSelectedRepo } from "../selectors";
+import { selectSelectedRepo } from "../selectors";
 import { countActivePrs, countTotalPrs, getVisiblePrs } from "../utils";
 import { REFRESH_INTERVAL_MS } from "../constants";
 import { appActions } from "../actions";
@@ -17,7 +17,6 @@ export type AppHandle = ReturnType<typeof useAppState>;
 export function useAppState() {
   const state = useAppStore();
 
-  const selectedOrg = selectSelectedOrg(state);
   const selectedRepo = selectSelectedRepo(state);
 
   const visiblePrs = useMemo(
@@ -47,7 +46,6 @@ export function useAppState() {
 
   return {
     state,
-    selectedOrg,
     selectedRepo,
     visiblePrs,
     selectedPr,

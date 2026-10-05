@@ -14,7 +14,7 @@ const isEnabled = (): boolean => {
   return value === "1" || value === "true";
 };
 
-export const debugLogPath = (): string =>
+const debugLogPath = (): string =>
   process.env.ADOTUI_DEBUG_FILE ?? join(tmpdir(), "adotui-debug.log");
 
 export const debugLog = (...args: unknown[]): void => {
