@@ -165,6 +165,14 @@ describe("sign-in pages (unknown organization or bad credentials)", () => {
     expectSignInError(await adoGet(ORG, "_apis/projects").catch((e: unknown) => e));
   });
 
+  test("the organization is read from the path only on dev.azure.com itself, not a look-alike host", async () => {
+    globalThis.fetch = (async () => html()) as unknown as typeof fetch;
+    const lookAlike = await adoGet("https://evil-dev.azure.com/acme", "_apis/projects").catch((e: unknown) => e);
+    expect((lookAlike as AdoHttpError).detail).toContain('organization "evil-dev.azure.com"');
+    const identities = await adoGet("https://vssps.dev.azure.com/acme", "_apis/identities").catch((e: unknown) => e);
+    expect((identities as AdoHttpError).detail).toContain('organization "acme"');
+  });
+
   test("a 203 is a sign-in page too (what a bad token or PAT gets)", async () => {
     globalThis.fetch = (async () => html(203)) as unknown as typeof fetch;
     expectSignInError(await adoGet(ORG, "_apis/projects").catch((e: unknown) => e));

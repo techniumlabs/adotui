@@ -75,7 +75,9 @@ const isSignInPage = (resp: Response, asText: boolean): boolean =>
 /** `https://dev.azure.com/acme/...` → `acme` (or the host, for `<org>.visualstudio.com`). */
 const organizationOf = (url: string): string => {
   const { hostname, pathname } = new URL(url);
-  return hostname.endsWith("dev.azure.com") ? (pathname.split("/")[1] ?? hostname) : hostname;
+  // Exact host or a real subdomain (vssps.dev.azure.com): a bare suffix match would also take evil-dev.azure.com.
+  const isDevAzure = hostname === "dev.azure.com" || hostname.endsWith(".dev.azure.com");
+  return isDevAzure ? (pathname.split("/")[1] ?? hostname) : hostname;
 };
 
 const signInMessage = (url: string): string => {
