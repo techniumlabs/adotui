@@ -43,7 +43,7 @@ export const CompletionEditor: React.FC<CompletionEditorProps> = ({ state }) => 
 
   return (
     <Box
-      marginTop={1}
+      flexGrow={1}
       borderStyle="round"
       borderColor={palette.accent}
       paddingX={1}

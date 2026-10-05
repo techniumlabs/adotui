@@ -1,9 +1,4 @@
-import type {
-  AppData,
-  PullRequest,
-  PullRequestStatus,
-  ReviewState,
-} from "../domain/types";
+import type { AppData, PullRequest, PullRequestStatus, ReviewState, RepoBranches } from "../domain/types";
 
 type RawPr = Omit<
   PullRequest,
@@ -481,3 +476,13 @@ export const getMockComments = (prId: number): PrCommentThread[] => {
     }
   ];
 };
+
+/** Branches offered by the "new pull request" form in mock mode. */
+export const MOCK_BRANCHES: RepoBranches = {
+  branches: ["develop", "feature/mock-demo", "fix/typo", "main"],
+  defaultBranch: "main",
+};
+
+/** The id mock mode reports for a "created" pull request (nothing is saved). */
+export const MOCK_CREATED_PR_ID = 9001;
+

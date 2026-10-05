@@ -3,6 +3,7 @@ import { render } from "ink-testing-library";
 import { SetupScreen } from "../src/app/components/SetupScreen";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { until } from "./helpers/wait";
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
@@ -128,9 +129,8 @@ describe("SetupScreen UI & Submission", () => {
 
       // 15. Press Enter to Save and Complete Configuration
       stdin.write("\r");
-      await delay(100);
-
-      expect(completed).toBe(true);
+      // Saving writes the config file: poll, a slow runner takes well over 100ms.
+      await until(() => completed, "the configuration to be saved");
 
       // Verify config was written
       const createdConfigPath = join(testDir, "adotui.config.json");

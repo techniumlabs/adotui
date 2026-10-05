@@ -3,10 +3,11 @@
  * projects, repositories, the signed-in-user filters (reviewer/creator) and the
  * project-wide PR listing, paged and grouped by repository.
  */
-import type { PullRequest } from "../domain/types";
+import type { PullRequest, RepoBranches } from "../domain/types";
+import type { RepoRef } from "./refs";
 import type { AdoConfig, AdoProjectConfig } from "./config";
 import type { AzureIdentityRef, AzurePullRequest, AzureRepository } from "./azureTypes";
-import { normalizePullRequest, orgLabel } from "./azureNormalize";
+import { normalizePullRequest, orgLabel, shortBranch } from "./azureNormalize";
 import { adoGet, adoGetFrom, seg, type AdoList } from "./adoFetch";
 import { PR_LIST_MAX_PAGES, PR_LIST_PAGE_SIZE } from "./constants";
 import { debugLog } from "../shared/debugLog";
@@ -53,6 +54,7 @@ const resolveIdentityId = async (
   value: string,
 ): Promise<string | null> => {
   if (GUID.test(value)) return value;
+  if (process.env.ADOTUI_MOCK) return value.includes("@") ? `mock-id:${value.toLowerCase()}` : null;
   const cacheKey = `${organization}|${value.toLowerCase()}`;
   const cached = identityCache.get(cacheKey);
   if (cached !== undefined) return cached;
@@ -210,3 +212,20 @@ export const groupPrsByRepository = (
   }
   return groups;
 };
+
+/** A repository's branches and default branch (for the "new pull request" form). */
+export const listBranches = async (repo: RepoRef): Promise<RepoBranches> => {
+  if (process.env.ADOTUI_MOCK) return (await import("./mock")).MOCK_BRANCHES;
+  const repoPath = `${seg(repo.project)}/_apis/git/repositories/${seg(repo.repositoryId)}`;
+  const [refs, info] = await Promise.all([
+    adoGet<AdoList<{ name?: string }>>(repo.organizationUrl, `${repoPath}/refs`, { query: { filter: "heads/" } }),
+    adoGet<{ defaultBranch?: string }>(repo.organizationUrl, repoPath),
+  ]);
+  const branches = (refs.value ?? []).map((ref) => shortBranch(ref.name)).filter((name) => name !== "").sort();
+  return { branches, defaultBranch: info.defaultBranch ? shortBranch(info.defaultBranch) : null };
+};
+
+/** An Azure DevOps identity id for an e-mail address, or null when there is no such user. */
+export const findIdentityId = (organization: string, email: string): Promise<string | null> =>
+  resolveIdentityId(organization, email);
+

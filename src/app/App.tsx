@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Text, useApp } from "ink";
 import { CommandBar } from "./components/CommandBar";
 import { CompletionEditor } from "./components/CompletionEditor";
+import { CreatePrForm } from "./components/CreatePrForm";
 import { OrganizationTree } from "./components/OrganizationTree";
 import { PrTabs } from "./components/PrTabs";
 import { PullRequestList } from "./components/PullRequestList";
@@ -104,8 +105,15 @@ export const App: React.FC<{ mouse?: boolean }> = ({ mouse = false }) => {
       </Box>
 
       <Box height={paneHeight} flexShrink={0} flexDirection="row" overflow="hidden">
+        {/* Full-pane screens replace the tree and PR panes. They used to render
+            below the footer, outside the fixed-height frame, where Ink clipped
+            them: the completion editor was never visible. */}
         {state.focus === "help" ? (
           <HelpView />
+        ) : state.focus === "completion" ? (
+          <CompletionEditor state={state} />
+        ) : state.focus === "createPr" && state.createPr ? (
+          <CreatePrForm form={state.createPr} onClick={actions.clickCreatePr} />
         ) : (
           <>
             <OrganizationTree
@@ -166,7 +174,6 @@ export const App: React.FC<{ mouse?: boolean }> = ({ mouse = false }) => {
         <FooterHints hasPr={!!selectedPr} />
       )}
 
-      <CompletionEditor state={state} />
     </Box>
   );
 };

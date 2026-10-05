@@ -28,6 +28,7 @@ const COMMANDS: Partial<Record<string, GlobalCommand>> = {
   x: ({ actions }) => actions.armConfirm("reject"),
   b: ({ actions }) => actions.armConfirm("abandon"),
   c: ({ actions }) => actions.openCompletionEditor(DEFAULT_COMPLETION_OPTIONS),
+  N: ({ actions }) => actions.openCreatePr(),
 };
 
 const PR_PANES: readonly FocusArea[] = ["detail", "files", "comments", "runs"];

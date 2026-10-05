@@ -5,6 +5,7 @@ import { updateState } from "../store";
 import { handleGlobals } from "./keyboard/globals";
 import { handleHelp } from "./keyboard/helpKeyboard";
 import { handleCompletion } from "./keyboard/completionKeyboard";
+import { handleCreatePr } from "./keyboard/createPrKeyboard";
 import { handleCommand } from "./keyboard/commandKeyboard";
 import { handleFilter } from "./keyboard/filterKeyboard";
 import { handleTree } from "./keyboard/treeKeyboard";
@@ -43,6 +44,7 @@ export function useAppKeyboard(app: AppHandle, exitApp: () => void, suppressed =
       // 3. Modal focus handlers (handle the entire input exclusively)
       if (state.focus === "help")       { handleHelp(input, key, app, exitApp); return; }
       if (state.focus === "completion") { handleCompletion(input, key, app, exitApp); return; }
+      if (state.focus === "createPr")   { handleCreatePr(input, key, app, exitApp); return; }
       if (state.focus === "command")    { handleCommand(input, key, app, exitApp); return; }
       if (state.focus === "filter")     { handleFilter(input, key, app, exitApp); return; }
 

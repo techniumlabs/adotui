@@ -5,10 +5,10 @@ import { FilesView } from "./FilesView";
 import { PipelineRunsView } from "./PipelineRunsView";
 import { PrDetails } from "./PrDetails";
 
-/** The pane under the PR tabs. Modal prompts (command, completion, filter) keep the tab they opened over. */
+/** The pane under the PR tabs. Modal prompts (command, completion, filter, new PR) keep the tab they opened over. */
 export const TabContent: React.FC<{ app: AppHandle }> = ({ app }) => {
   const { state, selectedPr, actions } = app;
-  const overlay = state.focus === "command" || state.focus === "completion" || state.focus === "filter";
+  const overlay = ["command", "completion", "filter", "createPr"].includes(state.focus);
   const renderFocus = overlay ? (state.previousFocus ?? "detail") : state.focus;
 
   if (renderFocus === "files") {

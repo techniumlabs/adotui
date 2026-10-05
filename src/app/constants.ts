@@ -40,6 +40,7 @@ export const INITIAL_STATE: AppState = {
   pendingConfirm: null,
   fileScrollStates: {},
   toasts: [],
+  createPr: null,
 };
 
 export const REFRESH_INTERVAL_MS = 60_000;
@@ -106,3 +107,23 @@ export const COMPLETION_CURSOR = {
   SQUASH:         7,
   SUBMIT:         8,
 } as const;
+
+/** Rows of the "new pull request" form, in cursor order. */
+export const CREATE_PR_FIELD = {
+  SOURCE: 0,
+  TARGET: 1,
+  TITLE: 2,
+  DESCRIPTION: 3,
+  REVIEWERS: 4,
+  DRAFT: 5,
+  SUBMIT: 6,
+} as const;
+export const CREATE_PR_FIELD_COUNT = 7;
+/** Rows of the scrolled branch list under the active branch field. */
+export const BRANCH_LIST_ROWS = 8;
+/** Reviewer suggestions listed under the reviewers field. */
+export const REVIEWER_SUGGESTIONS = 5;
+/** Azure DevOps limits (Pull Requests - Create). */
+export const PR_TITLE_MAX_CHARS = 400;
+export const PR_DESCRIPTION_MAX_CHARS = 4_000;
+
