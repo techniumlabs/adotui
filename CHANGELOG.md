@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-05
+
 ### Added
 - Create pull requests: `N` opens a form for the selected repository with source/target branch pickers
   (type to filter, ↑/↓ or the mouse wheel to scroll the list, click to pick; the target defaults to
@@ -20,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - The completion editor (`c`) is visible again: it was rendered below the footer, outside the
   fixed-height frame, so its options could not be seen while completing a PR
+- The organization named in a sign-in error is read from the URL path only on `dev.azure.com`
+  itself or its subdomains, not on look-alike hosts (CodeQL `js/incomplete-url-substring-sanitization`)
+
+### Removed
+- Dead code and two unused dev dependencies (`@typescript-eslint/eslint-plugin`,
+  `@typescript-eslint/parser`)
 
 ## [0.2.0] - 2026-10-04
 
